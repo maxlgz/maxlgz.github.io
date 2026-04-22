@@ -34,8 +34,47 @@
         </div>
       </section>
 
-      <section class="piano-wrap">
-        <div class="piano" id="piano" role="group" aria-label="Clavier de piano"></div>
+      <section class="lesson-panel">
+        <div class="lesson-controls">
+          <label>
+            <span>Difficulté</span>
+            <select id="lesson-difficulty">
+              <option value="very-easy">Très simple</option>
+              <option value="easy">Simple</option>
+              <option value="medium">Moyen</option>
+              <option value="hard">Dur</option>
+            </select>
+          </label>
+          <label>
+            <span>Morceau</span>
+            <select id="lesson-song"></select>
+          </label>
+          <label>
+            <span>Mains</span>
+            <select id="lesson-hand">
+              <option value="both">Deux mains</option>
+              <option value="right">Main droite</option>
+              <option value="left">Main gauche</option>
+            </select>
+          </label>
+          <button id="lesson-start" type="button">Démarrer</button>
+        </div>
+        <div class="lesson-hud" id="lesson-hud">
+          <div><span>Score</span><strong id="lesson-score">0</strong></div>
+          <div><span>Combo</span><strong id="lesson-combo">0</strong></div>
+          <div><span>Précision</span><strong id="lesson-accuracy">—</strong></div>
+          <div class="legend">
+            <span class="swatch right"></span>Droite
+            <span class="swatch left"></span>Gauche
+          </div>
+        </div>
+      </section>
+
+      <section class="playfield">
+        <canvas id="highway"></canvas>
+        <div class="piano-wrap">
+          <div class="piano" id="piano" role="group" aria-label="Clavier de piano"></div>
+        </div>
       </section>
 
       <section class="hint">
@@ -54,6 +93,7 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
+    <script src="songs.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
