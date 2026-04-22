@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Piano – Apprentissage</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Piano</h1>
+      <div class="status" id="status" data-state="idle">
+        <span class="dot"></span>
+        <span class="label" id="status-label">MIDI non initialisé</span>
+        <button id="connect-btn" type="button">Connecter un clavier MIDI</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="now-playing">
+        <div class="note-display" id="note-display" aria-live="polite">—</div>
+        <div class="device" id="device-name">Aucun appareil</div>
+      </section>
+
+      <section class="piano-wrap">
+        <div class="piano" id="piano" role="group" aria-label="Clavier de piano"></div>
+      </section>
+
+      <section class="hint">
+        <p>
+          Branche ton clavier en USB puis clique sur
+          <strong>Connecter un clavier MIDI</strong>. Les touches jouées s'allument
+          en temps réel. Tu peux aussi cliquer les touches à l'écran pour les
+          entendre.
+        </p>
+        <p class="small">
+          Nécessite un navigateur compatible Web MIDI (Chrome, Edge, Opera sur macOS).
+        </p>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
