@@ -80,9 +80,28 @@ function attachKeyPointerEvents(el, midi) {
 }
 
 let audioCtx = null;
+let mediaSessionUnlocked = false;
 const activeVoices = new Map();
 
+// Tiny valid silent WAV (data URI). Playing an HTMLAudioElement switches iOS
+// audio session to a category that survives the ringer/silent switch.
+const SILENT_WAV =
+  'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhAAAAAA==';
+
+function unlockIosAudio() {
+  if (mediaSessionUnlocked) return;
+  mediaSessionUnlocked = true;
+  try {
+    const a = new Audio(SILENT_WAV);
+    a.muted = false;
+    a.playsInline = true;
+    const p = a.play();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_) {}
+}
+
 function ensureAudio() {
+  unlockIosAudio();
   if (!audioCtx) {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return;
@@ -116,9 +135,10 @@ function stopAudio(midi, immediate = false) {
   const tail = immediate ? 0.02 : 0.18;
   try {
     v.gain.gain.cancelScheduledValues(now);
-    v.gain.gain.setValueAtTime(v.gain.gain.value, now);
+    const current = Math.max(v.gain.gain.value, 0.0001);
+    v.gain.gain.setValueAtTime(current, now);
     v.gain.gain.exponentialRampToValueAtTime(0.0001, now + tail);
-    v.osc.stop(now + tail + 0.02);
+    v.osc.stop(now + tail + 0.05);
   } catch (_) {}
   activeVoices.delete(midi);
 }
