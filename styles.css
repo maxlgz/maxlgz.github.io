@@ -31,8 +31,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding: 16px 24px;
   border-bottom: 1px solid #20242d;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .topbar h1 {
@@ -40,6 +48,55 @@ body {
   font-size: 20px;
   letter-spacing: 0.02em;
   font-weight: 600;
+}
+
+.version {
+  font-size: 11px;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  padding: 2px 6px;
+  background: var(--bg-elev);
+  border: 1px solid #242832;
+  border-radius: 999px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.instrument-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+
+.instrument-picker select {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid #2a2f3a;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  font-family: inherit;
+}
+
+.instrument-picker select:hover,
+.instrument-picker select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.instrument-picker select:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .status {
@@ -116,9 +173,29 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
-.device {
+.meta {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.device,
+.instrument-state {
   color: var(--fg-dim);
   font-size: 14px;
+}
+
+.instrument-state[data-state="loading"] {
+  color: var(--accent);
+}
+
+.instrument-state[data-state="error"] {
+  color: var(--danger);
+}
+
+.instrument-state[data-state="ready"] {
+  color: var(--fg);
 }
 
 .piano-wrap {

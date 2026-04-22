@@ -1,6 +1,20 @@
+const APP_VERSION = 'v0.2.0';
+
 const FIRST_MIDI = 48; // C3
 const LAST_MIDI = 84;  // C6
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+const INSTRUMENTS = [
+  { id: 'piano',   label: 'Piano acoustique',  kind: 'soundfont', sf: 'acoustic_grand_piano' },
+  { id: 'bright',  label: 'Piano droit',       kind: 'soundfont', sf: 'bright_acoustic_piano' },
+  { id: 'rhodes',  label: 'Piano électrique',  kind: 'soundfont', sf: 'electric_piano_1' },
+  { id: 'organ',   label: 'Orgue',             kind: 'soundfont', sf: 'church_organ' },
+  { id: 'strings', label: 'Cordes',            kind: 'soundfont', sf: 'string_ensemble_1' },
+  { id: 'guitar',  label: 'Guitare nylon',     kind: 'soundfont', sf: 'acoustic_guitar_nylon' },
+  { id: 'celesta', label: 'Célesta',           kind: 'soundfont', sf: 'celesta' },
+  { id: 'synth',   label: 'Synthé (triangle)', kind: 'oscillator' },
+];
+const DEFAULT_INSTRUMENT_ID = 'piano';
 
 const pianoEl = document.getElementById('piano');
 const noteDisplayEl = document.getElementById('note-display');
@@ -8,6 +22,11 @@ const deviceEl = document.getElementById('device-name');
 const statusEl = document.getElementById('status');
 const statusLabelEl = document.getElementById('status-label');
 const connectBtn = document.getElementById('connect-btn');
+const instrumentSelect = document.getElementById('instrument');
+const instrumentStateEl = document.getElementById('instrument-state');
+const versionEl = document.getElementById('version');
+
+if (versionEl) versionEl.textContent = APP_VERSION;
 
 const keyEls = new Map();
 const held = new Set();
@@ -83,8 +102,6 @@ let audioCtx = null;
 let mediaSessionUnlocked = false;
 const activeVoices = new Map();
 
-// Tiny valid silent WAV (data URI). Playing an HTMLAudioElement switches iOS
-// audio session to a category that survives the ringer/silent switch.
 const SILENT_WAV =
   'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhAAAAAA==';
 
@@ -110,10 +127,90 @@ function ensureAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
 }
 
+let currentInstrumentId = DEFAULT_INSTRUMENT_ID;
+let sfInstrument = null;
+const sfCache = new Map();
+let sfLoadToken = 0;
+
+function getInstrument(id) {
+  return INSTRUMENTS.find((i) => i.id === id);
+}
+
+function setInstrumentState(state, label) {
+  instrumentStateEl.dataset.state = state;
+  instrumentStateEl.textContent = label;
+}
+
+async function selectInstrument(id) {
+  const def = getInstrument(id);
+  if (!def) return;
+  currentInstrumentId = id;
+
+  for (const midi of [...activeVoices.keys()]) stopAudio(midi, true);
+
+  if (def.kind === 'oscillator') {
+    sfInstrument = null;
+    setInstrumentState('ready', def.label);
+    instrumentSelect.disabled = false;
+    return;
+  }
+
+  if (!window.Soundfont) {
+    setInstrumentState('error', 'soundfont-player indisponible');
+    return;
+  }
+
+  ensureAudio();
+  if (!audioCtx) {
+    setInstrumentState('error', 'Audio non disponible');
+    return;
+  }
+
+  if (sfCache.has(def.sf)) {
+    sfInstrument = sfCache.get(def.sf);
+    setInstrumentState('ready', def.label);
+    instrumentSelect.disabled = false;
+    return;
+  }
+
+  const token = ++sfLoadToken;
+  setInstrumentState('loading', 'Chargement ' + def.label + '…');
+  instrumentSelect.disabled = true;
+  try {
+    const inst = await window.Soundfont.instrument(audioCtx, def.sf, {
+      soundfont: 'MusyngKite',
+    });
+    if (token !== sfLoadToken) return; // superseded
+    sfCache.set(def.sf, inst);
+    sfInstrument = inst;
+    setInstrumentState('ready', def.label);
+  } catch (e) {
+    console.error(e);
+    if (token === sfLoadToken) setInstrumentState('error', 'Échec du chargement');
+  } finally {
+    if (token === sfLoadToken) instrumentSelect.disabled = false;
+  }
+}
+
 function playAudio(midi, velocity) {
   ensureAudio();
   if (!audioCtx) return;
   stopAudio(midi, true);
+
+  const def = getInstrument(currentInstrumentId);
+  if (def && def.kind === 'soundfont' && sfInstrument) {
+    try {
+      const handle = sfInstrument.play(midi, audioCtx.currentTime, {
+        gain: Math.max(0.1, (velocity / 127) * 1.6),
+      });
+      activeVoices.set(midi, { kind: 'sf', handle });
+    } catch (e) {
+      console.error(e);
+    }
+    return;
+  }
+
+  // Oscillator fallback / synth preset
   const now = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
@@ -125,12 +222,21 @@ function playAudio(midi, velocity) {
   gain.gain.exponentialRampToValueAtTime(peak * 0.4, now + 0.35);
   osc.connect(gain).connect(audioCtx.destination);
   osc.start(now);
-  activeVoices.set(midi, { osc, gain });
+  activeVoices.set(midi, { kind: 'osc', osc, gain });
 }
 
 function stopAudio(midi, immediate = false) {
   const v = activeVoices.get(midi);
   if (!v || !audioCtx) return;
+  activeVoices.delete(midi);
+
+  if (v.kind === 'sf') {
+    try {
+      if (v.handle && typeof v.handle.stop === 'function') v.handle.stop();
+    } catch (_) {}
+    return;
+  }
+
   const now = audioCtx.currentTime;
   const tail = immediate ? 0.02 : 0.18;
   try {
@@ -140,7 +246,6 @@ function stopAudio(midi, immediate = false) {
     v.gain.gain.exponentialRampToValueAtTime(0.0001, now + tail);
     v.osc.stop(now + tail + 0.05);
   } catch (_) {}
-  activeVoices.delete(midi);
 }
 
 function setNoteDisplay() {
@@ -154,7 +259,6 @@ function setNoteDisplay() {
 
 function triggerNote(midi, velocity = 100) {
   if (midi < FIRST_MIDI || midi > LAST_MIDI) {
-    // Still play audio even if outside the visible range
     playAudio(midi, velocity);
     return;
   }
@@ -192,6 +296,9 @@ async function connectMIDI() {
     const access = await navigator.requestMIDIAccess();
     attachInputs(access);
     access.onstatechange = () => attachInputs(access);
+    if (getInstrument(currentInstrumentId).kind === 'soundfont' && !sfInstrument) {
+      selectInstrument(currentInstrumentId);
+    }
   } catch (e) {
     setStatus('error', 'Accès MIDI refusé');
     console.error(e);
@@ -224,8 +331,32 @@ function handleMIDI(msg) {
   }
 }
 
+function populateInstrumentSelect() {
+  for (const inst of INSTRUMENTS) {
+    const opt = document.createElement('option');
+    opt.value = inst.id;
+    opt.textContent = inst.label;
+    instrumentSelect.appendChild(opt);
+  }
+  instrumentSelect.value = DEFAULT_INSTRUMENT_ID;
+  instrumentSelect.addEventListener('change', () => {
+    selectInstrument(instrumentSelect.value);
+  });
+}
+
 connectBtn.addEventListener('click', connectMIDI);
 buildKeyboard();
+populateInstrumentSelect();
+setInstrumentState('idle', 'Tape une touche pour charger ' + getInstrument(DEFAULT_INSTRUMENT_ID).label);
+
+// Trigger soundfont load lazily on the first user gesture (also unlocks audio).
+function firstGestureLoad() {
+  window.removeEventListener('pointerdown', firstGestureLoad, true);
+  window.removeEventListener('keydown', firstGestureLoad, true);
+  selectInstrument(currentInstrumentId);
+}
+window.addEventListener('pointerdown', firstGestureLoad, true);
+window.addEventListener('keydown', firstGestureLoad, true);
 
 if (navigator.requestMIDIAccess) {
   navigator.requestMIDIAccess().then(

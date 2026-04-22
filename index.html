@@ -8,18 +8,30 @@
   </head>
   <body>
     <header class="topbar">
-      <h1>Piano</h1>
-      <div class="status" id="status" data-state="idle">
-        <span class="dot"></span>
-        <span class="label" id="status-label">MIDI non initialisé</span>
-        <button id="connect-btn" type="button">Connecter un clavier MIDI</button>
+      <div class="brand">
+        <h1>Piano</h1>
+        <span class="version" id="version">v0.0.0</span>
+      </div>
+      <div class="controls">
+        <label class="instrument-picker">
+          <span>Instrument</span>
+          <select id="instrument"></select>
+        </label>
+        <div class="status" id="status" data-state="idle">
+          <span class="dot"></span>
+          <span class="label" id="status-label">MIDI non initialisé</span>
+          <button id="connect-btn" type="button">Connecter un clavier MIDI</button>
+        </div>
       </div>
     </header>
 
     <main>
       <section class="now-playing">
         <div class="note-display" id="note-display" aria-live="polite">—</div>
-        <div class="device" id="device-name">Aucun appareil</div>
+        <div class="meta">
+          <div class="device" id="device-name">Aucun appareil</div>
+          <div class="instrument-state" id="instrument-state">—</div>
+        </div>
       </section>
 
       <section class="piano-wrap">
@@ -35,10 +47,13 @@
         </p>
         <p class="small">
           Nécessite un navigateur compatible Web MIDI (Chrome, Edge, Opera sur macOS).
+          Les instruments échantillonnés (piano, orgue…) sont chargés depuis
+          <code>gleitz/midi-js-soundfonts</code>.
         </p>
       </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
