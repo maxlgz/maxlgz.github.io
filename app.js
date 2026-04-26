@@ -1,7 +1,7 @@
-const APP_VERSION = 'v0.3.0';
+const APP_VERSION = 'v0.3.1';
 
 const FIRST_MIDI = 48; // C3
-const LAST_MIDI = 84;  // C6
+const LAST_MIDI = 72;  // C5
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 const INSTRUMENTS = [
