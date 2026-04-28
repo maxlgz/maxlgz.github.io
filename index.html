@@ -3,97 +3,578 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Piano – Apprentissage</title>
+    <title>Étude — Piano · MIDI</title>
+    <meta name="description" content="Apprentissage du piano au clavier MIDI ou via le micro — leçons, rythme, accords, improvisation." />
+    <meta name="theme-color" content="#0c0907" />
+
+    <!-- Favicon (SVG modern + PNG fallbacks + .ico legacy) -->
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+    <link rel="alternate icon" href="favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Étude" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400;1,9..144,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div class="grain" aria-hidden="true"></div>
+
     <header class="topbar">
       <div class="brand">
-        <h1>Piano</h1>
+        <span class="mark" aria-hidden="true">
+          <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+            <rect width="512" height="512" rx="96" fill="#0c0907"/>
+            <ellipse cx="170" cy="130" rx="240" ry="180" fill="#d4a049" opacity="0.12"/>
+            <g transform="translate(96 296)">
+              <rect x="0"   y="0" width="100" height="184" rx="8" fill="#f1e6d0"/>
+              <rect x="110" y="0" width="100" height="184" rx="8" fill="#f1e6d0"/>
+              <rect x="220" y="0" width="100" height="184" rx="8" fill="#f1e6d0"/>
+              <rect x="68"  y="0" width="60" height="118" rx="6" fill="#0a0805"/>
+              <rect x="178" y="0" width="60" height="118" rx="6" fill="#0a0805"/>
+              <rect x="68"  y="0" width="60" height="4" rx="2" fill="#d4a049" opacity="0.65"/>
+              <rect x="178" y="0" width="60" height="4" rx="2" fill="#d4a049" opacity="0.65"/>
+            </g>
+            <text x="256" y="296" font-family="Georgia, serif" font-style="italic" font-weight="500" font-size="320" text-anchor="middle" fill="#e8b760">É</text>
+            <rect x="6" y="6" width="500" height="500" rx="92" fill="none" stroke="#d4a049" stroke-width="2" opacity="0.45"/>
+          </svg>
+        </span>
+        <div class="brand-text">
+          <h1>Étude</h1>
+          <span class="brand-tag">Piano · MIDI · Apprentissage</span>
+        </div>
         <span class="version" id="version">v0.0.0</span>
       </div>
       <div class="controls">
-        <label class="instrument-picker">
-          <span>Instrument</span>
-          <select id="instrument"></select>
-        </label>
+        <button type="button" id="mode-toggle" class="mode-toggle-btn" data-mode-target="school" aria-pressed="false">
+          <span class="mode-toggle-icon" aria-hidden="true">𝄞</span>
+          <span class="mode-toggle-label">École</span>
+          <span class="mode-toggle-state" aria-hidden="true"></span>
+        </button>
+        <nav class="topnav" aria-label="Sections">
+          <button type="button" class="topnav-btn" data-modal="daily">
+            <span class="topnav-icon" aria-hidden="true">✦</span>Défi
+          </button>
+          <button type="button" class="topnav-btn" data-modal="improv">
+            <span class="topnav-icon" aria-hidden="true">✺</span>Impro
+          </button>
+          <button type="button" class="topnav-btn" data-modal="journal">
+            <span class="topnav-icon" aria-hidden="true">◷</span>Carnet
+          </button>
+          <button type="button" class="topnav-btn" data-modal="notice">
+            <span class="topnav-icon" aria-hidden="true">i</span>Notice
+          </button>
+        </nav>
         <div class="status" id="status" data-state="idle">
-          <span class="dot"></span>
+          <span class="dot" aria-hidden="true"></span>
           <span class="label" id="status-label">MIDI non initialisé</span>
-          <button id="connect-btn" type="button">Connecter un clavier MIDI</button>
+          <button id="connect-btn" type="button" class="btn btn-ghost">Connecter</button>
         </div>
       </div>
     </header>
 
-    <main>
-      <section class="now-playing">
-        <div class="note-display" id="note-display" aria-live="polite">—</div>
-        <div class="meta">
-          <div class="device" id="device-name">Aucun appareil</div>
-          <div class="instrument-state" id="instrument-state">—</div>
-        </div>
-      </section>
+    <main class="workbench">
+      <!-- ============ RAIL LEFT — Atelier / École ============ -->
+      <aside class="rail rail-left">
+        <header class="rail-head">
+          <h2 id="rail-left-title"></h2>
+        </header>
 
-      <section class="lesson-panel">
-        <div class="lesson-controls">
-          <label>
-            <span>Difficulté</span>
-            <select id="lesson-difficulty">
-              <option value="very-easy">Très simple</option>
-              <option value="easy">Simple</option>
-              <option value="medium">Moyen</option>
-              <option value="hard">Dur</option>
-            </select>
-          </label>
-          <label>
-            <span>Morceau</span>
-            <select id="lesson-song"></select>
-          </label>
-          <label>
-            <span>Mains</span>
-            <select id="lesson-hand">
-              <option value="both">Deux mains</option>
-              <option value="right">Main droite</option>
-              <option value="left">Main gauche</option>
-            </select>
-          </label>
-          <button id="lesson-start" type="button">Démarrer</button>
+        <div class="rail-body">
+          <!-- Pane Atelier -->
+          <div id="atelier-panel" class="rail-pane">
+            <div class="rail-group">
+              <label class="field">
+                <span>Difficulté</span>
+                <select id="lesson-difficulty">
+                  <option value="very-easy">Très simple</option>
+                  <option value="easy">Simple</option>
+                  <option value="medium">Moyen</option>
+                  <option value="hard">Dur</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Morceau</span>
+                <select id="lesson-song"></select>
+              </label>
+
+              <div class="field-row">
+                <label class="field">
+                  <span>Mains</span>
+                  <select id="lesson-hand">
+                    <option value="both">Deux mains</option>
+                    <option value="right">Main droite</option>
+                    <option value="left">Main gauche</option>
+                  </select>
+                </label>
+
+                <label class="field">
+                  <span>Section</span>
+                  <select id="lesson-section">
+                    <option value="all">Tout</option>
+                    <option value="first-half">1re moitié</option>
+                    <option value="second-half">2e moitié</option>
+                    <option value="first-quarter">1er quart</option>
+                    <option value="second-quarter">2e quart</option>
+                    <option value="third-quarter">3e quart</option>
+                    <option value="fourth-quarter">4e quart</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div class="rail-group">
+              <span class="rail-group-label">Options</span>
+              <label class="toggle">
+                <input type="checkbox" id="lesson-wait" />
+                <span class="toggle-track" aria-hidden="true"></span>
+                <span class="toggle-text">Attendre la touche</span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" id="lesson-loop" />
+                <span class="toggle-track" aria-hidden="true"></span>
+                <span class="toggle-text">Boucle</span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" id="lesson-accomp" />
+                <span class="toggle-track" aria-hidden="true"></span>
+                <span class="toggle-text">Accompagnement (l'app joue l'autre main)</span>
+              </label>
+            </div>
+
+            <div class="rail-group">
+              <span class="rail-group-label">Bibliothèque MIDI</span>
+              <div class="library-input">
+                <input type="search" id="library-search" placeholder="Chercher (Beethoven, Mario…)" autocomplete="off" />
+                <button id="library-search-btn" type="button" class="btn-icon" title="Rechercher" aria-label="Rechercher">↵</button>
+              </div>
+              <div class="library-results" id="library-results" hidden></div>
+              <div class="library-status" id="library-status" hidden></div>
+              <div class="action-pair">
+                <button id="lesson-import-btn" type="button" class="btn btn-ghost">Importer</button>
+                <button id="lesson-library-clear" type="button" class="btn btn-ghost" title="Vider la bibliothèque d'imports">Vider</button>
+              </div>
+              <input type="file" id="lesson-import" accept=".mid,.midi,audio/midi" multiple hidden />
+            </div>
+
+            <div class="rail-actions">
+              <button id="lesson-play" type="button" class="btn btn-secondary">▶ Lecture</button>
+              <button id="lesson-start" type="button" class="btn btn-primary">Démarrer</button>
+            </div>
+          </div>
+
+          <!-- Pane École -->
+          <div id="school-panel" class="rail-pane" hidden>
+            <p class="rail-intro">
+              Un parcours pas-à-pas — du repérage du clavier aux premiers accords.
+              Avance à ton rythme.
+            </p>
+            <div class="lesson-browser" id="lesson-browser"></div>
+          </div>
         </div>
-        <div class="lesson-hud" id="lesson-hud">
-          <div><span>Score</span><strong id="lesson-score">0</strong></div>
-          <div><span>Combo</span><strong id="lesson-combo">0</strong></div>
-          <div><span>Précision</span><strong id="lesson-accuracy">—</strong></div>
-          <div class="legend">
-            <span class="swatch right"></span>Droite
-            <span class="swatch left"></span>Gauche
+      </aside>
+
+      <!-- ============ STAGE — note display + highway + piano ============ -->
+      <section class="stage">
+        <div class="stage-head" id="stage-head">
+          <div class="stage-now">
+            <span class="eyebrow">Touche jouée</span>
+            <div class="note-display" id="note-display" aria-live="polite">—</div>
+          </div>
+        </div>
+
+        <div class="playfield" id="stage-playfield">
+          <canvas id="highway"></canvas>
+
+          <div class="stage-lesson" id="stage-lesson" hidden>
+            <header class="stage-lesson-head">
+              <span class="lesson-eyebrow" id="lesson-step-eyebrow">Module · Leçon</span>
+              <button type="button" id="lesson-exit" class="lesson-close" aria-label="Quitter la leçon">×</button>
+            </header>
+
+            <div class="stage-lesson-body">
+              <h3 class="lesson-step-title" id="lesson-step-title">Titre de l'étape</h3>
+              <div class="lesson-step-body" id="lesson-step-body"></div>
+              <div class="lesson-extra" id="lesson-step-extra"></div>
+            </div>
+
+            <footer class="stage-lesson-foot">
+              <div class="lesson-progress">
+                <div class="lesson-progress-bar" id="lesson-progress-bar"></div>
+                <span class="lesson-progress-label" id="lesson-progress-label">Étape 1 sur 5</span>
+              </div>
+              <div class="lesson-actions">
+                <button type="button" id="lesson-prev" class="btn btn-ghost">◀ Précédent</button>
+                <button type="button" id="lesson-replay" class="btn btn-ghost" hidden>▶ Réécouter</button>
+                <button type="button" id="lesson-next" class="btn btn-primary">Continuer</button>
+              </div>
+            </footer>
+          </div>
+
+          <div class="improv-panel" id="improv-panel" hidden></div>
+
+          <div class="seek-bar" id="seek-bar" hidden>
+            <button type="button" class="seek-skip" id="seek-back" aria-label="Reculer de 5 secondes">◀◀ 5s</button>
+            <div class="seek-track" id="seek-track">
+              <div class="seek-progress" id="seek-progress"></div>
+              <div class="seek-thumb" id="seek-thumb"></div>
+            </div>
+            <span class="seek-time" id="seek-time">0:00 / 0:00</span>
+            <button type="button" class="seek-skip" id="seek-forward" aria-label="Avancer de 5 secondes">5s ▶▶</button>
+          </div>
+
+          <div class="piano-wrap">
+            <div class="piano" id="piano" role="group" aria-label="Clavier de piano"></div>
           </div>
         </div>
       </section>
 
-      <section class="playfield">
-        <canvas id="highway"></canvas>
-        <div class="piano-wrap">
-          <div class="piano" id="piano" role="group" aria-label="Clavier de piano"></div>
-        </div>
-      </section>
+      <!-- ============ RAIL RIGHT — Performance + voix ============ -->
+      <aside class="rail rail-right">
+        <header class="rail-head">
+          <h2>Mesure</h2>
+        </header>
 
-      <section class="hint">
-        <p>
-          Branche ton clavier en USB puis clique sur
-          <strong>Connecter un clavier MIDI</strong>. Les touches jouées s'allument
-          en temps réel. Tu peux aussi cliquer les touches à l'écran pour les
-          entendre.
-        </p>
-        <p class="small">
-          Nécessite un navigateur compatible Web MIDI (Chrome, Edge, Opera sur macOS).
-          Les instruments échantillonnés (piano, orgue…) sont chargés depuis
-          <code>gleitz/midi-js-soundfonts</code>.
-        </p>
-      </section>
+        <div class="rail-body">
+          <div class="stat-stack atelier-only" id="lesson-hud">
+            <div class="stat">
+              <span class="stat-label">Score</span>
+              <strong class="stat-value" id="lesson-score">0</strong>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Combo</span>
+              <strong class="stat-value" id="lesson-combo">0</strong>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Précision</span>
+              <strong class="stat-value" id="lesson-accuracy">—</strong>
+            </div>
+          </div>
+
+          <div class="school-hud school-only" id="school-hud" hidden>
+            <p class="school-tip">
+              <strong>Astuce :</strong> branche un clavier MIDI pour une expérience optimale,
+              ou clique directement les touches à l'écran.
+            </p>
+          </div>
+
+          <div class="legend atelier-only">
+            <div><span class="swatch swatch-right" aria-hidden="true"></span>Main droite</div>
+            <div><span class="swatch swatch-left" aria-hidden="true"></span>Main gauche</div>
+          </div>
+
+          <div class="rail-divider" aria-hidden="true"></div>
+
+          <div class="metro-panel">
+            <div class="metro-head">
+              <span class="metro-title">Métronome</span>
+              <span class="metro-pulse" id="metro-pulse" aria-hidden="true"></span>
+            </div>
+            <div class="metro-bpm-row">
+              <button id="metro-down" type="button" class="metro-step" aria-label="−4 BPM">−</button>
+              <input type="range" id="metro-bpm" min="40" max="220" value="80" />
+              <button id="metro-up" type="button" class="metro-step" aria-label="+4 BPM">+</button>
+            </div>
+            <div class="metro-bpm-display">
+              <strong id="metro-bpm-value">80</strong>
+              <span>BPM</span>
+            </div>
+            <button id="metro-btn" type="button" class="btn btn-mic">
+              <span class="metro-icon" aria-hidden="true"></span>
+              <span class="metro-btn-label">Démarrer</span>
+            </button>
+          </div>
+
+          <div class="rail-divider" aria-hidden="true"></div>
+
+          <div class="mic-panel">
+            <div class="mic-head">
+              <span class="mic-title">Piano acoustique</span>
+              <span class="mic-badge" id="mic-label" data-state="off">Désactivé</span>
+            </div>
+            <p class="mic-hint">
+              Active le micro de ton Mac et joue sur un vrai piano —
+              l'app détecte les notes en temps réel.
+            </p>
+            <button id="mic-btn" type="button" class="btn btn-mic">
+              <span class="mic-icon" aria-hidden="true"></span>
+              <span class="mic-btn-label">Activer le micro</span>
+            </button>
+            <div class="mic-meter" aria-hidden="true">
+              <div class="mic-meter-fill" id="mic-meter-fill"></div>
+            </div>
+            <div class="mic-last">
+              <span class="mic-last-label">Dernière note</span>
+              <strong class="mic-last-note" id="mic-last-note">—</strong>
+            </div>
+            <label class="mic-sensitivity">
+              <span>Sensibilité</span>
+              <input type="range" id="mic-sens" min="1" max="10" step="1" value="5" />
+            </label>
+          </div>
+
+          <div class="rail-divider" aria-hidden="true"></div>
+
+          <label class="field">
+            <span>Instrument</span>
+            <select id="instrument"></select>
+          </label>
+
+          <dl class="meta">
+            <div>
+              <dt>Appareil</dt>
+              <dd id="device-name">Aucun appareil</dd>
+            </div>
+            <div>
+              <dt>Voix</dt>
+              <dd id="instrument-state" class="instrument-state">—</dd>
+            </div>
+          </dl>
+
+          <div class="rail-divider" aria-hidden="true"></div>
+
+          <div class="kb-toggle">
+            <span class="kb-toggle-label">Clavier visible</span>
+            <div class="kb-toggle-tabs" role="tablist">
+              <button type="button" class="kb-toggle-tab" data-kb-layout="mini" role="tab">
+                <strong>25</strong><span>touches · C3–C5</span>
+              </button>
+              <button type="button" class="kb-toggle-tab" data-kb-layout="large" role="tab">
+                <strong>49</strong><span>touches · C2–C6</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
     </main>
 
+    <!-- Modales (Notice / Défi / Carnet) -->
+    <div class="modal-overlay" id="modal-daily" data-modal-id="daily" hidden>
+      <div class="modal-card" role="dialog" aria-labelledby="modal-daily-title" aria-modal="true">
+        <header class="modal-head">
+          <h2 id="modal-daily-title">Défi du jour</h2>
+          <button type="button" class="modal-close" data-modal-close aria-label="Fermer">×</button>
+        </header>
+        <div class="modal-body">
+          <div id="daily"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-journal" data-modal-id="journal" hidden>
+      <div class="modal-card" role="dialog" aria-labelledby="modal-journal-title" aria-modal="true">
+        <header class="modal-head">
+          <h2 id="modal-journal-title">Carnet</h2>
+          <button type="button" class="modal-close" data-modal-close aria-label="Fermer">×</button>
+        </header>
+        <div class="modal-body">
+          <div id="journal" class="journal"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-improv" data-modal-id="improv" hidden>
+      <div class="modal-card" role="dialog" aria-labelledby="modal-improv-title" aria-modal="true">
+        <header class="modal-head">
+          <h2 id="modal-improv-title">Improvisation guidée</h2>
+          <button type="button" class="modal-close" data-modal-close aria-label="Fermer">×</button>
+        </header>
+        <div class="modal-body">
+          <p class="improv-launcher-text">
+            L'app joue une grille d'accords en boucle, à toi d'inventer.
+            Sol te suggère les notes qui sonneront bien sur la grille.
+          </p>
+          <div class="improv-launcher-grids">
+            <button type="button" class="improv-grid-card" data-improv="ii-V-I" data-modal-close>
+              <span class="improv-grid-eyebrow">Jazz · 4 mesures</span>
+              <strong>II–V–I en Do majeur</strong>
+              <span class="improv-grid-detail">Dm7 → G7 → Cmaj7. La cadence la plus utilisée du jazz.</span>
+            </button>
+            <button type="button" class="improv-grid-card" data-improv="blues-12" data-modal-close>
+              <span class="improv-grid-eyebrow">Blues · 12 mesures</span>
+              <strong>Blues en Do</strong>
+              <span class="improv-grid-detail">Pattern classique Do7 / Fa7 / Sol7. Improvise sur la gamme blues.</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-notice" data-modal-id="notice" hidden>
+      <div class="modal-card" role="dialog" aria-labelledby="modal-notice-title" aria-modal="true">
+        <header class="modal-head">
+          <h2 id="modal-notice-title">Notice</h2>
+          <button type="button" class="modal-close" data-modal-close aria-label="Fermer">×</button>
+        </header>
+        <div class="modal-body">
+          <div class="notes-grid">
+            <article class="note">
+              <span class="note-num">i.</span>
+              <p>
+                Branche ton clavier en USB puis clique sur <strong>Connecter</strong>.
+                Les touches s'allument en temps réel — tu peux aussi jouer en cliquant
+                directement sur l'écran.
+              </p>
+            </article>
+            <article class="note">
+              <span class="note-num">ii.</span>
+              <p>
+                Pour ajouter tes morceaux, clique sur <strong>Importer</strong>
+                ou glisse-dépose un fichier <code>.mid</code> n'importe où. Tes imports
+                apparaissent dans la catégorie <em>Importés</em> et sont conservés entre
+                les sessions.
+              </p>
+            </article>
+            <article class="note">
+              <span class="note-num">iii.</span>
+              <p>
+                Pour un piano acoustique, ouvre le panneau <strong>Piano acoustique</strong>
+                à droite et active le micro. Ajuste la <em>sensibilité</em> selon ton instrument.
+              </p>
+            </article>
+            <article class="note">
+              <span class="note-num">iv.</span>
+              <p>
+                Le mode <strong>École</strong> propose un curriculum guidé pas-à-pas — du
+                repérage du clavier aux premiers accords, en passant par le rythme et
+                l'improvisation.
+              </p>
+            </article>
+            <article class="note">
+              <span class="note-num">v.</span>
+              <p>
+                Web MIDI requis (Chrome, Edge, Opera). Voix échantillonnées par
+                <code>gleitz/midi-js-soundfonts</code>, parsing par
+                <code>@tonejs/midi</code>.
+              </p>
+            </article>
+            <article class="note">
+              <span class="note-num">vi.</span>
+              <p>
+                <strong>Sol</strong>, ta mascotte, t'accompagne et te récompense en XP.
+                Clique-la pour voir ton niveau et ta progression.
+              </p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="colophon">
+      <span>Étude — pratique délibérée du piano.</span>
+      <span class="colophon-tag">Composé en Fraunces, DM Sans &amp; JetBrains Mono.</span>
+    </footer>
+
+    <div class="drop-overlay" id="drop-overlay" hidden>
+      <div class="drop-card">
+        <span class="drop-eyebrow">Importer</span>
+        <div class="drop-title">Lâche ton fichier <em>.mid</em></div>
+        <div class="drop-sub">Le morceau apparaîtra dans <strong>Importés</strong>.</div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.js"></script>
     <script src="songs.js"></script>
+    <script src="harmony.js"></script>
+    <script src="staff.js"></script>
+    <script src="storage.js"></script>
     <script src="app.js"></script>
+    <script src="metronome.js"></script>
+    <script src="lessons.js"></script>
+    <script src="mic.js"></script>
+    <script src="dashboard.js"></script>
+    <script src="improv.js"></script>
+    <script src="mascot.js"></script>
+    <script src="daily.js"></script>
+
+    <script>
+      // Modal system — Notice / Défi / Carnet.
+      (function () {
+        const overlays = document.querySelectorAll('.modal-overlay');
+        const buttons = document.querySelectorAll('[data-modal]');
+        let openOverlay = null;
+
+        function openModal(id) {
+          const overlay = document.getElementById('modal-' + id);
+          if (!overlay) return;
+          if (openOverlay && openOverlay !== overlay) closeModal();
+          overlay.hidden = false;
+          // Trigger CSS transition.
+          requestAnimationFrame(() => overlay.classList.add('is-open'));
+          document.body.classList.add('modal-locked');
+          openOverlay = overlay;
+          // Notify dashboard/daily to refresh contents.
+          if (id === 'journal' && window.JOURNAL && window.JOURNAL.refresh) window.JOURNAL.refresh();
+          if (id === 'daily' && window.DAILY && window.DAILY.refresh) window.DAILY.refresh();
+        }
+
+        function closeModal() {
+          if (!openOverlay) return;
+          openOverlay.classList.remove('is-open');
+          const o = openOverlay;
+          openOverlay = null;
+          document.body.classList.remove('modal-locked');
+          setTimeout(() => { o.hidden = true; }, 220);
+        }
+
+        buttons.forEach((b) =>
+          b.addEventListener('click', () => openModal(b.dataset.modal))
+        );
+
+        overlays.forEach((o) => {
+          o.addEventListener('click', (e) => {
+            if (e.target === o || e.target.hasAttribute('data-modal-close')) closeModal();
+          });
+        });
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && openOverlay) closeModal();
+        });
+      })();
+
+      // PWA — register the service worker after first paint.
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js')
+            .then((reg) => {
+              // Force an update check against the network on every page load.
+              reg.update().catch(() => {});
+              // If a new SW was installed in the background, activate it now.
+              if (reg.waiting) reg.waiting.postMessage('skip-waiting');
+              reg.addEventListener('updatefound', () => {
+                const sw = reg.installing;
+                if (!sw) return;
+                sw.addEventListener('statechange', () => {
+                  if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                    sw.postMessage('skip-waiting');
+                  }
+                });
+              });
+            })
+            .catch((err) => console.warn('[sw] registration failed', err));
+
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            window.location.reload();
+          });
+        });
+      }
+    </script>
   </body>
 </html>
