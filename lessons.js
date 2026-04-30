@@ -22,8 +22,77 @@
   // ------------------------------------------------------------
 
   const MODULES = [
+    // ÉCHAUFFEMENT — routine quotidienne
+    {
+      id: 'warmup',
+      level: 'warmup',
+      title: 'Échauffement',
+      eyebrow: 'Routine · Avant chaque session',
+      blurb: '5 minutes pour réveiller les doigts. À faire avant chaque leçon ou pratique.',
+      lessons: [
+        {
+          id: 'warmup-l1',
+          title: 'Étirement 5 doigts — main droite',
+          summary: 'Do-Ré-Mi-Fa-Sol-Fa-Mi-Ré-Do — 4 fois.',
+          steps: [
+            { type: 'intro', title: 'Le geste fondamental', text: 'Pose tes 5 doigts main D sur Do-Ré-Mi-Fa-Sol et fais monter / descendre régulièrement.' },
+            { type: 'practice-sequence', title: 'Aller-retour ×4', text: 'Quatre tours. Cherche l\'égalité, pas la vitesse.', sequence: [60, 62, 64, 65, 67, 65, 64, 62, 60], fingers: [1, 2, 3, 4, 5, 4, 3, 2, 1], repeat: 4 },
+          ],
+        },
+        {
+          id: 'warmup-l2',
+          title: 'Étirement 5 doigts — main gauche',
+          summary: 'Sol-Fa-Mi-Ré-Do — 4 fois.',
+          steps: [
+            { type: 'intro', title: 'L\'autre main', text: 'Pouce main G sur Sol2, auriculaire sur Do2. Même mouvement, inversé.' },
+            { type: 'practice-sequence', title: 'Aller-retour ×4', text: 'Quatre tours main gauche.', sequence: [55, 53, 52, 50, 48, 50, 52, 53, 55], fingers: [1, 2, 3, 4, 5, 4, 3, 2, 1], repeat: 4 },
+          ],
+        },
+        {
+          id: 'warmup-l3',
+          title: 'Mouvement contraire',
+          summary: 'Mains qui s\'écartent et se rapprochent — 3 fois chaque main.',
+          steps: [
+            { type: 'intro', title: 'Symétrie pure', text: 'Les deux mains partent du <strong>Do central</strong> et s\'écartent en miroir, puis reviennent. Excellent pour la coordination.' },
+            { type: 'practice-sequence', title: 'Main D ×3', text: 'Do-Ré-Mi-Fa-Sol-Fa-Mi-Ré-Do, trois fois.', sequence: [60, 62, 64, 65, 67, 65, 64, 62, 60], fingers: [1, 2, 3, 4, 5, 4, 3, 2, 1], repeat: 3 },
+            { type: 'practice-sequence', title: 'Main G ×3 (miroir)', text: 'Do-Si-La-Sol-Fa-Sol-La-Si-Do, trois fois.', sequence: [60, 59, 57, 55, 53, 55, 57, 59, 60], fingers: [1, 2, 3, 4, 5, 4, 3, 2, 1], repeat: 3 },
+          ],
+        },
+        {
+          id: 'warmup-l4',
+          title: 'Arpèges Do majeur',
+          summary: 'Aller simple ×4, aller-retour ×3.',
+          steps: [
+            { type: 'intro', title: 'Décomposer l\'accord', text: 'On joue les notes de Do majeur l\'<strong>une après l\'autre</strong> — fluide, doré, indispensable.' },
+            { type: 'practice-sequence', title: 'Arpège ascendant ×4', text: 'Do-Mi-Sol-Do. Doigtés 1-2-3-5.', sequence: [60, 64, 67, 72], fingers: [1, 2, 3, 5], repeat: 4 },
+            { type: 'practice-sequence', title: 'Aller-retour ×3', text: 'Do-Mi-Sol-Do-Sol-Mi-Do.', sequence: [60, 64, 67, 72, 67, 64, 60], fingers: [1, 2, 3, 5, 3, 2, 1], repeat: 3 },
+          ],
+        },
+        {
+          id: 'warmup-l5',
+          title: 'Trilles',
+          summary: 'Alternance rapide — 5 fois chaque paire.',
+          steps: [
+            { type: 'intro', title: 'Léger, vif', text: 'Alterne rapidement deux notes voisines. Cherche l\'<strong>égalité</strong> entre les deux.' },
+            { type: 'practice-sequence', title: 'Trille Do-Ré (1-2) ×5', text: 'Cinq tours.', sequence: [60, 62, 60, 62, 60, 62, 60, 62], fingers: [1, 2, 1, 2, 1, 2, 1, 2], repeat: 5 },
+            { type: 'practice-sequence', title: 'Trille Ré-Mi (2-3) ×5', text: 'Index-majeur, cinq tours.', sequence: [62, 64, 62, 64, 62, 64, 62, 64], fingers: [2, 3, 2, 3, 2, 3, 2, 3], repeat: 5 },
+          ],
+        },
+        {
+          id: 'warmup-l6',
+          title: 'Gamme de Do — finale',
+          summary: 'Octave montante — 3 fois.',
+          steps: [
+            { type: 'intro', title: 'Pour finir', text: 'Tu es prêt. Trois gammes propres pour signer la fin.' },
+            { type: 'practice-sequence', title: 'Gamme ascendante ×3', text: 'Do-Ré-Mi-Fa-Sol-La-Si-Do. Pouce-passant après Mi.', sequence: [60, 62, 64, 65, 67, 69, 71, 72], fingers: [1, 2, 3, 1, 2, 3, 4, 5], repeat: 3 },
+          ],
+        },
+      ],
+    },
+
     {
       id: 'm1',
+      level: 'beginner',
       title: 'Le clavier',
       eyebrow: 'Module I · Découverte',
       blurb: 'Avant de jouer, on apprend à se repérer.',
@@ -205,6 +274,7 @@
 
     {
       id: 'm2',
+      level: 'beginner',
       title: 'Doigté main droite',
       eyebrow: 'Module II · Geste',
       blurb: 'Cinq doigts, cinq notes. La position de base.',
@@ -312,6 +382,7 @@
 
     {
       id: 'm3',
+      level: 'beginner',
       title: 'Premier morceau',
       eyebrow: 'Module III · Mélodie',
       blurb: '« Au clair de la lune » — main droite.',
@@ -387,6 +458,7 @@
 
     {
       id: 'm4',
+      level: 'beginner',
       title: 'Main gauche',
       eyebrow: 'Module IV · L\'autre main',
       blurb: 'Symétrie : pouce gauche sur Sol grave, et on descend.',
@@ -427,6 +499,7 @@
 
     {
       id: 'm-rythme',
+      level: 'beginner',
       title: 'Rythme',
       eyebrow: 'Module · Pulsation',
       blurb: 'Sentir le temps. Compter. Jouer en place.',
@@ -548,6 +621,7 @@
 
     {
       id: 'm5',
+      level: 'beginner',
       title: 'Premiers accords',
       eyebrow: 'Module V · Harmonie',
       blurb: 'Trois notes ensemble : la triade.',
@@ -640,6 +714,1199 @@
         },
       ],
     },
+
+    // =========================================================
+    // Module VII — Mains ensemble
+    // =========================================================
+    {
+      id: 'm6',
+      level: 'beginner',
+      title: 'Mains ensemble',
+      eyebrow: 'Module · Coordination',
+      blurb: 'Les deux mains, un cerveau. La vraie sensation du piano.',
+      lessons: [
+        {
+          id: 'm6-l1',
+          title: 'Tenir une basse',
+          summary: 'Main G tient un Do, main D joue la mélodie.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le geste fondateur',
+              text: 'La forme la plus simple de jeu à deux mains : la main gauche <strong>tient un seul Do grave</strong> qui résonne, pendant que la main droite joue une mélodie au-dessus. C\'est la base de centaines de chansons.',
+            },
+            {
+              type: 'highlight',
+              title: 'Position de départ',
+              text: 'Auriculaire main gauche sur Do2, pouce main droite sur Do central.',
+              highlights: [
+                { midi: 36, color: 'petrol', label: '5' },
+                { midi: 60, color: 'gold', label: '1' },
+              ],
+            },
+            {
+              type: 'listen',
+              title: 'Écoute',
+              text: 'On tient le Do grave une mesure entière, on joue Do-Mi-Sol au-dessus.',
+              sequence: [
+                { midi: 36, dur: 0.4, chord: [36, 60] },
+                { midi: 64, dur: 0.4 },
+                { midi: 67, dur: 0.4 },
+                { midi: 64, dur: 0.4 },
+                { midi: 60, dur: 0.6 },
+              ],
+            },
+            {
+              type: 'practice-chord',
+              title: 'À toi : pose les deux notes',
+              text: 'Pose le Do grave (main G) et le Do central (main D) <strong>en même temps</strong>.',
+              chord: [36, 60],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'La mélodie au-dessus',
+              text: 'Maintenant joue Do-Mi-Sol-Mi-Do main droite seule.',
+              sequence: [60, 64, 67, 64, 60],
+              fingers: [1, 3, 5, 3, 1],
+            },
+          ],
+        },
+        {
+          id: 'm6-l2',
+          title: 'Au clair de la lune — 2 mains',
+          summary: 'Mélodie main D + basse en pédale main G.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Premier vrai morceau à 2 mains',
+              text: 'Tu connais déjà la mélodie de <em>Au clair de la lune</em> main droite. On y ajoute une basse simple en main gauche : un seul Do tenu pendant chaque phrase.',
+            },
+            {
+              type: 'listen',
+              title: 'Écoute la phrase complète',
+              text: 'Main G tient Do2, main D fait la mélodie.',
+              sequence: [
+                { midi: 36, dur: 4.5, chord: [36] },
+                { midi: 60, dur: 0.4 }, { midi: 60, dur: 0.4 }, { midi: 60, dur: 0.4 },
+                { midi: 62, dur: 0.4 }, { midi: 64, dur: 0.8 }, { midi: 62, dur: 0.8 },
+                { midi: 60, dur: 0.4 }, { midi: 64, dur: 0.4 }, { midi: 62, dur: 0.4 },
+                { midi: 62, dur: 0.4 }, { midi: 60, dur: 1.0 },
+              ],
+            },
+            {
+              type: 'practice-chord',
+              title: 'D\'abord la basse',
+              text: 'Pose ton auriculaire gauche sur Do2 et tiens-le.',
+              chord: [36],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Avec la mélodie',
+              text: 'Une fois Do2 posé, joue la mélodie main D : Do Do Do Ré Mi Ré Do Mi Ré Ré Do.',
+              sequence: [60, 60, 60, 62, 64, 62, 60, 64, 62, 62, 60],
+            },
+          ],
+        },
+        {
+          id: 'm6-l3',
+          title: 'Pulse de croches main G',
+          summary: 'Main G tape le rythme, main D chante.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Marteler la pulsation',
+              text: 'Au lieu de tenir une note, la main gauche peut <strong>répéter le Do grave</strong> sur chaque temps — comme une horloge. Pendant ce temps la main droite joue librement.',
+            },
+            {
+              type: 'listen',
+              title: 'Écoute',
+              text: 'Pulse Do-Do-Do-Do main G + Do-Mi-Sol-Mi main D.',
+              sequence: [
+                { midi: 36, dur: 0.5 }, { midi: 60, dur: 0.5 },
+                { midi: 36, dur: 0.5 }, { midi: 64, dur: 0.5 },
+                { midi: 36, dur: 0.5 }, { midi: 67, dur: 0.5 },
+                { midi: 36, dur: 0.5 }, { midi: 64, dur: 0.5 },
+              ],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'À toi de pulser',
+              text: 'Joue cette suite — alternance basse Do2 et notes de la gamme.',
+              sequence: [36, 60, 36, 64, 36, 67, 36, 64],
+            },
+          ],
+        },
+      ],
+    },
+
+    // =========================================================
+    // Module VIII — Plus d'accords
+    // =========================================================
+    {
+      id: 'm7',
+      level: 'intermediate',
+      title: 'Plus d\'accords majeurs',
+      eyebrow: 'Module · Harmonie',
+      blurb: 'Fa, Sol et le trio des accords parfaits de Do.',
+      lessons: [
+        {
+          id: 'm7-l1',
+          title: 'Fa majeur',
+          summary: 'Fa + La + Do, joués ensemble.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le 4e degré',
+              text: 'Après Do majeur, voici <strong>Fa majeur</strong> : <em>Fa + La + Do</em>. Doigté main D : 1 (Fa), 3 (La), 5 (Do).',
+            },
+            {
+              type: 'highlight',
+              title: 'Les trois notes',
+              text: 'Pouce sur Fa, majeur sur La, auriculaire sur Do.',
+              highlights: [
+                { midi: 65, color: 'gold', label: '1' },
+                { midi: 69, color: 'gold', label: '3' },
+                { midi: 72, color: 'gold', label: '5' },
+              ],
+            },
+            {
+              type: 'listen',
+              title: 'L\'accord plein',
+              text: 'Couleur de Fa majeur — un peu plus sombre, plus rond que Do majeur.',
+              sequence: [{ midi: 65, dur: 1.5, chord: [65, 69, 72] }],
+            },
+            {
+              type: 'practice-chord',
+              title: 'À toi',
+              text: 'Plaque Fa, La et Do en même temps.',
+              chord: [65, 69, 72],
+            },
+          ],
+        },
+        {
+          id: 'm7-l2',
+          title: 'Sol majeur',
+          summary: 'Sol + Si + Ré, le 5e degré.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'La dominante',
+              text: 'Sol majeur est l\'accord <em>de tension</em>. Il a envie de retourner sur Do. Tu vas l\'utiliser tout le temps.',
+            },
+            {
+              type: 'highlight',
+              title: 'Les trois notes',
+              text: 'Pouce sur Sol, majeur sur Si, auriculaire sur Ré (octave au-dessus).',
+              highlights: [
+                { midi: 67, color: 'gold', label: '1' },
+                { midi: 71, color: 'gold', label: '3' },
+                { midi: 74, color: 'gold', label: '5' },
+              ],
+            },
+            {
+              type: 'listen',
+              title: 'Écoute la tension',
+              text: 'Sol majeur seul, puis qui se résout sur Do majeur. Sens-tu le soulagement ?',
+              sequence: [
+                { midi: 67, dur: 1.2, chord: [67, 71, 74] },
+                { midi: 60, dur: 1.5, chord: [60, 64, 67] },
+              ],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Plaque Sol majeur',
+              text: 'Sol, Si, Ré — ensemble.',
+              chord: [67, 71, 74],
+            },
+          ],
+        },
+        {
+          id: 'm7-l3',
+          title: 'Le trio I-IV-V',
+          summary: 'Do, Fa, Sol — les 3 piliers de toute chanson en Do majeur.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Trois accords, mille chansons',
+              text: 'Avec ces <strong>trois accords seulement</strong> (Do, Fa, Sol majeur), tu peux accompagner des centaines de chansons populaires. C\'est ce qu\'on appelle la <em>cadence parfaite</em>.',
+            },
+            {
+              type: 'listen',
+              title: 'Écoute la progression',
+              text: 'Do → Fa → Sol → Do. La résolution sonne très naturelle.',
+              sequence: [
+                { midi: 60, dur: 1.2, chord: [60, 64, 67] },
+                { midi: 65, dur: 1.2, chord: [65, 69, 72] },
+                { midi: 67, dur: 1.2, chord: [67, 71, 74] },
+                { midi: 60, dur: 1.8, chord: [60, 64, 67] },
+              ],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Étape 1 : Do majeur',
+              text: 'Do-Mi-Sol.',
+              chord: [60, 64, 67],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Étape 2 : Fa majeur',
+              text: 'Fa-La-Do.',
+              chord: [65, 69, 72],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Étape 3 : Sol majeur',
+              text: 'Sol-Si-Ré.',
+              chord: [67, 71, 74],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Retour à Do majeur',
+              text: 'Et on referme.',
+              chord: [60, 64, 67],
+            },
+            {
+              type: 'quiz',
+              title: 'Vérification',
+              question: 'L\'accord <strong>Sol majeur</strong> donne envie de revenir sur quel autre accord ?',
+              options: ['Fa majeur', 'Do majeur', 'Ré mineur'],
+              correct: 1,
+              explain: 'Do — Sol est la <em>dominante</em>, Do est la <em>tonique</em>. La résolution V → I est l\'âme de la musique tonale.',
+            },
+          ],
+        },
+        {
+          id: 'm7-l4',
+          title: 'Premier renversement',
+          summary: 'Do majeur version Mi-Sol-Do (basse Mi).',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Même accord, autre disposition',
+              text: 'Un accord peut se jouer dans plusieurs <em>renversements</em>. Le premier renversement de Do majeur, c\'est <strong>Mi-Sol-Do</strong> : on prend le Do du bas et on le met en haut. Ça reste Do majeur, mais avec une couleur différente.',
+            },
+            {
+              type: 'highlight',
+              title: 'Mi en bas',
+              text: 'Pouce sur Mi, index sur Sol, auriculaire sur Do.',
+              highlights: [
+                { midi: 64, color: 'gold', label: '1' },
+                { midi: 67, color: 'gold', label: '2' },
+                { midi: 72, color: 'gold', label: '5' },
+              ],
+            },
+            {
+              type: 'listen',
+              title: 'Compare',
+              text: 'Position fondamentale puis premier renversement. C\'est le même accord avec une autre saveur.',
+              sequence: [
+                { midi: 60, dur: 1.4, chord: [60, 64, 67] },
+                { midi: 64, dur: 1.6, chord: [64, 67, 72] },
+              ],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Plaque le renversement',
+              text: 'Mi, Sol, Do — ensemble.',
+              chord: [64, 67, 72],
+            },
+          ],
+        },
+      ],
+    },
+
+    // =========================================================
+    // Module IX — Petites mélodies populaires
+    // =========================================================
+    {
+      id: 'm8',
+      level: 'beginner',
+      title: 'Petites mélodies',
+      eyebrow: 'Module · Répertoire',
+      blurb: 'Quatre airs que tout le monde reconnaît, à ton tour de les jouer.',
+      lessons: [
+        {
+          id: 'm8-l1',
+          title: 'Hot Cross Buns',
+          summary: 'Trois notes (Mi-Ré-Do), une comptine entière.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Trois notes seulement',
+              text: 'Cette comptine anglaise tient sur <strong>Do, Ré, Mi</strong>. Si tu la maîtrises, tu maîtrises ton positionnement de pouce-index-majeur.',
+            },
+            {
+              type: 'listen',
+              title: 'Écoute',
+              text: '« Hot cross buns, hot cross buns, one a penny, two a penny, hot cross buns. »',
+              sequence: [
+                { midi: 64, dur: 0.4 }, { midi: 62, dur: 0.4 }, { midi: 60, dur: 0.8 },
+                { midi: 64, dur: 0.4 }, { midi: 62, dur: 0.4 }, { midi: 60, dur: 0.8 },
+                { midi: 60, dur: 0.25 }, { midi: 60, dur: 0.25 }, { midi: 60, dur: 0.25 }, { midi: 60, dur: 0.25 },
+                { midi: 62, dur: 0.25 }, { midi: 62, dur: 0.25 }, { midi: 62, dur: 0.25 }, { midi: 62, dur: 0.25 },
+                { midi: 64, dur: 0.4 }, { midi: 62, dur: 0.4 }, { midi: 60, dur: 0.8 },
+              ],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'À toi',
+              text: 'Doigts 3-2-1 puis répétés. Doucement.',
+              sequence: [
+                64, 62, 60,
+                64, 62, 60,
+                60, 60, 60, 60, 62, 62, 62, 62,
+                64, 62, 60,
+              ],
+              fingers: [3, 2, 1, 3, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 2, 1],
+            },
+          ],
+        },
+        {
+          id: 'm8-l2',
+          title: 'Frère Jacques',
+          summary: 'Le canon le plus célèbre, main droite.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Tout le monde le connaît',
+              text: 'Quatre phrases courtes répétées chacune deux fois. Tient sur 5 notes Do-Sol.',
+            },
+            {
+              type: 'listen',
+              title: 'Écoute',
+              text: '« Frère Jacques, frère Jacques, dormez-vous ? dormez-vous ? Sonnez les matines… »',
+              sequence: [
+                { midi: 60, dur: 0.4 }, { midi: 62, dur: 0.4 }, { midi: 64, dur: 0.4 }, { midi: 60, dur: 0.4 },
+                { midi: 60, dur: 0.4 }, { midi: 62, dur: 0.4 }, { midi: 64, dur: 0.4 }, { midi: 60, dur: 0.4 },
+                { midi: 64, dur: 0.4 }, { midi: 65, dur: 0.4 }, { midi: 67, dur: 0.8 },
+                { midi: 64, dur: 0.4 }, { midi: 65, dur: 0.4 }, { midi: 67, dur: 0.8 },
+                { midi: 67, dur: 0.25 }, { midi: 69, dur: 0.25 }, { midi: 67, dur: 0.25 }, { midi: 65, dur: 0.25 },
+                { midi: 64, dur: 0.4 }, { midi: 60, dur: 0.4 },
+                { midi: 67, dur: 0.25 }, { midi: 69, dur: 0.25 }, { midi: 67, dur: 0.25 }, { midi: 65, dur: 0.25 },
+                { midi: 64, dur: 0.4 }, { midi: 60, dur: 0.4 },
+              ],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Première phrase',
+              text: 'Do-Ré-Mi-Do (deux fois).',
+              sequence: [60, 62, 64, 60, 60, 62, 64, 60],
+              fingers: [1, 2, 3, 1, 1, 2, 3, 1],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Deuxième phrase',
+              text: 'Mi-Fa-Sol (deux fois).',
+              sequence: [64, 65, 67, 64, 65, 67],
+              fingers: [3, 4, 5, 3, 4, 5],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Phrase complète',
+              text: 'Tout d\'un coup. Ne te précipite pas.',
+              sequence: [
+                60, 62, 64, 60, 60, 62, 64, 60,
+                64, 65, 67, 64, 65, 67,
+                67, 69, 67, 65, 64, 60,
+                67, 69, 67, 65, 64, 60,
+              ],
+            },
+          ],
+        },
+        {
+          id: 'm8-l3',
+          title: 'Joyeux anniversaire',
+          summary: 'L\'air universel — main droite avec sa petite levée.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Anacrouse',
+              text: 'Cet air commence par <em>deux notes courtes avant le premier vrai temps</em> — c\'est une <strong>anacrouse</strong>. Compte « et un, deux trois, un, deux trois ».',
+            },
+            {
+              type: 'listen',
+              title: 'Écoute la première phrase',
+              text: '« Joyeux a-nni-ver-saire »',
+              sequence: [
+                { midi: 60, dur: 0.3 }, { midi: 60, dur: 0.3 },
+                { midi: 62, dur: 0.6 }, { midi: 60, dur: 0.6 },
+                { midi: 65, dur: 0.6 }, { midi: 64, dur: 1.2 },
+              ],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Première moitié',
+              text: 'Do-Do-Ré-Do-Fa-Mi.',
+              sequence: [60, 60, 62, 60, 65, 64],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Deuxième moitié',
+              text: 'Do-Do-Ré-Do-Sol-Fa.',
+              sequence: [60, 60, 62, 60, 67, 65],
+            },
+          ],
+        },
+        {
+          id: 'm8-l4',
+          title: 'Ode à la joie — thème',
+          summary: 'Beethoven, simplifié pour 5 doigts.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le thème universel',
+              text: 'Le thème principal de la 9e symphonie de Beethoven tient en <strong>cinq notes côte-à-côte</strong> : Do-Ré-Mi-Fa-Sol. Tu n\'as pas besoin de bouger ta main.',
+            },
+            {
+              type: 'listen',
+              title: 'Écoute le thème',
+              text: 'La phrase complète A.',
+              sequence: [
+                { midi: 64, dur: 0.4 }, { midi: 64, dur: 0.4 }, { midi: 65, dur: 0.4 }, { midi: 67, dur: 0.4 },
+                { midi: 67, dur: 0.4 }, { midi: 65, dur: 0.4 }, { midi: 64, dur: 0.4 }, { midi: 62, dur: 0.4 },
+                { midi: 60, dur: 0.4 }, { midi: 60, dur: 0.4 }, { midi: 62, dur: 0.4 }, { midi: 64, dur: 0.4 },
+                { midi: 64, dur: 0.6 }, { midi: 62, dur: 0.2 }, { midi: 62, dur: 0.8 },
+              ],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Premier vers',
+              text: 'Mi-Mi-Fa-Sol-Sol-Fa-Mi-Ré.',
+              sequence: [64, 64, 65, 67, 67, 65, 64, 62],
+              fingers: [3, 3, 4, 5, 5, 4, 3, 2],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Phrase complète',
+              text: 'Le thème entier.',
+              sequence: [
+                64, 64, 65, 67, 67, 65, 64, 62,
+                60, 60, 62, 64, 64, 62, 62,
+              ],
+            },
+          ],
+        },
+      ],
+    },
+
+    // =========================================================
+    // Module X — Gammes
+    // =========================================================
+    {
+      id: 'm9',
+      level: 'intermediate',
+      title: 'Gammes',
+      eyebrow: 'Module · Technique',
+      blurb: 'Le pouce qui passe sous, l\'auriculaire qui prend le relais.',
+      lessons: [
+        {
+          id: 'm9-l1',
+          title: 'Gamme de Do — main droite',
+          summary: 'Une octave montante avec le pouce-passant.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Pouce-passant',
+              text: 'Pour jouer une octave entière avec une seule main de 5 doigts, on utilise le <strong>pouce-passant</strong> : le pouce passe sous le majeur après Mi pour atteindre Fa. Doigté : <strong>1-2-3-1-2-3-4-5</strong>.',
+            },
+            {
+              type: 'highlight',
+              title: 'La gamme avec doigtés',
+              text: 'Tu vois le saut du pouce sous le majeur entre Mi et Fa.',
+              highlights: [
+                { midi: 60, color: 'finger', label: '1' },
+                { midi: 62, color: 'finger', label: '2' },
+                { midi: 64, color: 'finger', label: '3' },
+                { midi: 65, color: 'finger', label: '1' },
+                { midi: 67, color: 'finger', label: '2' },
+                { midi: 69, color: 'finger', label: '3' },
+                { midi: 71, color: 'finger', label: '4' },
+                { midi: 72, color: 'finger', label: '5' },
+              ],
+            },
+            {
+              type: 'listen',
+              title: 'Démo',
+              text: 'Une octave montante.',
+              sequence: [
+                { midi: 60, dur: 0.35 }, { midi: 62, dur: 0.35 }, { midi: 64, dur: 0.35 },
+                { midi: 65, dur: 0.35 }, { midi: 67, dur: 0.35 }, { midi: 69, dur: 0.35 },
+                { midi: 71, dur: 0.35 }, { midi: 72, dur: 0.7 },
+              ],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'À toi',
+              text: 'Le pouce passe sous le majeur après Mi. Doucement.',
+              sequence: [60, 62, 64, 65, 67, 69, 71, 72],
+              fingers: [1, 2, 3, 1, 2, 3, 4, 5],
+            },
+          ],
+        },
+        {
+          id: 'm9-l2',
+          title: 'Gamme descendante main D',
+          summary: 'Le majeur passe par-dessus le pouce.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Majeur-passant',
+              text: 'En descendant, c\'est l\'inverse : <strong>le majeur passe par-dessus le pouce</strong>. Doigté : 5-4-3-2-1-3-2-1.',
+            },
+            {
+              type: 'practice-sequence',
+              title: 'À toi',
+              text: 'De Do aigu à Do central.',
+              sequence: [72, 71, 69, 67, 65, 64, 62, 60],
+              fingers: [5, 4, 3, 2, 1, 3, 2, 1],
+            },
+          ],
+        },
+        {
+          id: 'm9-l3',
+          title: 'Aller-retour fluide',
+          summary: 'Une octave montante puis descendante d\'un trait.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le but',
+              text: 'L\'objectif : enchaîner montée + descente <strong>sans arrêt</strong>, à un tempo régulier. C\'est le travail technique de base de tous les pianistes.',
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Aller-retour',
+              text: 'Do→Do aigu→Do. Sois régulier, pas trop vite.',
+              sequence: [
+                60, 62, 64, 65, 67, 69, 71, 72,
+                71, 69, 67, 65, 64, 62, 60,
+              ],
+              fingers: [
+                1, 2, 3, 1, 2, 3, 4, 5,
+                4, 3, 2, 1, 3, 2, 1,
+              ],
+            },
+          ],
+        },
+      ],
+    },
+
+    // =========================================================
+    // Module XI — Accords mineurs
+    // =========================================================
+    {
+      id: 'm10',
+      level: 'intermediate',
+      title: 'Accords mineurs',
+      eyebrow: 'Module · Couleur',
+      blurb: 'Les trois mineurs naturels de la gamme de Do.',
+      lessons: [
+        {
+          id: 'm10-l1',
+          title: 'Ré mineur',
+          summary: 'Ré + Fa + La — un accord mélancolique.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le 2e degré',
+              text: 'Dans la gamme de Do majeur, le 2e degré (Ré) donne un accord <strong>mineur</strong>. <em>Ré + Fa + La</em>. Plus mélancolique que les majeurs, il prépare souvent une tension.',
+            },
+            {
+              type: 'highlight',
+              title: 'Les trois notes',
+              text: 'Pouce sur Ré, majeur sur Fa, auriculaire sur La.',
+              highlights: [
+                { midi: 62, color: 'petrol', label: '1' },
+                { midi: 65, color: 'petrol', label: '3' },
+                { midi: 69, color: 'petrol', label: '5' },
+              ],
+            },
+            {
+              type: 'listen',
+              title: 'La couleur mineure',
+              text: 'Ré mineur seul, puis Do majeur. Tu entends la différence d\'humeur ?',
+              sequence: [
+                { midi: 62, dur: 1.4, chord: [62, 65, 69] },
+                { midi: 60, dur: 1.5, chord: [60, 64, 67] },
+              ],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Plaque Ré mineur',
+              text: 'Ré, Fa, La — ensemble.',
+              chord: [62, 65, 69],
+            },
+          ],
+        },
+        {
+          id: 'm10-l2',
+          title: 'La mineur',
+          summary: 'La + Do + Mi — le mineur le plus connu.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le 6e degré',
+              text: '<strong>La mineur</strong> est l\'accord <em>relatif mineur</em> de Do majeur — ils partagent les mêmes notes de gamme. La + Do + Mi. Tu vas le rencontrer dans presque toutes les chansons pop.',
+            },
+            {
+              type: 'highlight',
+              title: 'Les trois notes',
+              text: 'Doigté 1-3-5.',
+              highlights: [
+                { midi: 57, color: 'petrol', label: '1' },
+                { midi: 60, color: 'petrol', label: '3' },
+                { midi: 64, color: 'petrol', label: '5' },
+              ],
+            },
+            {
+              type: 'listen',
+              title: 'Écoute',
+              text: 'La mineur, puis enchaîné avec Do majeur.',
+              sequence: [
+                { midi: 57, dur: 1.2, chord: [57, 60, 64] },
+                { midi: 60, dur: 1.4, chord: [60, 64, 67] },
+              ],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Plaque La mineur',
+              text: 'La, Do, Mi.',
+              chord: [57, 60, 64],
+            },
+          ],
+        },
+        {
+          id: 'm10-l3',
+          title: 'Mi mineur',
+          summary: 'Mi + Sol + Si — discret mais essentiel.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le 3e degré',
+              text: '<strong>Mi mineur</strong> : Mi + Sol + Si. Souvent utilisé en passage entre Do majeur et La mineur. Plus rare mais très joli.',
+            },
+            {
+              type: 'highlight',
+              title: 'Les trois notes',
+              text: 'Doigté 1-3-5.',
+              highlights: [
+                { midi: 64, color: 'petrol', label: '1' },
+                { midi: 67, color: 'petrol', label: '3' },
+                { midi: 71, color: 'petrol', label: '5' },
+              ],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Plaque Mi mineur',
+              text: 'Mi, Sol, Si.',
+              chord: [64, 67, 71],
+            },
+            {
+              type: 'quiz',
+              title: 'Récapitulatif',
+              question: 'Combien d\'accords mineurs « naturels » dans la gamme de Do majeur ?',
+              options: ['1', '2', '3', '4'],
+              correct: 2,
+              explain: 'Trois : Ré mineur (II), Mi mineur (III), La mineur (VI). Avec les majeurs Do/Fa/Sol et le diminué Si, on a 7 accords pour 7 degrés.',
+            },
+          ],
+        },
+      ],
+    },
+
+    // =========================================================
+    // Module XII — Cadences populaires
+    // =========================================================
+    {
+      id: 'm11',
+      level: 'intermediate',
+      title: 'Cadences populaires',
+      eyebrow: 'Module · Progressions',
+      blurb: 'Quatre accords, et tu peux jouer la moitié de la radio.',
+      lessons: [
+        {
+          id: 'm11-l1',
+          title: 'I-V-vi-IV — la grille pop',
+          summary: 'Do → Sol → La mineur → Fa.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'La progression magique',
+              text: '<strong>Do → Sol → La mineur → Fa</strong>. C\'est sans doute la grille d\'accords la plus utilisée dans la pop des 50 dernières années — Beatles, Adele, Coldplay, Taylor Swift l\'ont tous utilisée.',
+            },
+            {
+              type: 'listen',
+              title: 'Écoute',
+              text: 'La grille en boucle. Sens-tu comme on a envie qu\'elle continue ?',
+              sequence: [
+                { midi: 60, dur: 1.0, chord: [60, 64, 67] },
+                { midi: 67, dur: 1.0, chord: [67, 71, 74] },
+                { midi: 57, dur: 1.0, chord: [57, 60, 64] },
+                { midi: 65, dur: 1.0, chord: [65, 69, 72] },
+                { midi: 60, dur: 1.4, chord: [60, 64, 67] },
+              ],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Étape 1 — Do majeur',
+              text: 'Do-Mi-Sol.',
+              chord: [60, 64, 67],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Étape 2 — Sol majeur',
+              text: 'Sol-Si-Ré.',
+              chord: [67, 71, 74],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Étape 3 — La mineur',
+              text: 'La-Do-Mi.',
+              chord: [57, 60, 64],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Étape 4 — Fa majeur',
+              text: 'Fa-La-Do. Et tu peux recommencer en boucle.',
+              chord: [65, 69, 72],
+            },
+          ],
+        },
+        {
+          id: 'm11-l2',
+          title: 'II-V-I — la cadence jazz',
+          summary: 'Ré mineur → Sol → Do.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'L\'âme du jazz',
+              text: 'La cadence <strong>II-V-I</strong> (Ré mineur → Sol majeur → Do majeur) est l\'une des résolutions les plus puissantes de la musique tonale. Tout le jazz est construit dessus.',
+            },
+            {
+              type: 'listen',
+              title: 'Écoute la résolution',
+              text: 'Ré mineur (préparation) → Sol (tension) → Do (résolution). Note l\'effet d\'arrivée.',
+              sequence: [
+                { midi: 62, dur: 1.0, chord: [62, 65, 69] },
+                { midi: 67, dur: 1.0, chord: [67, 71, 74] },
+                { midi: 60, dur: 1.5, chord: [60, 64, 67] },
+              ],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Ré mineur',
+              text: 'Ré-Fa-La.',
+              chord: [62, 65, 69],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Sol majeur',
+              text: 'Sol-Si-Ré.',
+              chord: [67, 71, 74],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Do majeur',
+              text: 'Do-Mi-Sol. Tu sens l\'arrivée à bon port ?',
+              chord: [60, 64, 67],
+            },
+          ],
+        },
+        {
+          id: 'm11-l3',
+          title: 'I-vi-IV-V — l\'anatole',
+          summary: 'Do → La mineur → Fa → Sol.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le doo-wop des années 50',
+              text: '<strong>Do → La mineur → Fa → Sol</strong>. Cette grille est partout dans le doo-wop et la pop classique : « Stand by Me », « Earth Angel », « Heart and Soul »...',
+            },
+            {
+              type: 'listen',
+              title: 'Écoute',
+              text: 'On va lentement.',
+              sequence: [
+                { midi: 60, dur: 1.0, chord: [60, 64, 67] },
+                { midi: 57, dur: 1.0, chord: [57, 60, 64] },
+                { midi: 65, dur: 1.0, chord: [65, 69, 72] },
+                { midi: 67, dur: 1.4, chord: [67, 71, 74] },
+              ],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Do majeur',
+              text: 'Do-Mi-Sol.',
+              chord: [60, 64, 67],
+            },
+            {
+              type: 'practice-chord',
+              title: 'La mineur',
+              text: 'La-Do-Mi.',
+              chord: [57, 60, 64],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Fa majeur',
+              text: 'Fa-La-Do.',
+              chord: [65, 69, 72],
+            },
+            {
+              type: 'practice-chord',
+              title: 'Sol majeur',
+              text: 'Sol-Si-Ré. La grille peut boucler indéfiniment.',
+              chord: [67, 71, 74],
+            },
+          ],
+        },
+      ],
+    },
+
+    // =========================================================
+    // Module XIII — Lecture sur portée (clé de sol)
+    // =========================================================
+    {
+      id: 'm12',
+      level: 'intermediate',
+      title: 'Lire la portée',
+      eyebrow: 'Module · Solfège',
+      blurb: 'Reconnaître les notes sur les cinq lignes — clé de sol.',
+      lessons: [
+        {
+          id: 'm12-l1',
+          title: 'La portée et la clé de sol',
+          summary: 'Cinq lignes, quatre interlignes, et un signe qui dit où on est.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le système universel',
+              text: 'Une <strong>portée</strong> est composée de 5 lignes horizontales et 4 interlignes. La <strong>clé de sol</strong> 𝄞 placée au début dit : « la 2e ligne en partant du bas, c\'est Sol ».',
+            },
+            {
+              type: 'highlight',
+              title: 'Le Do central, sur la portée',
+              text: 'Le Do central se trouve juste en dessous de la portée, sur une <em>ligne supplémentaire</em>. Voici à quoi ça ressemble.',
+              highlights: [{ midi: 60, color: 'gold', label: 'Do' }],
+            },
+            {
+              type: 'practice-key',
+              title: 'Joue le Do central',
+              text: 'La note dessinée sous la portée.',
+              midi: 60,
+            },
+          ],
+        },
+        {
+          id: 'm12-l2',
+          title: 'Mi-Sol-Si-Ré-Fa',
+          summary: 'Les notes sur les lignes (de bas en haut).',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Une mnémonique simple',
+              text: 'Sur les <strong>lignes</strong> de la portée (de bas en haut) : <em>Mi-Sol-Si-Ré-Fa</em>. Beaucoup de musiciens retiennent : « <strong>Mi</strong>nuscule <strong>So</strong>uris <strong>Si</strong>fflante <strong>Re</strong>narde <strong>Fa</strong>cétieuse ».',
+            },
+            {
+              type: 'highlight',
+              title: 'Les 5 notes des lignes',
+              text: 'Mi (1re ligne) — Sol — Si — Ré — Fa (5e ligne).',
+              highlights: [
+                { midi: 64, color: 'gold', label: 'Mi' },
+                { midi: 67, color: 'gold', label: 'Sol' },
+                { midi: 71, color: 'gold', label: 'Si' },
+                { midi: 74, color: 'gold', label: 'Ré' },
+                { midi: 77, color: 'gold', label: 'Fa' },
+              ],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Joue les 5 notes des lignes',
+              text: 'Mi-Sol-Si-Ré-Fa, dans l\'ordre.',
+              sequence: [64, 67, 71, 74, 77],
+            },
+            {
+              type: 'quiz',
+              title: 'Vérification',
+              question: 'Quelle note se trouve sur la <strong>3e ligne</strong> (du milieu) ?',
+              options: ['Sol', 'Si', 'Ré'],
+              correct: 1,
+              explain: 'Si — Mi (1re), Sol (2e), <strong>Si (3e)</strong>, Ré (4e), Fa (5e).',
+            },
+          ],
+        },
+        {
+          id: 'm12-l3',
+          title: 'Fa-La-Do-Mi',
+          summary: 'Les notes dans les interlignes.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'L\'autre moitié',
+              text: 'Dans les <strong>interlignes</strong> de la portée (de bas en haut) : <em>Fa-La-Do-Mi</em>. Mnémonique courante : <strong>FACE</strong> (en anglais — ça forme le mot « visage »).',
+            },
+            {
+              type: 'highlight',
+              title: 'Les 4 notes des interlignes',
+              text: 'Fa, La, Do, Mi.',
+              highlights: [
+                { midi: 65, color: 'gold', label: 'Fa' },
+                { midi: 69, color: 'gold', label: 'La' },
+                { midi: 72, color: 'gold', label: 'Do' },
+                { midi: 76, color: 'gold', label: 'Mi' },
+              ],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Joue les 4 interlignes',
+              text: 'Fa-La-Do-Mi, dans l\'ordre.',
+              sequence: [65, 69, 72, 76],
+            },
+            {
+              type: 'quiz',
+              title: 'Récapitulatif',
+              question: 'Lignes (Mi-Sol-Si-Ré-Fa) + Interlignes (Fa-La-Do-Mi) = combien de notes différentes sur la portée en clé de sol ?',
+              options: ['7', '9', '5'],
+              correct: 1,
+              explain: '9 positions (sur 5 lignes + 4 interlignes), mais elles couvrent surtout l\'octave entre Mi3 et Fa5.',
+            },
+          ],
+        },
+      ],
+    },
+
+    // =========================================================
+    // Module XIV — Rythmes avancés
+    // =========================================================
+    {
+      id: 'm13',
+      level: 'intermediate',
+      title: 'Rythmes avancés',
+      eyebrow: 'Module · Pulsation+',
+      blurb: 'Silences, syncopes, doubles croches.',
+      lessons: [
+        {
+          id: 'm13-l1',
+          title: 'Le silence',
+          summary: 'Ne rien jouer aussi est de la musique.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le silence est une note',
+              text: 'À chaque durée de note correspond un <strong>silence</strong> de même durée. Une <em>pause</em> = silence d\'une noire. Un <em>demi-soupir</em> = silence d\'une croche. Pendant un silence, tu ne joues rien — mais tu comptes.',
+            },
+            {
+              type: 'rhythm-tap',
+              title: 'Noire — silence — noire — silence',
+              text: 'Tape, attends 1 temps, tape, attends. Le silence vaut autant qu\'une note.',
+              bpm: 70,
+              meter: 4,
+              pattern: [1, 1, 1, 1], // user taps on 1 and 3, but we accept all 4 for simplicity in the engine
+              tolerance: 0.28,
+            },
+            {
+              type: 'rhythm-tap',
+              title: 'Pattern syncopé',
+              text: 'Noire, croche-croche, silence (compté), noire-noire.',
+              bpm: 65,
+              meter: 4,
+              pattern: [1, 0.5, 0.5, 1, 1],
+              tolerance: 0.25,
+            },
+          ],
+        },
+        {
+          id: 'm13-l2',
+          title: 'Doubles croches',
+          summary: 'Quatre notes par temps.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Plus rapide encore',
+              text: 'Une <strong>double-croche</strong> = un quart de noire. Il en faut <strong>quatre</strong> pour remplir un battement. On compte « <em>un-e-et-a</em> ».',
+            },
+            {
+              type: 'rhythm-tap',
+              title: 'Quatre doubles par temps',
+              text: 'Tape 4 fois exactement régulières par battement.',
+              bpm: 50,
+              meter: 4,
+              pattern: [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25],
+              tolerance: 0.18,
+            },
+            {
+              type: 'rhythm-tap',
+              title: 'Mélange croches + doubles',
+              text: 'Croche, deux doubles, croche, deux doubles. Garde la pulsation.',
+              bpm: 55,
+              meter: 4,
+              pattern: [0.5, 0.25, 0.25, 0.5, 0.25, 0.25, 0.5, 0.25, 0.25, 0.5, 0.25, 0.25],
+              tolerance: 0.18,
+            },
+          ],
+        },
+        {
+          id: 'm13-l3',
+          title: 'Syncope',
+          summary: 'Accent à contretemps.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le « contre-temps »',
+              text: 'Une <strong>syncope</strong> place l\'accent là où on ne s\'attend pas — sur le « et » entre deux temps. C\'est le moteur du jazz, du funk, du reggae.',
+            },
+            {
+              type: 'rhythm-tap',
+              title: 'Pattern syncopé classique',
+              text: 'Croche-noire-croche-noire — l\'accent tombe sur le deuxième « et ».',
+              bpm: 75,
+              meter: 4,
+              pattern: [0.5, 1, 0.5, 1, 0.5, 1, 0.5, 0.5],
+              tolerance: 0.22,
+            },
+          ],
+        },
+      ],
+    },
+
+    // =========================================================
+    // Module XV — Tonalités voisines
+    // =========================================================
+    {
+      id: 'm14',
+      level: 'intermediate',
+      title: 'Tonalités voisines',
+      eyebrow: 'Module · Au-delà de Do',
+      blurb: 'Sortir de Do : les premiers dièses, les premiers bémols.',
+      lessons: [
+        {
+          id: 'm14-l1',
+          title: 'Sol majeur',
+          summary: 'Une nouvelle tonalité, un nouveau dièse.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le passage par le dièse',
+              text: 'Sol majeur ressemble beaucoup à Do majeur, mais avec une différence essentielle : le <strong>Fa devient Fa#</strong>. C\'est la première tonalité qu\'on apprend après Do.',
+            },
+            {
+              type: 'highlight',
+              title: 'La gamme de Sol majeur',
+              text: 'Sol-La-Si-Do-Ré-Mi-Fa#-Sol. Le 7e degré est un dièse !',
+              highlights: [
+                { midi: 67, color: 'gold', label: 'Sol' },
+                { midi: 69, color: 'gold', label: 'La' },
+                { midi: 71, color: 'gold', label: 'Si' },
+                { midi: 72, color: 'gold', label: 'Do' },
+                { midi: 74, color: 'gold', label: 'Ré' },
+                { midi: 76, color: 'gold', label: 'Mi' },
+                { midi: 78, color: 'petrol', label: 'Fa#' },
+                { midi: 79, color: 'gold', label: 'Sol' },
+              ],
+            },
+            {
+              type: 'listen',
+              title: 'Écoute la gamme de Sol',
+              text: 'Note le Fa# qui sonne plus tendu que le Fa naturel.',
+              sequence: [
+                { midi: 67, dur: 0.35 }, { midi: 69, dur: 0.35 }, { midi: 71, dur: 0.35 },
+                { midi: 72, dur: 0.35 }, { midi: 74, dur: 0.35 }, { midi: 76, dur: 0.35 },
+                { midi: 78, dur: 0.35 }, { midi: 79, dur: 0.7 },
+              ],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Joue la gamme de Sol',
+              text: 'Tu vas devoir <strong>aller chercher la touche noire</strong> Fa# au lieu du Fa blanc.',
+              sequence: [67, 69, 71, 72, 74, 76, 78, 79],
+              fingers: [1, 2, 3, 1, 2, 3, 4, 5],
+            },
+          ],
+        },
+        {
+          id: 'm14-l2',
+          title: 'Fa majeur',
+          summary: 'Côté bémol, avec Si bémol.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le passage par le bémol',
+              text: 'Fa majeur va dans l\'autre direction du cycle des quintes : il introduit un <strong>Si bémol</strong> à la place du Si naturel. C\'est la 2e tonalité fondamentale après Do.',
+            },
+            {
+              type: 'highlight',
+              title: 'La gamme de Fa majeur',
+              text: 'Fa-Sol-La-Sib-Do-Ré-Mi-Fa. Le Si est aplati d\'un demi-ton.',
+              highlights: [
+                { midi: 65, color: 'gold', label: 'Fa' },
+                { midi: 67, color: 'gold', label: 'Sol' },
+                { midi: 69, color: 'gold', label: 'La' },
+                { midi: 70, color: 'petrol', label: 'Sib' },
+                { midi: 72, color: 'gold', label: 'Do' },
+                { midi: 74, color: 'gold', label: 'Ré' },
+                { midi: 76, color: 'gold', label: 'Mi' },
+                { midi: 77, color: 'gold', label: 'Fa' },
+              ],
+            },
+            {
+              type: 'listen',
+              title: 'Écoute la gamme de Fa',
+              text: 'Sib donne une couleur plus douce que Si naturel.',
+              sequence: [
+                { midi: 65, dur: 0.35 }, { midi: 67, dur: 0.35 }, { midi: 69, dur: 0.35 },
+                { midi: 70, dur: 0.35 }, { midi: 72, dur: 0.35 }, { midi: 74, dur: 0.35 },
+                { midi: 76, dur: 0.35 }, { midi: 77, dur: 0.7 },
+              ],
+            },
+            {
+              type: 'practice-sequence',
+              title: 'Joue la gamme de Fa',
+              text: 'Le pouce passe sous, mais cette fois pour atteindre Sib (touche noire).',
+              sequence: [65, 67, 69, 70, 72, 74, 76, 77],
+              fingers: [1, 2, 3, 4, 1, 2, 3, 4],
+            },
+          ],
+        },
+        {
+          id: 'm14-l3',
+          title: 'Cycle des quintes',
+          summary: 'Comment les tonalités s\'enchaînent.',
+          steps: [
+            {
+              type: 'intro',
+              title: 'Le cycle musical',
+              text: 'Les tonalités s\'enchaînent par <strong>quintes justes</strong>. Côté <em>dièses</em> : Do (0) → Sol (1#) → Ré (2#) → La (3#) → Mi (4#)... Côté <em>bémols</em> : Do (0) → Fa (1♭) → Sib (2♭) → Mib (3♭)... Chaque cran ajoute une altération.',
+            },
+            {
+              type: 'quiz',
+              title: 'Le 1er dièse',
+              question: 'Combien de dièses dans la tonalité de <strong>Sol majeur</strong> ?',
+              options: ['0', '1', '2', '3'],
+              correct: 1,
+              explain: 'Un seul : Fa#. C\'est la 1re tonalité « dièse ».',
+            },
+            {
+              type: 'quiz',
+              title: 'Le 1er bémol',
+              question: 'Combien de bémols dans la tonalité de <strong>Fa majeur</strong> ?',
+              options: ['0', '1', '2'],
+              correct: 1,
+              explain: 'Un seul : Sib. C\'est la 1re tonalité « bémol ».',
+            },
+            {
+              type: 'quiz',
+              title: 'Vue d\'ensemble',
+              question: 'En allant <strong>du côté des bémols</strong>, l\'ordre est…',
+              options: [
+                'Fa → Sib → Mib → Lab',
+                'Sol → Ré → La → Mi',
+                'Do → Mi → Sol → Si',
+              ],
+              correct: 0,
+              explain: 'Côté bémols : Fa → Sib → Mib → Lab → Réb. Chaque cran rajoute un bémol au début.',
+            },
+          ],
+        },
+      ],
+    },
   ];
 
   // ------------------------------------------------------------
@@ -717,47 +1984,103 @@
     if (!e.lessonBrowser) return;
     e.lessonBrowser.innerHTML = '';
 
-    for (const mod of MODULES) {
-      const modEl = document.createElement('section');
-      modEl.className = 'module';
+    // Warmup is shown via the header menu modal, not in the École browser.
+    // Beginner & Intermediate groups (curriculum proper) — collapsible.
+    const LEVEL_GROUPS = [
+      { key: 'beginner',     title: 'Débutant',      desc: 'Les bases : repérage, doigté, premiers morceaux et accords.' },
+      { key: 'intermediate', title: 'Intermédiaire', desc: 'Aller plus loin : harmonie, lecture, technique, autres tonalités.' },
+    ];
 
-      const head = document.createElement('header');
-      head.className = 'module-head';
-      head.innerHTML = `<span class="module-eyebrow">${mod.eyebrow}</span>
-                        <h3>${mod.title}</h3>
-                        <p>${mod.blurb}</p>`;
-      modEl.appendChild(head);
+    let collapsed = {};
+    try { collapsed = JSON.parse(localStorage.getItem('etude-level-collapsed') || '{}'); }
+    catch (_) {}
 
-      const list = document.createElement('ol');
-      list.className = 'lesson-list';
-      mod.lessons.forEach((les, idx) => {
-        const li = document.createElement('li');
-        li.className = 'lesson-item';
-        const isDone = !!state.progress.completed[les.id];
-        const isCurrent = state.lesson && state.lesson.id === les.id;
-        if (isDone) li.classList.add('is-done');
-        if (isCurrent) li.classList.add('is-current');
+    function saveCollapsed() {
+      try { localStorage.setItem('etude-level-collapsed', JSON.stringify(collapsed)); } catch (_) {}
+    }
 
-        const num = document.createElement('span');
-        num.className = 'lesson-num';
-        num.textContent = String(idx + 1).padStart(2, '0');
+    for (const grp of LEVEL_GROUPS) {
+      const mods = MODULES.filter((m) => (m.level || 'beginner') === grp.key);
+      if (mods.length === 0) continue;
 
-        const body = document.createElement('div');
-        body.className = 'lesson-meta';
-        body.innerHTML = `<strong>${les.title}</strong><span>${les.summary}</span>`;
+      const totalLessons = mods.reduce((acc, m) => acc + m.lessons.length, 0);
+      const doneLessons  = mods.reduce(
+        (acc, m) => acc + m.lessons.filter((l) => state.progress.completed[l.id]).length,
+        0
+      );
 
-        const mark = document.createElement('span');
-        mark.className = 'lesson-mark';
-        mark.textContent = isDone ? '✓' : (isCurrent ? '●' : '');
+      const section = document.createElement('div');
+      section.className = `level-group level-${grp.key}`;
+      if (collapsed[grp.key]) section.classList.add('is-collapsed');
 
-        li.appendChild(num);
-        li.appendChild(body);
-        li.appendChild(mark);
-        li.addEventListener('click', () => openLesson(les.id));
-        list.appendChild(li);
+      const header = document.createElement('button');
+      header.type = 'button';
+      header.className = 'level-header';
+      header.setAttribute('aria-expanded', String(!collapsed[grp.key]));
+      header.innerHTML = `
+        <div class="level-header-text">
+          <span class="level-eyebrow">${grp.title}</span>
+          <p class="level-desc">${grp.desc}</p>
+        </div>
+        <span class="level-counter">${doneLessons} / ${totalLessons}</span>
+        <span class="level-chevron" aria-hidden="true">▾</span>
+      `;
+      header.addEventListener('click', () => {
+        const isNow = !section.classList.contains('is-collapsed');
+        section.classList.toggle('is-collapsed', isNow);
+        collapsed[grp.key] = isNow;
+        saveCollapsed();
+        header.setAttribute('aria-expanded', String(!isNow));
       });
-      modEl.appendChild(list);
-      e.lessonBrowser.appendChild(modEl);
+      section.appendChild(header);
+
+      const content = document.createElement('div');
+      content.className = 'level-content';
+
+      for (const mod of mods) {
+        const modEl = document.createElement('section');
+        modEl.className = 'module';
+
+        const head = document.createElement('header');
+        head.className = 'module-head';
+        head.innerHTML = `<span class="module-eyebrow">${mod.eyebrow}</span>
+                          <h3>${mod.title}</h3>
+                          <p>${mod.blurb}</p>`;
+        modEl.appendChild(head);
+
+        const list = document.createElement('ol');
+        list.className = 'lesson-list';
+        mod.lessons.forEach((les, idx) => {
+          const li = document.createElement('li');
+          li.className = 'lesson-item';
+          const isDone = !!state.progress.completed[les.id];
+          const isCurrent = state.lesson && state.lesson.id === les.id;
+          if (isDone) li.classList.add('is-done');
+          if (isCurrent) li.classList.add('is-current');
+
+          const num = document.createElement('span');
+          num.className = 'lesson-num';
+          num.textContent = String(idx + 1).padStart(2, '0');
+
+          const body = document.createElement('div');
+          body.className = 'lesson-meta';
+          body.innerHTML = `<strong>${les.title}</strong><span>${les.summary}</span>`;
+
+          const mark = document.createElement('span');
+          mark.className = 'lesson-mark';
+          mark.textContent = isDone ? '✓' : (isCurrent ? '●' : '');
+
+          li.appendChild(num);
+          li.appendChild(body);
+          li.appendChild(mark);
+          li.addEventListener('click', () => openLesson(les.id));
+          list.appendChild(li);
+        });
+        modEl.appendChild(list);
+        content.appendChild(modEl);
+      }
+      section.appendChild(content);
+      e.lessonBrowser.appendChild(section);
     }
   }
 
@@ -985,6 +2308,8 @@
       seq: step.sequence.slice(),
       fingers: step.fingers ? step.fingers.slice() : null,
       pos: 0,
+      repeats: Math.max(1, step.repeat || 1),
+      repeatDone: 0,
     };
     refreshSequenceHighlight();
   }
@@ -1006,8 +2331,11 @@
     const f = p.fingers ? p.fingers[p.pos] : null;
     clearKeyHints();
     applyHighlights([{ midi: m, color: f != null ? 'finger' : 'gold', label: f != null ? String(f) : null }]);
+    const repeatBadge = p.repeats > 1
+      ? ` <span class="repeat-badge">Tour ${p.repeatDone + 1} / ${p.repeats}</span>`
+      : '';
     renderPracticeStatus(
-      `Note <strong>${p.pos + 1}</strong> / ${p.seq.length} — joue <strong>${frName(m)}</strong>${f != null ? ` (doigt ${f})` : ''}.`
+      `Note <strong>${p.pos + 1}</strong> / ${p.seq.length} — joue <strong>${frName(m)}</strong>${f != null ? ` (doigt ${f})` : ''}.${repeatBadge}`
     );
     // Show the current note + next 2 on the staff (lookahead).
     const lookahead = p.seq.slice(p.pos, p.pos + 3);
@@ -1125,11 +2453,30 @@
         if (window.MASCOT) window.MASCOT.cheer('note');
         if (window.DAILY) window.DAILY.report('note-hit');
         if (p.pos >= p.seq.length) {
-          flashSuccess('Excellent ! Séquence complète.');
-          clearKeyHints();
-          const e = getEls();
-          e.lessonNext.disabled = false;
-          e.lessonNext.textContent = (state.stepIndex === state.lesson.steps.length - 1) ? 'Terminer la leçon' : 'Continuer →';
+          p.repeatDone++;
+          if (p.repeatDone >= p.repeats) {
+            flashSuccess(p.repeats > 1
+              ? `Excellent ! ${p.repeats} tours bouclés.`
+              : 'Excellent ! Séquence complète.');
+            clearKeyHints();
+            const e = getEls();
+            e.lessonNext.disabled = false;
+            e.lessonNext.textContent = (state.stepIndex === state.lesson.steps.length - 1) ? 'Terminer la leçon' : 'Continuer →';
+            // Offer "↻ Recommencer" right here, without going through the
+            // "Bien joué" screen — useful for warm-up routines.
+            if (e.lessonReplay) {
+              e.lessonReplay.hidden = false;
+              e.lessonReplay.textContent = '↻ Recommencer';
+              e.lessonReplay.dataset.replayKind = 'sequence-restart';
+            }
+          } else {
+            // Reset for next repetition.
+            flashSuccess(`Tour ${p.repeatDone} / ${p.repeats} — bien joué, recommence.`);
+            p.pos = 0;
+            setTimeout(() => {
+              if (state.practice === p) refreshSequenceHighlight();
+            }, 900);
+          }
         } else {
           refreshSequenceHighlight();
         }
@@ -1559,8 +2906,14 @@
       e.lessonReplay.addEventListener('click', () => {
         if (!state.lesson) return;
         const step = state.lesson.steps[state.stepIndex];
+        // Sequence completed → restart the same exercise without leaving the step.
+        if (e.lessonReplay.dataset.replayKind === 'sequence-restart' && step && step.type === 'practice-sequence') {
+          delete e.lessonReplay.dataset.replayKind;
+          renderStep();
+          return;
+        }
         if (state.practice && state.practice.kind === 'done') {
-          // Refaire la leçon
+          // Refaire toute la leçon depuis le début
           state.stepIndex = 0;
           state.progress.completed[state.lesson.id] = false;
           saveProgress();
@@ -1576,10 +2929,25 @@
           renderStep();
           return;
         }
-        if (step && step.sequence) playSequence(step.sequence);
-        else if (step && step.type === 'practice-sequence') {
-          // Demo from sequence.
-          playSequence(step.sequence.map((m) => ({ midi: m, dur: 0.4 })));
+        // practice-sequence: sequence is an array of midi numbers — wrap into objects.
+        if (step && step.type === 'practice-sequence' && step.sequence) {
+          // Hide the static "next note" hint while the demo plays so the
+          // user sees only the keys actually being played, in sync with audio.
+          clearKeyHints();
+          const seqObjs = step.sequence.map((m) => ({ midi: m, dur: 0.4 }));
+          playSequence(seqObjs);
+          // Restore the highlight when the demo is done.
+          const totalMs = seqObjs.reduce((acc, s) => acc + (s.dur + 0.03) * 1000, 0);
+          setTimeout(() => {
+            if (state.practice && state.practice.kind === 'sequence') {
+              refreshSequenceHighlight();
+            }
+          }, totalMs + 250);
+          return;
+        }
+        // listen step: sequence is already an array of {midi, dur, chord?}.
+        if (step && step.sequence) {
+          playSequence(step.sequence);
         }
       });
     }
@@ -1596,10 +2964,13 @@
   window.SCHOOL = {
     init: attach,
     setMode,
+    openLesson: (lessonId) => { setMode('school'); openLesson(lessonId); },
+    findModule: (modId) => MODULES.find((m) => m.id === modId),
     onNoteOn: handleNoteOn,
     onNoteOff: handleNoteOff,
     isActive: () => state.active,
     isLessonRunning: () => state.active && !!state.lesson,
+    isCompleted: (lessonId) => !!state.progress.completed[lessonId],
   };
   window.SCHOOL_MODULES = MODULES;
 

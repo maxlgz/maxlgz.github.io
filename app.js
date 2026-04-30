@@ -1,4 +1,4 @@
-const APP_VERSION = 'v0.23.1';
+const APP_VERSION = 'v0.35.1';
 
 // Default keyboard window — overridable at runtime via setKeyboardLayout().
 let FIRST_MIDI = 36; // C2
@@ -47,6 +47,27 @@ const difficultySelect = document.getElementById('lesson-difficulty');
 const songSelect = document.getElementById('lesson-song');
 const handSelect = document.getElementById('lesson-hand');
 const sectionSelect = document.getElementById('lesson-section');
+const speedInput = document.getElementById('lesson-speed');
+const speedValueEl = document.getElementById('lesson-speed-value');
+
+function getSpeedPct() {
+  const v = speedInput ? parseInt(speedInput.value, 10) : 100;
+  return Math.max(25, Math.min(200, v || 100));
+}
+function refreshSpeedLabel() {
+  if (speedValueEl) speedValueEl.textContent = getSpeedPct() + ' %';
+}
+if (speedInput) {
+  try {
+    const saved = parseInt(localStorage.getItem('etude-lesson-speed'), 10);
+    if (saved >= 25 && saved <= 200) speedInput.value = String(saved);
+  } catch (_) {}
+  speedInput.addEventListener('input', () => {
+    refreshSpeedLabel();
+    try { localStorage.setItem('etude-lesson-speed', String(getSpeedPct())); } catch (_) {}
+  });
+  refreshSpeedLabel();
+}
 const startBtn = document.getElementById('lesson-start');
 const playBtn = document.getElementById('lesson-play');
 const waitToggle = document.getElementById('lesson-wait');
@@ -187,8 +208,40 @@ function ensureAudio() {
 
 let currentInstrumentId = DEFAULT_INSTRUMENT_ID;
 let sfInstrument = null;
-const sfCache = new Map();
+const sfCache = new Map();           // by sf name (current voice select)
+const sfByName = new Map();          // by sf name (per-track GM cache)
 let sfLoadToken = 0;
+
+// Load (or reuse) a Soundfont instrument by GM name. Used by accomp tracks.
+async function ensureSoundfont(name) {
+  if (!name) return null;
+  if (sfByName.has(name)) return sfByName.get(name);
+  if (!window.Soundfont) return null;
+  ensureAudio();
+  if (!audioCtx) return null;
+  // Reuse instances already loaded via the instrument picker.
+  if (sfCache.has(name)) {
+    sfByName.set(name, sfCache.get(name));
+    return sfCache.get(name);
+  }
+  try {
+    const inst = await window.Soundfont.instrument(audioCtx, name, { soundfont: 'MusyngKite' });
+    sfByName.set(name, inst);
+    return inst;
+  } catch (e) {
+    console.warn('[soundfont] failed to load', name, e);
+    return null;
+  }
+}
+
+function preloadTrackSoundfonts(songDef) {
+  if (!songDef || !songDef.tracks) return Promise.resolve();
+  const names = new Set();
+  for (const tr of songDef.tracks) {
+    if (tr.soundfontName) names.add(tr.soundfontName);
+  }
+  return Promise.all([...names].map(ensureSoundfont));
+}
 
 function getInstrument(id) { return INSTRUMENTS.find((i) => i.id === id); }
 
@@ -239,10 +292,27 @@ async function selectInstrument(id) {
   }
 }
 
-function playAudio(midi, velocity) {
+function playAudio(midi, velocity, sfName) {
   ensureAudio();
   if (!audioCtx) return;
   stopAudio(midi, true);
+
+  // Per-track soundfont path (accompaniment notes).
+  if (sfName) {
+    const inst = sfByName.get(sfName);
+    if (inst) {
+      try {
+        const handle = inst.play(midi, audioCtx.currentTime, {
+          gain: Math.max(0.1, (velocity / 127) * 1.4),
+        });
+        activeVoices.set(midi, { kind: 'sf', handle });
+      } catch (e) { console.error(e); }
+      return;
+    }
+    // Soundfont not yet loaded — kick off the load and fall through to default.
+    ensureSoundfont(sfName);
+  }
+
   const def = getInstrument(currentInstrumentId);
   if (def && def.kind === 'soundfont' && sfInstrument) {
     try {
@@ -300,13 +370,13 @@ function setNoteDisplay() {
   noteDisplayEl.textContent = text;
 }
 
-function triggerNote(midi, velocity = 100) {
-  if (midi < FIRST_MIDI || midi > LAST_MIDI) { playAudio(midi, velocity); return; }
+function triggerNote(midi, velocity = 100, sfName = null) {
+  if (midi < FIRST_MIDI || midi > LAST_MIDI) { playAudio(midi, velocity, sfName); return; }
   held.add(midi);
   const el = keyEls.get(midi);
   if (el) el.classList.add('active');
   setNoteDisplay();
-  playAudio(midi, velocity);
+  playAudio(midi, velocity, sfName);
   if (lesson.running) registerLessonHit(midi);
   if (window.SCHOOL && window.SCHOOL.isActive()) window.SCHOOL.onNoteOn(midi);
 }
@@ -405,6 +475,7 @@ function populateSongSelect() {
     opt.disabled = true;
     songSelect.appendChild(opt);
     startBtn.disabled = true;
+    renderTracksPanel();
     return;
   }
   for (const s of matches) {
@@ -414,7 +485,160 @@ function populateSongSelect() {
     songSelect.appendChild(opt);
   }
   startBtn.disabled = false;
+  renderTracksPanel();
 }
+
+// ---------- Tracks panel (per-song mixer) ----------
+
+const TRACK_PREFS_KEY = 'etude-track-prefs-v1';
+
+function loadTrackPrefs() {
+  try { return JSON.parse(localStorage.getItem(TRACK_PREFS_KEY) || '{}'); }
+  catch (_) { return {}; }
+}
+function saveTrackPrefs(prefs) {
+  try { localStorage.setItem(TRACK_PREFS_KEY, JSON.stringify(prefs)); } catch (_) {}
+}
+function getSongPrefs(song) {
+  if (!song || !song.tracks) return null;
+  const all = loadTrackPrefs();
+  let p = all[song.id];
+  if (!p) {
+    p = {
+      enabled: { ...song.defaultEnabled },
+      roles: { ...song.defaultRoles },
+      userTrackId: song.defaultUserTrackId,
+    };
+    all[song.id] = p;
+    saveTrackPrefs(all);
+  }
+  return p;
+}
+function updateSongPrefs(song, fn) {
+  if (!song || !song.tracks) return;
+  const all = loadTrackPrefs();
+  const p = all[song.id] || {
+    enabled: { ...song.defaultEnabled },
+    roles: { ...song.defaultRoles },
+    userTrackId: song.defaultUserTrackId,
+  };
+  fn(p);
+  all[song.id] = p;
+  saveTrackPrefs(all);
+}
+
+function getCurrentSongDef() {
+  return (window.SONGS || []).find((s) => s.id === songSelect.value);
+}
+
+function renderTracksPanel() {
+  const group = document.getElementById('tracks-group');
+  const list = document.getElementById('track-list');
+  const bulk = document.getElementById('track-bulk');
+  if (!group || !list) return;
+  const song = getCurrentSongDef();
+  if (!song || !song.tracks || song.tracks.length === 0) {
+    group.hidden = true;
+    return;
+  }
+  group.hidden = false;
+  const prefs = getSongPrefs(song);
+  list.innerHTML = '';
+
+  // Compute "all on" / "all off" state for the bulk row.
+  const togglable = song.tracks.filter((t) => !t.isDrums);
+  const allOn = togglable.every((t) => prefs.enabled[t.id] !== false);
+  const allOff = togglable.every((t) => prefs.enabled[t.id] === false);
+  if (bulk) {
+    bulk.querySelector('[data-bulk="all"]').classList.toggle('is-active', allOn);
+    bulk.querySelector('[data-bulk="none"]').classList.toggle('is-active', allOff);
+  }
+
+  for (const tr of song.tracks) {
+    const enabled = prefs.enabled[tr.id] !== false;
+    const role = prefs.roles[tr.id] || 'accomp';
+    const row = document.createElement('div');
+    row.className = 'track-row';
+    if (!enabled) row.classList.add('is-off');
+    if (role === 'user') row.classList.add('is-user');
+
+    row.innerHTML = `
+      <span class="track-swatch" style="background:${tr.color}" aria-hidden="true"></span>
+      <div class="track-meta">
+        <strong>${tr.name}</strong>
+        <span>${tr.category}${tr.isDrums ? '' : ` · ${tr.noteCount} notes`}</span>
+      </div>
+      <div class="track-actions">
+        <button type="button" class="track-mine ${role === 'user' ? 'is-active' : ''}" title="Définir comme ta partie" ${tr.isDrums ? 'disabled' : ''}>
+          ${role === 'user' ? '★' : '☆'}
+        </button>
+        <label class="track-onoff" title="Activer / désactiver">
+          <input type="checkbox" ${enabled ? 'checked' : ''} />
+          <span class="track-onoff-track" aria-hidden="true"></span>
+        </label>
+      </div>
+    `;
+
+    const mineBtn = row.querySelector('.track-mine');
+    mineBtn.addEventListener('click', () => {
+      if (tr.isDrums) return;
+      updateSongPrefs(song, (p) => {
+        // Demote previous user track to accomp.
+        for (const id of Object.keys(p.roles)) {
+          if (p.roles[id] === 'user') p.roles[id] = 'accomp';
+        }
+        p.roles[tr.id] = 'user';
+        p.userTrackId = tr.id;
+        // Make sure the user track is enabled.
+        p.enabled[tr.id] = true;
+      });
+      renderTracksPanel();
+    });
+
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    checkbox.addEventListener('change', () => {
+      updateSongPrefs(song, (p) => {
+        p.enabled[tr.id] = checkbox.checked;
+        // If we just disabled the user track, demote it.
+        if (!checkbox.checked && p.roles[tr.id] === 'user') {
+          p.roles[tr.id] = 'accomp';
+        }
+      });
+      renderTracksPanel();
+    });
+
+    list.appendChild(row);
+  }
+}
+
+if (songSelect) songSelect.addEventListener('change', renderTracksPanel);
+
+function bulkSetTracks(action) {
+  const song = getCurrentSongDef();
+  if (!song || !song.tracks) return;
+  updateSongPrefs(song, (p) => {
+    for (const tr of song.tracks) {
+      if (tr.isDrums) continue;
+      if (action === 'all') {
+        p.enabled[tr.id] = true;
+      } else if (action === 'none') {
+        p.enabled[tr.id] = false;
+        if (p.roles[tr.id] === 'user') p.roles[tr.id] = 'accomp';
+      } else if (action === 'reset') {
+        p.enabled[tr.id] = song.defaultEnabled[tr.id];
+        p.roles[tr.id] = song.defaultRoles[tr.id];
+      }
+    }
+    if (action === 'reset') p.userTrackId = song.defaultUserTrackId;
+  });
+  renderTracksPanel();
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-bulk]');
+  if (!btn) return;
+  bulkSetTracks(btn.dataset.bulk);
+});
 
 function startLesson(autoplay = false) {
   const diff = difficultySelect.value;
@@ -424,15 +648,49 @@ function startLesson(autoplay = false) {
 
   ensureAudio();
 
-  const beatDur = 60 / songDef.bpm;
+  const speedPct = getSpeedPct();
+  // 100% = original tempo. 50% = half speed (notes last twice as long).
+  const beatDur = (60 / songDef.bpm) * (100 / speedPct);
   const accompOn = !autoplay && !!(accompToggle && accompToggle.checked) && (hand === 'right' || hand === 'left');
   const otherHand = hand === 'right' ? 'L' : 'R';
   const section = sectionSelect ? sectionSelect.value : 'all';
 
-  // Section filter: keep notes whose beat is in [from, to[ and shift to start at 0.
-  const allBeats = songDef.notes.map((n) => n.beat);
-  const songStart = Math.min(...allBeats, 0);
-  const songEnd = Math.max(...allBeats.map((b, i) => b + (songDef.notes[i].length || 0)), 0);
+  // Determine if the song has multi-track data (imported MIDI) or only flat notes.
+  const hasTracks = !!(songDef.tracks && songDef.tracks.length > 0);
+  const prefs = hasTracks ? getSongPrefs(songDef) : null;
+
+  // Build the union of notes we care about, with metadata.
+  // For multi-track: use tracks based on roles. For single: fall back to flat notes.
+  const sourceNotes = [];
+  if (hasTracks) {
+    for (const tr of songDef.tracks) {
+      const enabled = prefs.enabled[tr.id] !== false;
+      const role = prefs.roles[tr.id] || 'accomp';
+      if (!enabled || role === 'mute' || tr.isDrums) continue;
+      for (const n of tr.notes) {
+        sourceNotes.push({
+          midi: n.midi, hand: n.hand, beat: n.beat, length: n.length,
+          trackId: tr.id, trackColor: tr.color, role,
+          trackSoundfont: tr.soundfontName,
+        });
+      }
+    }
+  } else {
+    for (const n of songDef.notes) {
+      sourceNotes.push({
+        midi: n.midi, hand: n.hand, beat: n.beat, length: n.length,
+        trackId: null, trackColor: null, role: 'user',
+        trackSoundfont: null,
+      });
+    }
+  }
+
+  // Section filter on the unified set.
+  const allBeats = sourceNotes.map((n) => n.beat);
+  const songStart = allBeats.length ? Math.min(...allBeats, 0) : 0;
+  const songEnd = allBeats.length
+    ? Math.max(...sourceNotes.map((n) => n.beat + (n.length || 0)), 0)
+    : 0;
   const songLen = songEnd - songStart;
   let from = songStart, to = songEnd;
   switch (section) {
@@ -446,14 +704,36 @@ function startLesson(autoplay = false) {
   function inSection(n) { return n.beat >= from - 0.001 && n.beat < to + 0.001; }
   function shiftBeat(b) { return b - from; }
 
-  // User notes = the hand the user is practicing.
-  const userNotes = songDef.notes.filter((n) =>
-    inSection(n) && (hand === 'both' || (hand === 'right' && n.hand === 'R') || (hand === 'left' && n.hand === 'L'))
+  // Hand filter ONLY applies to user-role notes (when single-track or user track).
+  function matchesHand(n) {
+    if (hand === 'both') return true;
+    if (hand === 'right' && n.hand === 'R') return true;
+    if (hand === 'left' && n.hand === 'L') return true;
+    return false;
+  }
+
+  // User notes : role 'user' AND in section AND (matches hand filter).
+  const userNotes = sourceNotes.filter((n) =>
+    inSection(n) && n.role === 'user' && matchesHand(n)
   );
-  // Accompaniment notes = the other hand, played by the app, only if toggled.
-  const accompNotes = accompOn
-    ? songDef.notes.filter((n) => inSection(n) && n.hand === otherHand)
-    : [];
+
+  // Accompaniment notes : everything else that should sound.
+  // - Multi-track: all enabled non-user, non-mute tracks.
+  // - Single-track: the OTHER hand if accompOn is set (legacy behaviour).
+  let accompNotes = [];
+  if (hasTracks) {
+    accompNotes = sourceNotes.filter((n) => inSection(n) && n.role === 'accomp');
+    // If user picked one hand, also play the OTHER hand of the user track as accomp
+    // when the toggle is on.
+    if (accompOn && (hand === 'right' || hand === 'left')) {
+      const otherHandUserNotes = sourceNotes.filter((n) =>
+        inSection(n) && n.role === 'user' && n.hand === otherHand
+      );
+      accompNotes = accompNotes.concat(otherHandUserNotes);
+    }
+  } else if (accompOn) {
+    accompNotes = sourceNotes.filter((n) => inSection(n) && n.hand === otherHand);
+  }
 
   lesson.song = songDef;
   lesson.hand = hand;
@@ -470,14 +750,21 @@ function startLesson(autoplay = false) {
       expectedTime: lesson.startTime + shiftBeat(n.beat) * beatDur,
       duration: n.length * beatDur,
       resolved: null, flashUntil: 0, auto: false,
+      trackColor: null,
+      trackSoundfont: null,
     })),
     ...accompNotes.map((n) => ({
       midi: n.midi, hand: n.hand,
       expectedTime: lesson.startTime + shiftBeat(n.beat) * beatDur,
       duration: n.length * beatDur,
       resolved: null, flashUntil: 0, auto: true,
+      trackColor: n.trackColor || null,
+      trackSoundfont: n.trackSoundfont || null,
     })),
   ];
+
+  // Préchargement des soundfonts de toutes les pistes audibles (best effort).
+  if (hasTracks) preloadTrackSoundfonts(songDef);
   lesson.totalScorable = lesson.notes.filter((n) => !n.auto).length;
   lesson.hits = 0;
   lesson.misses = 0;
@@ -674,7 +961,7 @@ function drawHighway() {
     if (adjusted > t) continue;
     note.resolved = 'hit';
     note.flashUntil = t + 0.35;
-    triggerNote(note.midi, note.auto ? 80 : 95);
+    triggerNote(note.midi, note.auto ? 80 : 95, note.trackSoundfont || null);
     const dur = Math.max(0.15, note.duration);
     setTimeout(() => releaseNote(note.midi), dur * 1000);
   }
@@ -702,7 +989,12 @@ function drawHighway() {
     const noteH = Math.max(6, (note.duration / LOOKAHEAD_SEC) * H);
     const yTop = yHead - noteH;
 
-    let color = HAND_COLOR[note.hand] || '#888';
+    let color;
+    if (note.auto && note.trackColor) {
+      color = note.trackColor;
+    } else {
+      color = HAND_COLOR[note.hand] || '#888';
+    }
     if (note.resolved === 'hit' && !lesson.autoplay) color = HIT_COLOR;
     else if (note.resolved === 'miss') color = MISS_COLOR;
 
@@ -798,11 +1090,18 @@ function seekTo(posSec) {
   if (!lesson.running) return;
   const t = now();
   const target = Math.max(0, Math.min(lesson.totalDuration, posSec));
-  // Reset timeShift, recompute startTime so that elapsed === target right now.
+  const oldStartTime = lesson.startTime;
+  const newStartTime = t - target;
+  const delta = newStartTime - oldStartTime;
+  // Rebase every note's expectedTime so the timeline aligns with the new origin.
+  for (const n of lesson.notes) {
+    n.expectedTime += delta;
+  }
+  lesson.startTime = newStartTime;
   lesson.timeShift = 0;
-  lesson.startTime = t - target;
-  // Reset note state: notes whose expected time is before "now" become past
-  // (treated as already played); notes ahead of now are reset to unplayed.
+  lesson.finishing = false;
+  if (lesson.loopTimer) { clearTimeout(lesson.loopTimer); lesson.loopTimer = null; }
+  // Mark notes already gone past as resolved (so they don't replay), reset future ones.
   for (const n of lesson.notes) {
     if (n.expectedTime + n.duration < t) {
       n.resolved = 'hit';
@@ -812,9 +1111,9 @@ function seekTo(posSec) {
       n.flashUntil = 0;
     }
   }
-  // Stop any currently held autoplay/accomp notes.
+  // Stop any currently held autoplay/accomp notes (don't kill user-pressed keys).
   for (const m of [...activeVoices.keys()]) {
-    if (held.has(m)) continue; // user-played, don't kill
+    if (held.has(m)) continue;
     stopAudio(m, true);
   }
 }
@@ -868,8 +1167,78 @@ difficultySelect.value = 'very-easy';
 populateSongSelect();
 difficultySelect.addEventListener('change', populateSongSelect);
 startBtn.addEventListener('click', () => {
-  if (lesson.running) stopLesson();
-  else startLesson(false);
+  if (lesson.running) { stopLesson(); return; }
+  const songDef = (window.SONGS || []).find((s) => s.id === songSelect.value);
+  if (songDef && songDef.tracks && songDef.tracks.length > 1) {
+    openPrestartModal(songDef);
+  } else {
+    startLesson(false);
+  }
+});
+
+// ---------- Prestart modal — pick the track you'll play ----------
+
+function openPrestartModal(songDef) {
+  const overlay = document.getElementById('modal-prestart');
+  const list = document.getElementById('prestart-tracks');
+  if (!overlay || !list) { startLesson(false); return; }
+  const prefs = getSongPrefs(songDef);
+  list.innerHTML = '';
+  let pick = prefs.userTrackId;
+  for (const tr of songDef.tracks) {
+    if (tr.isDrums) continue;
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'prestart-track';
+    if (tr.id === pick) row.classList.add('is-selected');
+    row.innerHTML = `
+      <span class="prestart-swatch" style="background:${tr.color}"></span>
+      <div class="prestart-meta">
+        <strong>${tr.name}</strong>
+        <span>${tr.category} · ${tr.noteCount} notes</span>
+      </div>
+      <span class="prestart-mark" aria-hidden="true">${tr.id === pick ? '★' : '☆'}</span>
+    `;
+    row.addEventListener('click', () => {
+      pick = tr.id;
+      list.querySelectorAll('.prestart-track').forEach((el) => {
+        el.classList.toggle('is-selected', el === row);
+        const m = el.querySelector('.prestart-mark');
+        if (m) m.textContent = el === row ? '★' : '☆';
+      });
+    });
+    list.appendChild(row);
+  }
+  document.getElementById('prestart-go').onclick = () => {
+    updateSongPrefs(songDef, (p) => {
+      for (const id of Object.keys(p.roles)) {
+        if (p.roles[id] === 'user') p.roles[id] = 'accomp';
+      }
+      p.roles[pick] = 'user';
+      p.userTrackId = pick;
+      p.enabled[pick] = true;
+    });
+    renderTracksPanel();
+    closePrestartModal();
+    startLesson(false);
+  };
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('is-open'));
+  document.body.classList.add('modal-locked');
+}
+
+function closePrestartModal() {
+  const overlay = document.getElementById('modal-prestart');
+  if (!overlay) return;
+  overlay.classList.remove('is-open');
+  document.body.classList.remove('modal-locked');
+  setTimeout(() => { overlay.hidden = true; }, 220);
+}
+document.addEventListener('click', (e) => {
+  const close = e.target.closest('#modal-prestart [data-modal-close], #modal-prestart');
+  if (close && (e.target.hasAttribute('data-modal-close') || e.target.id === 'modal-prestart')) {
+    closePrestartModal();
+  }
 });
 
 playBtn.addEventListener('click', () => {
@@ -908,48 +1277,181 @@ function ensureImportedDifficulty() {
   difficultySelect.appendChild(opt);
 }
 
+// GM instrument category from program number (0-127). Returns short FR label.
+function gmCategory(program) {
+  if (program < 8)   return 'Piano';
+  if (program < 16)  return 'Cloches / Mallets';
+  if (program < 24)  return 'Orgue';
+  if (program < 32)  return 'Guitare';
+  if (program < 40)  return 'Basse';
+  if (program < 48)  return 'Cordes';
+  if (program < 56)  return 'Ensemble';
+  if (program < 64)  return 'Cuivres';
+  if (program < 72)  return 'Anches';
+  if (program < 80)  return 'Bois';
+  if (program < 88)  return 'Synthé lead';
+  if (program < 96)  return 'Synthé pad';
+  if (program < 104) return 'Synthé FX';
+  if (program < 112) return 'Ethnique';
+  if (program < 120) return 'Percussions';
+  return 'Effets';
+}
+
+function prettifyInstrument(name, fallback) {
+  if (!name) return fallback;
+  return name
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// General MIDI program → soundfont name (gleitz/midi-js-soundfonts).
+const GM_SOUNDFONT_NAMES = [
+  // 0-7 piano
+  'acoustic_grand_piano','bright_acoustic_piano','electric_grand_piano','honky_tonk_piano',
+  'electric_piano_1','electric_piano_2','harpsichord','clavinet',
+  // 8-15 chromatic percussion
+  'celesta','glockenspiel','music_box','vibraphone','marimba','xylophone','tubular_bells','dulcimer',
+  // 16-23 organ
+  'drawbar_organ','percussive_organ','rock_organ','church_organ','reed_organ','accordion','harmonica','tango_accordion',
+  // 24-31 guitar
+  'acoustic_guitar_nylon','acoustic_guitar_steel','electric_guitar_jazz','electric_guitar_clean',
+  'electric_guitar_muted','overdriven_guitar','distortion_guitar','guitar_harmonics',
+  // 32-39 bass
+  'acoustic_bass','electric_bass_finger','electric_bass_pick','fretless_bass',
+  'slap_bass_1','slap_bass_2','synth_bass_1','synth_bass_2',
+  // 40-47 strings
+  'violin','viola','cello','contrabass','tremolo_strings','pizzicato_strings','orchestral_harp','timpani',
+  // 48-55 ensemble
+  'string_ensemble_1','string_ensemble_2','synth_strings_1','synth_strings_2',
+  'choir_aahs','voice_oohs','synth_choir','orchestra_hit',
+  // 56-63 brass
+  'trumpet','trombone','tuba','muted_trumpet','french_horn','brass_section','synth_brass_1','synth_brass_2',
+  // 64-71 reed
+  'soprano_sax','alto_sax','tenor_sax','baritone_sax','oboe','english_horn','bassoon','clarinet',
+  // 72-79 pipe
+  'piccolo','flute','recorder','pan_flute','blown_bottle','shakuhachi','whistle','ocarina',
+  // 80-87 synth lead
+  'lead_1_square','lead_2_sawtooth','lead_3_calliope','lead_4_chiff',
+  'lead_5_charang','lead_6_voice','lead_7_fifths','lead_8_bass__lead',
+  // 88-95 synth pad
+  'pad_1_new_age','pad_2_warm','pad_3_polysynth','pad_4_choir',
+  'pad_5_bowed','pad_6_metallic','pad_7_halo','pad_8_sweep',
+  // 96-103 fx
+  'fx_1_rain','fx_2_soundtrack','fx_3_crystal','fx_4_atmosphere',
+  'fx_5_brightness','fx_6_goblins','fx_7_echoes','fx_8_sci_fi',
+  // 104-111 ethnic
+  'sitar','banjo','shamisen','koto','kalimba','bag_pipe','fiddle','shanai',
+  // 112-119 percussive
+  'tinkle_bell','agogo','steel_drums','woodblock','taiko_drum','melodic_tom','synth_drum','reverse_cymbal',
+  // 120-127 sound effects
+  'guitar_fret_noise','breath_noise','seashore','bird_tweet','telephone_ring','helicopter','applause','gunshot'
+];
+
+function gmSoundfontName(program) {
+  return GM_SOUNDFONT_NAMES[program] || 'acoustic_grand_piano';
+}
+
+// Assign each note to a hand (L/R) using voicing: notes that start at the
+// same time form a chord (one hand if tight, split if there's a clear bass);
+// isolated notes are attached to the voice whose last note is closest in
+// pitch (tracks each hand's "last position" through time).
+//
+// Input/output: array of {midi, beat, length, ...}. Mutates `hand` field.
+function assignHands(notes) {
+  if (!notes || notes.length === 0) return notes;
+  const sorted = notes.slice().sort((a, b) => a.beat - b.beat || a.midi - b.midi);
+
+  // Initial guess for each voice's "current position" — use overall pitch range.
+  const allPitches = sorted.map((n) => n.midi);
+  const lo = Math.min(...allPitches);
+  const hi = Math.max(...allPitches);
+  let vLPitch = lo + (hi - lo) * 0.25;
+  let vRPitch = lo + (hi - lo) * 0.75;
+  // If range is narrow, fall back to a fixed middle-C-ish split.
+  if (hi - lo < 10) {
+    for (const n of sorted) n.hand = n.midi >= 60 ? 'R' : 'L';
+    return sorted;
+  }
+
+  // Group simultaneous notes (within ~30 ms at typical bpm = 0.05 beat).
+  const SIM_BEAT = 0.05;
+  const BASS_GAP = 7; // semitones — gap below which a note is the bass of a chord
+
+  let i = 0;
+  while (i < sorted.length) {
+    const grp = [sorted[i]];
+    let j = i + 1;
+    while (j < sorted.length && sorted[j].beat - sorted[i].beat < SIM_BEAT) {
+      grp.push(sorted[j]);
+      j++;
+    }
+    grp.sort((a, b) => a.midi - b.midi);
+
+    if (grp.length === 1) {
+      const n = grp[0];
+      const dL = Math.abs(n.midi - vLPitch);
+      const dR = Math.abs(n.midi - vRPitch);
+      const assignR = (Math.abs(dL - dR) < 1) ? (n.midi >= (vLPitch + vRPitch) / 2) : (dR < dL);
+      n.hand = assignR ? 'R' : 'L';
+      if (assignR) vRPitch = n.midi; else vLPitch = n.midi;
+    } else {
+      const lowest = grp[0];
+      const rest = grp.slice(1);
+      const gap = rest[0].midi - lowest.midi;
+      // Clear bass + chord above → split. Tight cluster → single hand.
+      if (gap >= BASS_GAP) {
+        lowest.hand = 'L';
+        for (const n of rest) n.hand = 'R';
+        vLPitch = lowest.midi;
+        vRPitch = rest[rest.length - 1].midi;
+      } else {
+        // Single-hand chord: use mean and last-position bias.
+        const mean = grp.reduce((a, n) => a + n.midi, 0) / grp.length;
+        const dL = Math.abs(mean - vLPitch);
+        const dR = Math.abs(mean - vRPitch);
+        const isR = (Math.abs(dL - dR) < 1) ? (mean >= (vLPitch + vRPitch) / 2) : (dR < dL);
+        for (const n of grp) n.hand = isR ? 'R' : 'L';
+        if (isR) vRPitch = grp[grp.length - 1].midi;
+        else vLPitch = lowest.midi;
+      }
+    }
+    i = j;
+  }
+  return sorted;
+}
+
+// Track palette (assigned in order, cycles).
+const TRACK_PALETTE = [
+  '#d4a049', // brass
+  '#5c98a7', // petrol
+  '#8eba9b', // sage
+  '#cd6555', // terra
+  '#9c87b8', // muted purple
+  '#e8b760', // brass-bright
+  '#7cb6c4', // petrol-bright
+  '#c9b894', // ivory dim
+];
+
 function midiFileToSong(file, midi) {
   const ppq = midi.header.ppq || 480;
   const tempos = midi.header.tempos || [];
   const bpm = Math.max(40, Math.round((tempos[0] && tempos[0].bpm) || 120));
 
-  // Pull notes from tracks. Tracks with notes ordered as in the file.
+  // Build a track per source MIDI track that has notes.
   const tracksWithNotes = midi.tracks.filter((t) => t.notes && t.notes.length > 0);
   if (tracksWithNotes.length === 0) return null;
 
-  const rawNotes = [];
-  if (tracksWithNotes.length >= 2) {
-    // Heuristic: track with higher average pitch = right hand.
-    const avg = (t) => t.notes.reduce((a, n) => a + n.midi, 0) / t.notes.length;
-    const sorted = [...tracksWithNotes].sort((a, b) => avg(b) - avg(a));
-    const rTrack = sorted[0];
-    const lTrack = sorted[1];
-    for (const n of rTrack.notes) rawNotes.push({ midi: n.midi, hand: 'R', tickStart: n.ticks, tickLen: n.durationTicks });
-    for (const n of lTrack.notes) rawNotes.push({ midi: n.midi, hand: 'L', tickStart: n.ticks, tickLen: n.durationTicks });
-    // Additional tracks: fold into nearest hand by pitch (skip if too many).
-    for (let i = 2; i < sorted.length && i < 6; i++) {
-      for (const n of sorted[i].notes) {
-        rawNotes.push({ midi: n.midi, hand: n.midi >= 60 ? 'R' : 'L', tickStart: n.ticks, tickLen: n.durationTicks });
-      }
-    }
-  } else {
-    for (const n of tracksWithNotes[0].notes) {
-      rawNotes.push({ midi: n.midi, hand: n.midi >= 60 ? 'R' : 'L', tickStart: n.ticks, tickLen: n.durationTicks });
-    }
+  // Compute global shift on the union of all melodic (non-drum) notes.
+  const allMelodic = [];
+  for (const t of tracksWithNotes) {
+    if (t.channel === 9) continue; // skip drums for shift calc
+    for (const n of t.notes) allMelodic.push(n.midi);
   }
-
-  // Global octave shift only — transposes every note by the same multiple
-  // of 12 semitones so the song is centered on the visible keyboard window.
-  // Pitch contour is preserved exactly; we never fold individual notes.
-  // Notes that still fall outside the window simply won't be drawn on the
-  // highway (they still play correctly in audio).
-  const noteMidis = rawNotes.map((n) => n.midi);
-  const fullMin = Math.min(...noteMidis);
-  const fullMax = Math.max(...noteMidis);
+  const fullMin = allMelodic.length ? Math.min(...allMelodic) : 60;
+  const fullMax = allMelodic.length ? Math.max(...allMelodic) : 60;
   const winCenter = (FIRST_MIDI + LAST_MIDI) / 2;
   const songCenter = (fullMin + fullMax) / 2;
   let shift = Math.round((winCenter - songCenter) / 12) * 12;
-  // Nudge so as much of the song as possible lives in the window.
   for (let attempt = 0; attempt < 4; attempt++) {
     const min = fullMin + shift;
     const max = fullMax + shift;
@@ -959,18 +1461,82 @@ function midiFileToSong(file, midi) {
     else break;
   }
 
-  const fitted = rawNotes.map((n) => ({ ...n, midi: n.midi + shift }));
-  const offWindow = fitted.filter((n) => n.midi < FIRST_MIDI || n.midi > LAST_MIDI).length;
-  if (fitted.length === 0) return null;
+  // Find the global earliest tick to normalize start to 0.
+  const allTicks = tracksWithNotes.flatMap((t) => t.notes.map((n) => n.ticks));
+  const minTick = Math.min(...allTicks, 0);
 
-  // Convert to beats and normalize start to 0.
-  const minTick = Math.min(...fitted.map((n) => n.tickStart));
-  const notes = fitted.map((n) => ({
-    midi: n.midi,
-    hand: n.hand,
-    beat: (n.tickStart - minTick) / ppq,
-    length: Math.max(0.1, n.tickLen / ppq),
-  })).sort((a, b) => a.beat - b.beat);
+  // Build per-track structures.
+  const tracks = tracksWithNotes.map((src, idx) => {
+    const isDrums = src.channel === 9;
+    const program = (src.instrument && src.instrument.number) || 0;
+    const rawName = (src.name && src.name.trim()) || (src.instrument && src.instrument.name);
+    const niceName = isDrums ? 'Batterie' : prettifyInstrument(rawName, gmCategory(program));
+    const category = isDrums ? 'Batterie' : gmCategory(program);
+    const isPiano = !isDrums && program < 8;
+    const trackShift = isDrums ? 0 : shift; // never transpose drum hits
+
+    const noteMidis = src.notes.map((n) => n.midi);
+    const lo = Math.min(...noteMidis);
+    const hi = Math.max(...noteMidis);
+    const avg = noteMidis.reduce((a, b) => a + b, 0) / noteMidis.length;
+
+    // Build notes first (no hand yet), then run a voicing pass.
+    let notes = src.notes.map((n) => ({
+      midi: n.midi + trackShift,
+      hand: 'R',
+      beat: (n.ticks - minTick) / ppq,
+      length: Math.max(0.1, n.durationTicks / ppq),
+    }));
+    if (isPiano && !isDrums) {
+      notes = assignHands(notes);
+    } else {
+      notes.sort((a, b) => a.beat - b.beat);
+      // Non-piano tracks: a single voice — assign by overall median.
+      const median = noteMidis.length ? noteMidis.slice().sort((a, b) => a - b)[Math.floor(noteMidis.length / 2)] : 60;
+      const splitFallback = avg + trackShift >= 60 ? 60 : (median + trackShift);
+      for (const n of notes) n.hand = n.midi >= splitFallback ? 'R' : 'L';
+    }
+
+    return {
+      id: 'tr' + idx,
+      name: niceName,
+      category,
+      channel: src.channel,
+      program,
+      isDrums,
+      isPiano,
+      soundfontName: isDrums ? null : gmSoundfontName(program),
+      color: TRACK_PALETTE[idx % TRACK_PALETTE.length],
+      noteCount: notes.length,
+      avg,
+      lo: lo + trackShift,
+      hi: hi + trackShift,
+      notes,
+    };
+  });
+
+  // Decide default user track : the highest-pitched piano track (typically RH).
+  const pianoTracks = tracks.filter((t) => t.isPiano);
+  const userTrackId = (pianoTracks.length
+    ? pianoTracks.sort((a, b) => b.avg - a.avg)[0]
+    : tracks.filter((t) => !t.isDrums).sort((a, b) => b.avg - a.avg)[0] || tracks[0]
+  ).id;
+
+  // Default roles: user track = 'user', other non-drum tracks = 'accomp', drums = 'mute'.
+  const defaultRoles = {};
+  const defaultEnabled = {};
+  for (const t of tracks) {
+    defaultRoles[t.id] = (t.id === userTrackId) ? 'user' : (t.isDrums ? 'mute' : 'accomp');
+    defaultEnabled[t.id] = !t.isDrums;
+  }
+
+  // Flatten notes for legacy code paths (default = user track only, hands assigned by pitch).
+  const userTrack = tracks.find((t) => t.id === userTrackId);
+  const notes = userTrack ? userTrack.notes.map((n) => ({ ...n })) : [];
+
+  // Stats.
+  const fitted = tracks.flatMap((t) => t.notes.map((n) => n.midi));
+  const offWindow = fitted.filter((m) => m < FIRST_MIDI || m > LAST_MIDI).length;
 
   const title = file.name.replace(/\.(mid|midi)$/i, '');
   return {
@@ -980,6 +1546,10 @@ function midiFileToSong(file, midi) {
       difficulty: 'imported',
       bpm,
       notes,
+      tracks,
+      defaultRoles,
+      defaultEnabled,
+      defaultUserTrackId: userTrackId,
     },
     folded: 0,
     offWindow,
