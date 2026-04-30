@@ -63,6 +63,11 @@
           <span class="mode-toggle-label">École</span>
           <span class="mode-toggle-state" aria-hidden="true"></span>
         </button>
+        <button type="button" class="action-pill warmup-pill" data-modal="warmup">
+          <span class="action-pill-icon" aria-hidden="true">𝆺</span>
+          <span class="action-pill-label">Échauffement</span>
+          <span class="action-pill-arrow" aria-hidden="true">→</span>
+        </button>
         <nav class="topnav" aria-label="Sections">
           <button type="button" class="topnav-btn" data-modal="daily">
             <span class="topnav-icon" aria-hidden="true">✦</span>Défi
@@ -134,6 +139,30 @@
                   </select>
                 </label>
               </div>
+
+              <label class="field">
+                <span>Vitesse de défilement</span>
+                <div class="speed-row">
+                  <input type="range" id="lesson-speed" min="25" max="200" step="5" value="100" />
+                  <strong id="lesson-speed-value">100 %</strong>
+                </div>
+              </label>
+            </div>
+
+            <div class="rail-actions">
+              <button id="lesson-play" type="button" class="btn btn-secondary">▶ Lecture</button>
+              <button id="lesson-start" type="button" class="btn btn-primary">Démarrer</button>
+            </div>
+
+            <div class="rail-group" id="tracks-group" hidden>
+              <span class="rail-group-label">Pistes du morceau</span>
+              <p class="rail-group-help">Choisis ta partie. Les autres jouent en accompagnement avec leur instrument d'origine.</p>
+              <div class="track-bulk" id="track-bulk">
+                <button type="button" class="track-bulk-btn" data-bulk="all">Tout</button>
+                <button type="button" class="track-bulk-btn" data-bulk="none">Aucun</button>
+                <button type="button" class="track-bulk-btn" data-bulk="reset">Réinitialiser</button>
+              </div>
+              <div class="track-list" id="track-list"></div>
             </div>
 
             <div class="rail-group">
@@ -169,11 +198,6 @@
               </div>
               <input type="file" id="lesson-import" accept=".mid,.midi,audio/midi" multiple hidden />
             </div>
-
-            <div class="rail-actions">
-              <button id="lesson-play" type="button" class="btn btn-secondary">▶ Lecture</button>
-              <button id="lesson-start" type="button" class="btn btn-primary">Démarrer</button>
-            </div>
           </div>
 
           <!-- Pane École -->
@@ -193,6 +217,44 @@
           <div class="stage-now">
             <span class="eyebrow">Touche jouée</span>
             <div class="note-display" id="note-display" aria-live="polite">—</div>
+          </div>
+        </div>
+
+        <div class="piano-tools" id="piano-tools">
+          <div class="piano-tool">
+            <span class="piano-tool-label">Voix piano</span>
+            <select id="instrument"></select>
+          </div>
+          <div class="piano-tool">
+            <span class="piano-tool-label">Clavier</span>
+            <div class="kb-toggle-tabs" role="tablist">
+              <button type="button" class="kb-toggle-tab" data-kb-layout="mini" role="tab">
+                <strong>25</strong><span>C3–C5</span>
+              </button>
+              <button type="button" class="kb-toggle-tab" data-kb-layout="large" role="tab">
+                <strong>49</strong><span>C2–C6</span>
+              </button>
+            </div>
+          </div>
+          <div class="piano-tool piano-tool-mic">
+            <span class="piano-tool-label">
+              Micro acoustique
+              <span class="mic-badge" id="mic-label" data-state="off">Désactivé</span>
+            </span>
+            <div class="piano-mic-row">
+              <button id="mic-btn" type="button" class="btn btn-mic">
+                <span class="mic-icon" aria-hidden="true"></span>
+                <span class="mic-btn-label">Activer</span>
+              </button>
+              <div class="mic-meter" aria-hidden="true">
+                <div class="mic-meter-fill" id="mic-meter-fill"></div>
+              </div>
+              <strong class="mic-last-note" id="mic-last-note" title="Dernière note détectée">—</strong>
+            </div>
+            <label class="mic-sensitivity">
+              <span>Sensibilité</span>
+              <input type="range" id="mic-sens" min="1" max="10" step="1" value="5" />
+            </label>
           </div>
         </div>
 
@@ -249,6 +311,7 @@
         </header>
 
         <div class="rail-body">
+         <div class="rail-pane rail-pane-mesure">
           <div class="stat-stack atelier-only" id="lesson-hud">
             <div class="stat">
               <span class="stat-label">Score</span>
@@ -300,39 +363,6 @@
 
           <div class="rail-divider" aria-hidden="true"></div>
 
-          <div class="mic-panel">
-            <div class="mic-head">
-              <span class="mic-title">Piano acoustique</span>
-              <span class="mic-badge" id="mic-label" data-state="off">Désactivé</span>
-            </div>
-            <p class="mic-hint">
-              Active le micro de ton Mac et joue sur un vrai piano —
-              l'app détecte les notes en temps réel.
-            </p>
-            <button id="mic-btn" type="button" class="btn btn-mic">
-              <span class="mic-icon" aria-hidden="true"></span>
-              <span class="mic-btn-label">Activer le micro</span>
-            </button>
-            <div class="mic-meter" aria-hidden="true">
-              <div class="mic-meter-fill" id="mic-meter-fill"></div>
-            </div>
-            <div class="mic-last">
-              <span class="mic-last-label">Dernière note</span>
-              <strong class="mic-last-note" id="mic-last-note">—</strong>
-            </div>
-            <label class="mic-sensitivity">
-              <span>Sensibilité</span>
-              <input type="range" id="mic-sens" min="1" max="10" step="1" value="5" />
-            </label>
-          </div>
-
-          <div class="rail-divider" aria-hidden="true"></div>
-
-          <label class="field">
-            <span>Instrument</span>
-            <select id="instrument"></select>
-          </label>
-
           <dl class="meta">
             <div>
               <dt>Appareil</dt>
@@ -344,22 +374,31 @@
             </div>
           </dl>
 
-          <div class="rail-divider" aria-hidden="true"></div>
-
-          <div class="kb-toggle">
-            <span class="kb-toggle-label">Clavier visible</span>
-            <div class="kb-toggle-tabs" role="tablist">
-              <button type="button" class="kb-toggle-tab" data-kb-layout="mini" role="tab">
-                <strong>25</strong><span>touches · C3–C5</span>
-              </button>
-              <button type="button" class="kb-toggle-tab" data-kb-layout="large" role="tab">
-                <strong>49</strong><span>touches · C2–C6</span>
-              </button>
-            </div>
-          </div>
+         </div>
         </div>
       </aside>
     </main>
+
+    <!-- Modale « Avant de démarrer » -->
+    <div class="modal-overlay" id="modal-prestart" data-modal-id="prestart" hidden>
+      <div class="modal-card" role="dialog" aria-labelledby="modal-prestart-title" aria-modal="true">
+        <header class="modal-head">
+          <h2 id="modal-prestart-title">Avant de démarrer</h2>
+          <button type="button" class="modal-close" data-modal-close aria-label="Fermer">×</button>
+        </header>
+        <div class="modal-body">
+          <p class="prestart-intro">
+            Choisis l'instrument que tu joues. Les autres pistes seront jouées automatiquement
+            avec leur instrument d'origine, en accompagnement.
+          </p>
+          <div id="prestart-tracks" class="prestart-tracks"></div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" data-modal-close>Annuler</button>
+            <button type="button" class="btn btn-primary" id="prestart-go">Démarrer →</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Modales (Notice / Défi / Carnet) -->
     <div class="modal-overlay" id="modal-daily" data-modal-id="daily" hidden>
@@ -382,6 +421,22 @@
         </header>
         <div class="modal-body">
           <div id="journal" class="journal"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-warmup" data-modal-id="warmup" hidden>
+      <div class="modal-card" role="dialog" aria-labelledby="modal-warmup-title" aria-modal="true">
+        <header class="modal-head">
+          <h2 id="modal-warmup-title">Échauffement</h2>
+          <button type="button" class="modal-close" data-modal-close aria-label="Fermer">×</button>
+        </header>
+        <div class="modal-body">
+          <p class="warmup-modal-intro">
+            Une routine pour réveiller les doigts avant chaque session.
+            Choisis l'exercice — tu peux les enchaîner ou les faire à la carte.
+          </p>
+          <div id="warmup-modal-list" class="warmup-modal-list"></div>
         </div>
       </div>
     </div>
@@ -520,6 +575,34 @@
           // Notify dashboard/daily to refresh contents.
           if (id === 'journal' && window.JOURNAL && window.JOURNAL.refresh) window.JOURNAL.refresh();
           if (id === 'daily' && window.DAILY && window.DAILY.refresh) window.DAILY.refresh();
+          if (id === 'warmup') renderWarmupModal();
+        }
+
+        function renderWarmupModal() {
+          const list = document.getElementById('warmup-modal-list');
+          if (!list || !window.SCHOOL || !window.SCHOOL.findModule) return;
+          const mod = window.SCHOOL.findModule('warmup');
+          if (!mod) return;
+          list.innerHTML = '';
+          mod.lessons.forEach((les, idx) => {
+            const done = window.SCHOOL.isCompleted(les.id);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'warmup-modal-item' + (done ? ' is-done' : '');
+            btn.innerHTML = `
+              <span class="warmup-modal-num">${String(idx + 1).padStart(2, '0')}</span>
+              <div class="warmup-modal-meta">
+                <strong>${les.title}</strong>
+                <span>${les.summary}</span>
+              </div>
+              <span class="warmup-modal-mark">${done ? '✓' : '▶'}</span>
+            `;
+            btn.addEventListener('click', () => {
+              closeModal();
+              window.SCHOOL.openLesson(les.id);
+            });
+            list.appendChild(btn);
+          });
         }
 
         function closeModal() {
