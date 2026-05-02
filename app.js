@@ -1,4 +1,4 @@
-const APP_VERSION = 'v0.35.1';
+const APP_VERSION = 'v0.36.0';
 
 // Default keyboard window — overridable at runtime via setKeyboardLayout().
 let FIRST_MIDI = 36; // C2
@@ -802,6 +802,8 @@ function stopLesson() {
   lesson.autoplay = false;
   lesson.notes = [];
   if (lesson.loopTimer) { clearTimeout(lesson.loopTimer); lesson.loopTimer = null; }
+  // Clear any wait hint left on keys.
+  for (const el of keyEls.values()) el.classList.remove('wait-hint');
   startBtn.textContent = 'Démarrer';
   startBtn.dataset.state = '';
   startBtn.disabled = false;
@@ -935,6 +937,8 @@ function drawHighway() {
   const t = now();
 
   // Wait mode: freeze time on the earliest unplayed user note that has reached the line.
+  // Also flag the blocker midi(s) for visual cue on the on-screen keyboard.
+  const waitHints = new Set();
   if (lesson.waitMode) {
     let blocker = null;
     for (const note of lesson.notes) {
@@ -948,7 +952,19 @@ function drawHighway() {
     if (blocker) {
       // Pin the blocker on the hit line (delta = 0) by extending the time shift.
       lesson.timeShift = t - blocker.expectedTime;
+      // Find every user note expected at the same beat (chord support).
+      for (const note of lesson.notes) {
+        if (note.auto || note.resolved === 'hit') continue;
+        if (Math.abs(note.expectedTime - blocker.expectedTime) < 0.005) {
+          waitHints.add(note.midi);
+        }
+      }
     }
+  }
+  // Apply visual wait hint on keys.
+  for (const [midi, el] of keyEls) {
+    if (waitHints.has(midi)) el.classList.add('wait-hint');
+    else el.classList.remove('wait-hint');
   }
 
   // Autoplay mode (full) — and accompaniment notes (n.auto = true) — are
