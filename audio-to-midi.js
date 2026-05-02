@@ -175,6 +175,19 @@
             <span class="yt-drop-text">Glisse un fichier audio ici<br>
               <em>ou clique pour parcourir</em> · MP3 / WAV / M4A / OGG</span>
           </div>
+          <div class="yt-progress" id="yt-progress" hidden>
+            <div class="yt-progress-bar">
+              <div class="yt-progress-fill" id="yt-progress-fill"></div>
+            </div>
+            <div class="yt-progress-meta">
+              <span class="yt-progress-phase" id="yt-progress-phase">Préparation…</span>
+              <span class="yt-progress-pct" id="yt-progress-pct">0 %</span>
+            </div>
+            <div class="yt-progress-times">
+              <span id="yt-progress-elapsed">⏱ 00:00 écoulées</span>
+              <span id="yt-progress-eta"></span>
+            </div>
+          </div>
           <div class="yt-status" id="yt-status" hidden></div>
           <p class="yt-disclaimer">
             La transcription tourne <strong>localement dans ton navigateur</strong> via
@@ -263,6 +276,73 @@
     urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   }
 
+  // Phase boundaries — overall progress goes 0..100 across these chunks.
+  const PHASES = {
+    decode:   { from: 0,  to: 5,   label: 'Décodage et conversion 22 kHz mono…' },
+    model:    { from: 5,  to: 15,  label: 'Chargement du modèle basic-pitch…' },
+    infer:    { from: 15, to: 90,  label: 'Transcription en cours…' },
+    post:     { from: 90, to: 96,  label: 'Extraction des notes…' },
+    midi:     { from: 96, to: 100, label: 'Génération du fichier MIDI…' },
+  };
+
+  function fmtMmss(secs) {
+    secs = Math.max(0, Math.round(secs));
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function makeProgress(overlay) {
+    const root = overlay.querySelector('#yt-progress');
+    const fill = overlay.querySelector('#yt-progress-fill');
+    const phaseEl = overlay.querySelector('#yt-progress-phase');
+    const pctEl = overlay.querySelector('#yt-progress-pct');
+    const elapsedEl = overlay.querySelector('#yt-progress-elapsed');
+    const etaEl = overlay.querySelector('#yt-progress-eta');
+    const startedAt = performance.now();
+    let lastPct = 0;
+    let interval = null;
+
+    function show() { if (root) root.hidden = false; }
+    function hide() { if (root) root.hidden = true; }
+
+    function update(phase, fraction) {
+      const p = PHASES[phase];
+      if (!p) return;
+      const pct = p.from + (p.to - p.from) * Math.max(0, Math.min(1, fraction));
+      lastPct = pct;
+      if (fill) fill.style.width = pct + '%';
+      if (phaseEl) phaseEl.textContent = p.label;
+      if (pctEl) pctEl.textContent = Math.round(pct) + ' %';
+    }
+
+    function tick() {
+      const elapsed = (performance.now() - startedAt) / 1000;
+      if (elapsedEl) elapsedEl.textContent = '⏱ ' + fmtMmss(elapsed) + ' écoulées';
+      if (etaEl) {
+        if (lastPct > 4 && lastPct < 99) {
+          const total = elapsed / (lastPct / 100);
+          const remaining = Math.max(0, total - elapsed);
+          etaEl.textContent = '≈ ' + fmtMmss(remaining) + ' restantes';
+        } else if (lastPct >= 99) {
+          etaEl.textContent = '';
+        } else {
+          etaEl.textContent = '';
+        }
+      }
+    }
+
+    interval = setInterval(tick, 250);
+    show();
+
+    return {
+      update,
+      tick,
+      stop() { if (interval) { clearInterval(interval); interval = null; } },
+      hide,
+    };
+  }
+
   // Shared transcription pipeline used by both drop and direct paths.
   async function transcribeFile(overlay, file) {
     const status = overlay.querySelector('#yt-status');
@@ -271,29 +351,44 @@
       status.dataset.state = state;
       status.textContent = msg;
     }
-    setStatus('loading', `Décodage et conversion en 22 kHz mono de ${file.name}…`);
-    const buf = await fileToAudioBuffer(file);
-    setStatus('loading', `Chargement du modèle basic-pitch (premier usage : ~20 MB)…`);
-    const notes = await transcribe(buf, (p) => {
-      const pct = Math.round(p * 100);
-      if (pct >= 100) {
-        setStatus('loading', 'Post-traitement (extraction des notes)…');
-      } else {
-        setStatus('loading', `Transcription en cours… ${pct} %`);
+    if (status) status.hidden = true;
+
+    const progress = makeProgress(overlay);
+    try {
+      progress.update('decode', 0);
+      const buf = await fileToAudioBuffer(file);
+      progress.update('decode', 1);
+
+      progress.update('model', 0);
+      const notes = await transcribe(buf, (p) => {
+        if (p < 0.001) progress.update('model', 1);
+        else progress.update('infer', p);
+      });
+      progress.update('post', 1);
+
+      if (!notes || notes.length === 0) {
+        progress.stop();
+        progress.hide();
+        setStatus('error', 'Aucune note détectée. Le morceau est peut-être trop bruité ou trop court.');
+        return;
       }
-    });
-    if (!notes || notes.length === 0) {
-      setStatus('error', 'Aucune note détectée. Le morceau est peut-être trop bruité ou trop court.');
-      return;
+
+      progress.update('midi', 0.5);
+      const baseName = file.name.replace(/\.[^.]+$/, '') + '.mid';
+      const midiFile = notesToMidiFile(notes, baseName);
+      if (typeof window.importMidiFile === 'function') {
+        await window.importMidiFile(midiFile);
+      }
+      progress.update('midi', 1);
+      progress.tick();
+      progress.stop();
+      setStatus('ok', `${notes.length} notes importées — va dans Difficulté → Importés.`);
+      setTimeout(() => { progress.hide(); closeYouTubeModal(); }, 2200);
+    } catch (err) {
+      progress.stop();
+      progress.hide();
+      throw err;
     }
-    setStatus('loading', `${notes.length} notes détectées — génération du MIDI…`);
-    const baseName = file.name.replace(/\.[^.]+$/, '') + '.mid';
-    const midiFile = notesToMidiFile(notes, baseName);
-    if (typeof window.importMidiFile === 'function') {
-      await window.importMidiFile(midiFile);
-    }
-    setStatus('ok', `Importé ! Va dans Difficulté → Importés pour le retrouver.`);
-    setTimeout(() => closeYouTubeModal(), 1800);
   }
 
   function wireDropZone(overlay) {

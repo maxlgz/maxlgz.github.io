@@ -2294,6 +2294,66 @@ body.modal-locked { overflow: hidden; }
   font-size: 12px;
 }
 
+.yt-progress {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--brass-soft);
+  border-radius: var(--rad);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.yt-progress[hidden] { display: none; }
+
+.yt-progress-bar {
+  height: 8px;
+  background: var(--surface-3);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.yt-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(to right, var(--brass-soft), var(--brass-bright));
+  border-radius: 999px;
+  transition: width 0.32s ease-out;
+  box-shadow: 0 0 12px rgba(212, 160, 73, 0.4);
+}
+
+.yt-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.yt-progress-phase {
+  font-size: 13px;
+  color: var(--ivory);
+  font-weight: 500;
+}
+
+.yt-progress-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--brass-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.yt-progress-times {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .yt-status {
   margin-top: 14px;
   padding: 10px 14px;

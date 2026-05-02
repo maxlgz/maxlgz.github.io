@@ -1,4 +1,4 @@
-const APP_VERSION = 'v0.41.2';
+const APP_VERSION = 'v0.42.0';
 
 // Default keyboard window — overridable at runtime via setKeyboardLayout().
 let FIRST_MIDI = 36; // C2
