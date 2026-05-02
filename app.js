@@ -1,4 +1,4 @@
-const APP_VERSION = 'v0.37.1';
+const APP_VERSION = 'v0.37.2';
 
 // Default keyboard window — overridable at runtime via setKeyboardLayout().
 let FIRST_MIDI = 36; // C2
@@ -825,7 +825,7 @@ function stopLesson() {
 function registerLessonHit(midi) {
   const t = now();
   if (lesson.waitMode) {
-    // Accept the earliest non-hit user note matching this midi, regardless of timing.
+    // Find the earliest non-hit user note with this midi.
     let target = null;
     for (const note of lesson.notes) {
       if (note.auto) continue;
@@ -834,8 +834,17 @@ function registerLessonHit(midi) {
       if (!target || note.expectedTime < target.expectedTime) target = note;
     }
     if (target) {
-      target.resolved = 'hit';
-      target.flashUntil = t + 0.35;
+      // Mark target + every other user note with the same midi *at the same beat*
+      // as hit too — covers the case where two user tracks contain the same
+      // note simultaneously (e.g. shared note in multi-track imports).
+      for (const note of lesson.notes) {
+        if (note.auto || note.resolved === 'hit') continue;
+        if (note.midi !== midi) continue;
+        if (Math.abs(note.expectedTime - target.expectedTime) < 0.005) {
+          note.resolved = 'hit';
+          note.flashUntil = t + 0.35;
+        }
+      }
       lesson.hits++;
       lesson.combo++;
       updateHud();
