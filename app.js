@@ -1,4 +1,4 @@
-const APP_VERSION = 'v0.37.2';
+const APP_VERSION = 'v0.38.0';
 
 // Default keyboard window — overridable at runtime via setKeyboardLayout().
 let FIRST_MIDI = 36; // C2
@@ -535,13 +535,21 @@ function renderTracksPanel() {
   const group = document.getElementById('tracks-group');
   const list = document.getElementById('track-list');
   const bulk = document.getElementById('track-bulk');
+  const accompRow = document.getElementById('lesson-accomp-row');
+  const accompHelp = document.getElementById('accomp-handled-by-tracks');
   if (!group || !list) return;
   const song = getCurrentSongDef();
   if (!song || !song.tracks || song.tracks.length === 0) {
     group.hidden = true;
+    // Single-track song : show legacy "accompagnement" toggle.
+    if (accompRow) accompRow.hidden = false;
+    if (accompHelp) accompHelp.hidden = true;
     return;
   }
   group.hidden = false;
+  // Multi-track song : tracks panel handles accompaniment, hide the legacy toggle.
+  if (accompRow) accompRow.hidden = true;
+  if (accompHelp) accompHelp.hidden = false;
   const prefs = getSongPrefs(song);
   list.innerHTML = '';
 
