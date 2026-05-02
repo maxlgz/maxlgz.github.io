@@ -20,6 +20,18 @@
     return (window['@tonejs/midi'] && window['@tonejs/midi'].Midi) || window.Midi || null;
   }
 
+  // Concat without using spread (...) which blows the call stack
+  // when the source array holds tens of thousands of entries — the
+  // exact failure mode that hit Havana around 98 %.
+  function appendAll(dest, src) {
+    if (!src || src.length === 0) return;
+    for (let i = 0; i < src.length; i++) dest.push(src[i]);
+  }
+
+  function yieldToBrowser() {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
   async function transcribe(audioBuffer, onProgress) {
     const mod = await loadBasicPitch();
     const { BasicPitch, noteFramesToTime, addPitchBendsToNoteEvents, outputToNotesPoly } = mod;
@@ -30,16 +42,19 @@
     const contours = [];
     await basicPitch.evaluateModel(
       audioBuffer,
-      (f, o, c) => { frames.push(...f); onsets.push(...o); contours.push(...c); },
+      (f, o, c) => { appendAll(frames, f); appendAll(onsets, o); appendAll(contours, c); },
       (p) => { if (onProgress) onProgress(p); }
     );
 
-    const noteEvents = noteFramesToTime(
-      addPitchBendsToNoteEvents(
-        contours,
-        outputToNotesPoly(frames, onsets, 0.25, 0.25, 5)
-      )
-    );
+    // Hand back control to the browser before the (possibly heavy) post-processing.
+    if (onProgress) onProgress(1);
+    await yieldToBrowser();
+
+    const polyNotes = outputToNotesPoly(frames, onsets, 0.25, 0.25, 5);
+    await yieldToBrowser();
+    const withBends = addPitchBendsToNoteEvents(contours, polyNotes);
+    await yieldToBrowser();
+    const noteEvents = noteFramesToTime(withBends);
     return noteEvents; // [{startTimeSeconds, endTimeSeconds, pitchMidi, amplitude, ...}]
   }
 
@@ -266,7 +281,12 @@
     const buf = await fileToAudioBuffer(file);
     setStatus('loading', `Chargement du modèle basic-pitch (premier usage : ~20 MB)…`);
     const notes = await transcribe(buf, (p) => {
-      setStatus('loading', `Transcription en cours… ${Math.round(p * 100)} %`);
+      const pct = Math.round(p * 100);
+      if (pct >= 100) {
+        setStatus('loading', 'Post-traitement (extraction des notes)…');
+      } else {
+        setStatus('loading', `Transcription en cours… ${pct} %`);
+      }
     });
     if (!notes || notes.length === 0) {
       setStatus('error', 'Aucune note détectée. Le morceau est peut-être trop bruité ou trop court.');
