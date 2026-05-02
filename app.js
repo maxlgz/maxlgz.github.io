@@ -1,4 +1,4 @@
-const APP_VERSION = 'v0.39.0';
+const APP_VERSION = 'v0.40.0';
 
 // Default keyboard window — overridable at runtime via setKeyboardLayout().
 let FIRST_MIDI = 36; // C2
@@ -49,6 +49,39 @@ const handSelect = document.getElementById('lesson-hand');
 const sectionSelect = document.getElementById('lesson-section');
 const speedInput = document.getElementById('lesson-speed');
 const speedValueEl = document.getElementById('lesson-speed-value');
+const transposeInput = document.getElementById('lesson-transpose');
+const transposeValueEl = document.getElementById('lesson-transpose-value');
+
+function getTranspose() {
+  if (!transposeInput) return 0;
+  const v = parseInt(transposeInput.value, 10);
+  return Math.max(-24, Math.min(24, v || 0));
+}
+function refreshTransposeLabel() {
+  if (!transposeValueEl) return;
+  const v = getTranspose();
+  transposeValueEl.textContent = (v > 0 ? '+' : '') + v;
+}
+function transposeStorageKey(songId) {
+  return 'etude-transpose-' + songId;
+}
+function loadTransposeFor(songId) {
+  if (!songId || !transposeInput) return;
+  try {
+    const saved = parseInt(localStorage.getItem(transposeStorageKey(songId)), 10);
+    transposeInput.value = String(isNaN(saved) ? 0 : saved);
+  } catch (_) { transposeInput.value = '0'; }
+  refreshTransposeLabel();
+}
+function saveTranspose() {
+  const songId = songSelect && songSelect.value;
+  if (!songId) return;
+  try { localStorage.setItem(transposeStorageKey(songId), String(getTranspose())); } catch (_) {}
+}
+if (transposeInput) {
+  transposeInput.addEventListener('input', () => { refreshTransposeLabel(); saveTranspose(); });
+  refreshTransposeLabel();
+}
 
 function getSpeedPct() {
   const v = speedInput ? parseInt(speedInput.value, 10) : 100;
@@ -486,6 +519,7 @@ function populateSongSelect() {
   }
   startBtn.disabled = false;
   renderTracksPanel();
+  loadTransposeFor(songSelect.value);
 }
 
 // ---------- Tracks panel (per-song mixer) ----------
@@ -639,7 +673,12 @@ function renderTracksPanel() {
   }
 }
 
-if (songSelect) songSelect.addEventListener('change', renderTracksPanel);
+if (songSelect) {
+  songSelect.addEventListener('change', () => {
+    renderTracksPanel();
+    loadTransposeFor(songSelect.value);
+  });
+}
 
 function bulkSetTracks(action) {
   const song = getCurrentSongDef();
@@ -687,6 +726,7 @@ function startLesson(autoplay = false) {
   const speedPct = getSpeedPct();
   // 100% = original tempo. 50% = half speed (notes last twice as long).
   const beatDur = (60 / songDef.bpm) * (100 / speedPct);
+  const transpose = getTranspose();
   const accompOn = !autoplay && !!(accompToggle && accompToggle.checked) && (hand === 'right' || hand === 'left');
   const otherHand = hand === 'right' ? 'L' : 'R';
   const section = sectionSelect ? sectionSelect.value : 'all';
@@ -786,7 +826,7 @@ function startLesson(autoplay = false) {
   lesson.startTime = now() + LEAD_IN_SEC;
   lesson.notes = [
     ...userNotes.map((n) => ({
-      midi: n.midi, hand: n.hand,
+      midi: n.midi + transpose, hand: n.hand,
       expectedTime: lesson.startTime + shiftBeat(n.beat) * beatDur,
       duration: n.length * beatDur,
       resolved: null, flashUntil: 0, auto: false,
@@ -796,7 +836,7 @@ function startLesson(autoplay = false) {
       mute: false,
     })),
     ...accompNotes.map((n) => ({
-      midi: n.midi, hand: n.hand,
+      midi: n.midi + transpose, hand: n.hand,
       expectedTime: lesson.startTime + shiftBeat(n.beat) * beatDur,
       duration: n.length * beatDur,
       resolved: null, flashUntil: 0, auto: true,
@@ -1657,6 +1697,7 @@ function midiFileToSong(file, midi) {
   };
 }
 
+window.importMidiFile = importMidiFile;
 async function importMidiFile(file, opts = {}) {
   const Ctor = getMidiCtor();
   if (!Ctor) {
@@ -1743,6 +1784,13 @@ if (importBtn && importInput) {
 const libraryClearBtn = document.getElementById('lesson-library-clear');
 if (libraryClearBtn) {
   libraryClearBtn.addEventListener('click', clearImportedLibrary);
+}
+
+const ytImportBtn = document.getElementById('yt-import-btn');
+if (ytImportBtn) {
+  ytImportBtn.addEventListener('click', () => {
+    if (window.AUDIO_TO_MIDI) window.AUDIO_TO_MIDI.openYouTubeModal();
+  });
 }
 
 // Restore previously imported MIDI from IndexedDB.

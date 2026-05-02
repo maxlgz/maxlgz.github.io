@@ -3,7 +3,7 @@
 // Stale-while-revalidate sur les CDN (fontes Google, soundfonts, @tonejs/midi).
 // Network-only (sans cache) sur l'API BitMidi (recherche dynamique).
 
-const VERSION = 'etude-v0.39.0';
+const VERSION = 'etude-v0.40.0';
 const CORE = `${VERSION}-core`;
 const CDN  = `${VERSION}-cdn`;
 
@@ -23,6 +23,7 @@ const PRECACHE = [
   './mascot.js',
   './daily.js',
   './storage.js',
+  './audio-to-midi.js',
   './songs.js',
   './manifest.webmanifest',
   './icon.svg',

@@ -147,6 +147,14 @@
                   <strong id="lesson-speed-value">100 %</strong>
                 </div>
               </label>
+
+              <label class="field">
+                <span>Transposer (demi-tons)</span>
+                <div class="speed-row">
+                  <input type="range" id="lesson-transpose" min="-24" max="24" step="1" value="0" />
+                  <strong id="lesson-transpose-value">0</strong>
+                </div>
+              </label>
             </div>
 
             <div class="rail-actions">
@@ -202,6 +210,10 @@
                 <button id="lesson-library-clear" type="button" class="btn btn-ghost" title="Vider la bibliothèque d'imports">Vider</button>
               </div>
               <input type="file" id="lesson-import" accept=".mid,.midi,audio/midi" multiple hidden />
+              <button id="yt-import-btn" type="button" class="btn btn-yt btn-block">
+                <span class="btn-yt-icon" aria-hidden="true">▶</span>
+                Importer depuis YouTube
+              </button>
             </div>
           </div>
 
@@ -561,6 +573,7 @@
     <script src="improv.js"></script>
     <script src="mascot.js"></script>
     <script src="daily.js"></script>
+    <script src="audio-to-midi.js"></script>
 
     <script>
       // Modal system — Notice / Défi / Carnet.
