@@ -1,4 +1,4 @@
-const APP_VERSION = 'v0.37.0';
+const APP_VERSION = 'v0.37.1';
 
 // Default keyboard window — overridable at runtime via setKeyboardLayout().
 let FIRST_MIDI = 36; // C2
@@ -705,8 +705,10 @@ function startLesson(autoplay = false) {
   function inSection(n) { return n.beat >= from - 0.001 && n.beat < to + 0.001; }
   function shiftBeat(b) { return b - from; }
 
-  // Hand filter ONLY applies to user-role notes (when single-track or user track).
+  // Hand filter applies to user-role notes during practice. In autoplay we
+  // play *everything* — the user is just listening, no filter.
   function matchesHand(n) {
+    if (autoplay) return true;
     if (hand === 'both') return true;
     if (hand === 'right' && n.hand === 'R') return true;
     if (hand === 'left' && n.hand === 'L') return true;
@@ -719,14 +721,16 @@ function startLesson(autoplay = false) {
   );
 
   // Accompaniment notes : everything else that should sound.
-  // - Multi-track: all enabled non-user, non-mute tracks.
-  // - Single-track: the OTHER hand if accompOn is set (legacy behaviour).
+  // - Autoplay: play every accomp note + the user-track notes filtered out by hand.
+  // - Multi-track practice: all enabled non-user, non-mute tracks.
+  // - Single-track practice: the OTHER hand if accompOn is set (legacy behaviour).
   let accompNotes = [];
   if (hasTracks) {
     accompNotes = sourceNotes.filter((n) => inSection(n) && n.role === 'accomp');
-    // If user picked one hand, also play the OTHER hand of the user track as accomp
-    // when the toggle is on.
-    if (accompOn && (hand === 'right' || hand === 'left')) {
+    if (autoplay) {
+      // Autoplay: nothing extra needed — every user note is already in userNotes
+      // (matchesHand returns true). accompNotes already covers the rest.
+    } else if (accompOn && (hand === 'right' || hand === 'left')) {
       const otherHandUserNotes = sourceNotes.filter((n) =>
         inSection(n) && n.role === 'user' && n.hand === otherHand
       );
