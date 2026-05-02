@@ -1,4 +1,4 @@
-const APP_VERSION = 'v0.36.0';
+const APP_VERSION = 'v0.37.0';
 
 // Default keyboard window — overridable at runtime via setKeyboardLayout().
 let FIRST_MIDI = 36; // C2
@@ -583,14 +583,15 @@ function renderTracksPanel() {
     mineBtn.addEventListener('click', () => {
       if (tr.isDrums) return;
       updateSongPrefs(song, (p) => {
-        // Demote previous user track to accomp.
-        for (const id of Object.keys(p.roles)) {
-          if (p.roles[id] === 'user') p.roles[id] = 'accomp';
+        // Toggle: a track is either part of "ma partie" (user) or accompaniment.
+        // Multiple tracks can be user simultaneously (e.g. one per hand).
+        if (p.roles[tr.id] === 'user') {
+          p.roles[tr.id] = 'accomp';
+        } else {
+          p.roles[tr.id] = 'user';
+          p.enabled[tr.id] = true; // ensure enabled
+          p.userTrackId = tr.id;
         }
-        p.roles[tr.id] = 'user';
-        p.userTrackId = tr.id;
-        // Make sure the user track is enabled.
-        p.enabled[tr.id] = true;
       });
       renderTracksPanel();
     });
@@ -1200,39 +1201,61 @@ function openPrestartModal(songDef) {
   if (!overlay || !list) { startLesson(false); return; }
   const prefs = getSongPrefs(songDef);
   list.innerHTML = '';
-  let pick = prefs.userTrackId;
+
+  // Local pick set: which track ids are part of "my parts".
+  const picks = new Set(
+    Object.keys(prefs.roles).filter((id) => prefs.roles[id] === 'user')
+  );
+  if (picks.size === 0 && prefs.userTrackId) picks.add(prefs.userTrackId);
+
+  function repaintRow(row, trId) {
+    const isPicked = picks.has(trId);
+    row.classList.toggle('is-selected', isPicked);
+    const m = row.querySelector('.prestart-mark');
+    if (m) m.textContent = isPicked ? '★' : '☆';
+  }
+
   for (const tr of songDef.tracks) {
     if (tr.isDrums) continue;
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'prestart-track';
-    if (tr.id === pick) row.classList.add('is-selected');
+    row.dataset.trackId = tr.id;
     row.innerHTML = `
       <span class="prestart-swatch" style="background:${tr.color}"></span>
       <div class="prestart-meta">
         <strong>${tr.name}</strong>
         <span>${tr.category} · ${tr.noteCount} notes</span>
       </div>
-      <span class="prestart-mark" aria-hidden="true">${tr.id === pick ? '★' : '☆'}</span>
+      <span class="prestart-mark" aria-hidden="true">☆</span>
     `;
+    repaintRow(row, tr.id);
     row.addEventListener('click', () => {
-      pick = tr.id;
-      list.querySelectorAll('.prestart-track').forEach((el) => {
-        el.classList.toggle('is-selected', el === row);
-        const m = el.querySelector('.prestart-mark');
-        if (m) m.textContent = el === row ? '★' : '☆';
-      });
+      if (picks.has(tr.id)) picks.delete(tr.id);
+      else picks.add(tr.id);
+      repaintRow(row, tr.id);
     });
     list.appendChild(row);
   }
+
   document.getElementById('prestart-go').onclick = () => {
+    if (picks.size === 0) {
+      // Force at least one track if user clicked Démarrer with nothing selected.
+      const first = songDef.tracks.find((t) => !t.isDrums);
+      if (first) picks.add(first.id);
+    }
     updateSongPrefs(songDef, (p) => {
+      // Demote everything, then promote what's in picks.
       for (const id of Object.keys(p.roles)) {
         if (p.roles[id] === 'user') p.roles[id] = 'accomp';
       }
-      p.roles[pick] = 'user';
-      p.userTrackId = pick;
-      p.enabled[pick] = true;
+      for (const id of picks) {
+        p.roles[id] = 'user';
+        p.enabled[id] = true;
+      }
+      // userTrackId tracks the "primary" pick — use the first one in track order.
+      const primary = songDef.tracks.find((t) => picks.has(t.id));
+      if (primary) p.userTrackId = primary.id;
     });
     renderTracksPanel();
     closePrestartModal();
