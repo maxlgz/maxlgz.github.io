@@ -1,4 +1,4 @@
-const APP_VERSION = 'v0.38.0';
+const APP_VERSION = 'v0.39.0';
 
 // Default keyboard window — overridable at runtime via setKeyboardLayout().
 let FIRST_MIDI = 36; // C2
@@ -531,6 +531,23 @@ function getCurrentSongDef() {
   return (window.SONGS || []).find((s) => s.id === songSelect.value);
 }
 
+// Live-update : toggle mute on every lesson note belonging to a track.
+// If the lesson is currently running and the song matches, this takes
+// effect immediately without restarting playback.
+function applyTrackMuteLive(songId, trackId, mute) {
+  if (!lesson.running) return;
+  if (!lesson.song || lesson.song.id !== songId) return;
+  if (!lesson.notes) return;
+  for (const note of lesson.notes) {
+    if (note.trackId !== trackId) continue;
+    note.mute = !!mute;
+    // If we're muting an accomp note that's currently sounding, cut it.
+    if (mute && note.auto && note.resolved === 'hit') {
+      releaseNote(note.midi);
+    }
+  }
+}
+
 function renderTracksPanel() {
   const group = document.getElementById('tracks-group');
   const list = document.getElementById('track-list');
@@ -613,6 +630,8 @@ function renderTracksPanel() {
           p.roles[tr.id] = 'accomp';
         }
       });
+      // Live update : if a lesson is running on this song, mute/unmute now.
+      applyTrackMuteLive(song.id, tr.id, !checkbox.checked);
       renderTracksPanel();
     });
 
@@ -625,6 +644,8 @@ if (songSelect) songSelect.addEventListener('change', renderTracksPanel);
 function bulkSetTracks(action) {
   const song = getCurrentSongDef();
   if (!song || !song.tracks) return;
+  // Capture the new enabled state per track so we can propagate live.
+  const newEnabled = {};
   updateSongPrefs(song, (p) => {
     for (const tr of song.tracks) {
       if (tr.isDrums) continue;
@@ -637,9 +658,15 @@ function bulkSetTracks(action) {
         p.enabled[tr.id] = song.defaultEnabled[tr.id];
         p.roles[tr.id] = song.defaultRoles[tr.id];
       }
+      newEnabled[tr.id] = p.enabled[tr.id];
     }
     if (action === 'reset') p.userTrackId = song.defaultUserTrackId;
   });
+  // Propagate to the running lesson if any.
+  for (const tr of song.tracks) {
+    if (tr.isDrums) continue;
+    applyTrackMuteLive(song.id, tr.id, !newEnabled[tr.id]);
+  }
   renderTracksPanel();
 }
 
@@ -763,16 +790,20 @@ function startLesson(autoplay = false) {
       expectedTime: lesson.startTime + shiftBeat(n.beat) * beatDur,
       duration: n.length * beatDur,
       resolved: null, flashUntil: 0, auto: false,
+      trackId: n.trackId || null,
       trackColor: null,
       trackSoundfont: null,
+      mute: false,
     })),
     ...accompNotes.map((n) => ({
       midi: n.midi, hand: n.hand,
       expectedTime: lesson.startTime + shiftBeat(n.beat) * beatDur,
       duration: n.length * beatDur,
       resolved: null, flashUntil: 0, auto: true,
+      trackId: n.trackId || null,
       trackColor: n.trackColor || null,
       trackSoundfont: n.trackSoundfont || null,
+      mute: false,
     })),
   ];
 
@@ -965,6 +996,7 @@ function drawHighway() {
     let blocker = null;
     for (const note of lesson.notes) {
       if (note.auto) continue;
+      if (note.mute) continue;
       if (note.resolved === 'hit') continue;
       const adjusted = note.expectedTime + lesson.timeShift;
       if (adjusted <= t + 0.0001) {
@@ -990,13 +1022,19 @@ function drawHighway() {
   }
 
   // Autoplay mode (full) — and accompaniment notes (n.auto = true) — are
-  // triggered as they cross the hit line.
+  // triggered as they cross the hit line. Muted tracks are silently skipped.
   for (const note of lesson.notes) {
     if (note.resolved) continue;
     const playMe = lesson.autoplay || note.auto;
     if (!playMe) continue;
     const adjusted = note.expectedTime + lesson.timeShift;
     if (adjusted > t) continue;
+    if (note.mute) {
+      // Resolve so we don't loop, but don't play any audio or visuals.
+      note.resolved = 'hit';
+      note.flashUntil = 0;
+      continue;
+    }
     note.resolved = 'hit';
     note.flashUntil = t + 0.35;
     triggerNote(note.midi, note.auto ? 80 : 95, note.trackSoundfont || null);
@@ -1006,6 +1044,7 @@ function drawHighway() {
 
   let allDone = true;
   for (const note of lesson.notes) {
+    if (note.mute) continue; // skip muted tracks entirely
     const delta = (note.expectedTime + lesson.timeShift) - t; // >0 future, <0 past
     if (delta > LOOKAHEAD_SEC) { allDone = false; continue; }
     if (delta < -1.0 && note.resolved) continue;
