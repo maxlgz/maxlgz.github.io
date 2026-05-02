@@ -64,11 +64,32 @@
     return new File([buffer], name, { type: 'audio/midi' });
   }
 
+  // basic-pitch was trained on 22050 Hz mono audio and refuses anything else.
+  const TARGET_SR = 22050;
+
   async function fileToAudioBuffer(file) {
     const ab = await file.arrayBuffer();
     const Ctx = window.AudioContext || window.webkitAudioContext;
     const ctx = new Ctx();
-    return await ctx.decodeAudioData(ab);
+    const decoded = await ctx.decodeAudioData(ab);
+    if (decoded.sampleRate === TARGET_SR && decoded.numberOfChannels === 1) {
+      return decoded;
+    }
+    return resampleToMono(decoded, TARGET_SR);
+  }
+
+  // Render `buffer` through an OfflineAudioContext at the target sample rate,
+  // mixed down to mono. Browsers handle the actual resampling.
+  async function resampleToMono(buffer, sampleRate) {
+    const length = Math.ceil(buffer.duration * sampleRate);
+    const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!Offline) throw new Error('OfflineAudioContext non supporté par ce navigateur.');
+    const offline = new Offline(1, length, sampleRate);
+    const src = offline.createBufferSource();
+    src.buffer = buffer;
+    src.connect(offline.destination);
+    src.start(0);
+    return await offline.startRendering();
   }
 
   // ---------------------------------------------------------
@@ -178,9 +199,9 @@
 
     async function handle(file) {
       try {
-        setStatus('loading', `Décodage de ${file.name}…`);
+        setStatus('loading', `Décodage et conversion en 22 kHz mono de ${file.name}…`);
         const buf = await fileToAudioBuffer(file);
-        setStatus('loading', `Chargement du modèle (premier usage : ~20 MB)…`);
+        setStatus('loading', `Chargement du modèle basic-pitch (premier usage : ~20 MB)…`);
         const notes = await transcribe(buf, (p) => {
           const pct = Math.round(p * 100);
           setStatus('loading', `Transcription en cours… ${pct} %`);
