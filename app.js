@@ -1,4 +1,4 @@
-const APP_VERSION = 'v0.40.0';
+const APP_VERSION = 'v0.40.1';
 
 // Default keyboard window — overridable at runtime via setKeyboardLayout().
 let FIRST_MIDI = 36; // C2
@@ -572,12 +572,23 @@ function applyTrackMuteLive(songId, trackId, mute) {
   if (!lesson.running) return;
   if (!lesson.song || lesson.song.id !== songId) return;
   if (!lesson.notes) return;
+  const t = now();
   for (const note of lesson.notes) {
     if (note.trackId !== trackId) continue;
     note.mute = !!mute;
-    // If we're muting an accomp note that's currently sounding, cut it.
-    if (mute && note.auto && note.resolved === 'hit') {
-      releaseNote(note.midi);
+    if (mute) {
+      // Cut any accomp note that's currently sounding.
+      if (note.auto && note.resolved === 'hit') {
+        releaseNote(note.midi);
+      }
+    } else {
+      // Just unmuted : notes that have already passed the hit line should
+      // NOT suddenly avalanche all at once. Mark them resolved silently.
+      const adjusted = note.expectedTime + lesson.timeShift;
+      if (!note.resolved && adjusted < t - lesson.tolerance) {
+        note.resolved = 'hit';
+        note.flashUntil = 0;
+      }
     }
   }
 }

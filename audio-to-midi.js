@@ -106,25 +106,43 @@
           <button type="button" class="modal-close" data-modal-close aria-label="Fermer">×</button>
         </header>
         <div class="modal-body">
-          <ol class="yt-steps">
-            <li><strong>Copie l'URL</strong> de la vidéo YouTube qui t'intéresse.</li>
-            <li>Va sur <a href="https://cobalt.tools" target="_blank" rel="noopener">cobalt.tools</a>
-              (site gratuit, sans pub, source ouverte). Colle l'URL, choisis <em>Audio → MP3</em>,
-              télécharge.</li>
-            <li><strong>Glisse le fichier MP3</strong> dans la zone ci-dessous (ou clique pour
-              le sélectionner). L'app le transcrit en MIDI piano automatiquement.</li>
-          </ol>
+          <p class="yt-intro">
+            YouTube interdit le téléchargement direct depuis le navigateur (CORS + URLs signées).
+            Utilise un de ces outils <strong>open source</strong> pour extraire l'audio,
+            puis glisse le fichier dans la zone ci-dessous.
+          </p>
+
+          <div class="yt-providers">
+            <a href="https://cobalt.tools" target="_blank" rel="noopener" class="yt-provider">
+              <strong>cobalt.tools</strong>
+              <span>Source ouverte, sans pub. <em>(parfois indisponible)</em></span>
+            </a>
+            <a href="https://www.y2mate.nu" target="_blank" rel="noopener" class="yt-provider">
+              <strong>y2mate.nu</strong>
+              <span>Web simple, MP3 instantané, des pubs.</span>
+            </a>
+            <a href="https://savefrom.net" target="_blank" rel="noopener" class="yt-provider">
+              <strong>savefrom.net</strong>
+              <span>Web populaire, collage URL → MP3.</span>
+            </a>
+            <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener" class="yt-provider">
+              <strong>yt-dlp</strong> <span class="yt-cli">CLI</span>
+              <span>La référence open source. <code>yt-dlp -x --audio-format mp3 URL</code></span>
+            </a>
+          </div>
+
           <div class="yt-drop" id="yt-drop">
             <input type="file" id="yt-file" accept="audio/*" hidden />
             <span class="yt-drop-icon">⤓</span>
             <span class="yt-drop-text">Glisse un fichier audio ici<br>
-              <em>ou clique pour parcourir</em></span>
+              <em>ou clique pour parcourir</em> · MP3 / WAV / M4A / OGG</span>
           </div>
           <div class="yt-status" id="yt-status" hidden></div>
           <p class="yt-disclaimer">
-            La transcription tourne <strong>localement</strong> dans ton navigateur via
-            <em>basic-pitch</em> de Spotify (modèle ~20 MB chargé une fois).
-            Qualité variable : excellente sur du piano solo, plus approximative sur des mixes complexes.
+            La transcription tourne <strong>localement dans ton navigateur</strong> via
+            <a href="https://github.com/spotify/basic-pitch" target="_blank" rel="noopener"><em>basic-pitch</em> de Spotify</a>
+            (open source, modèle TensorFlow.js ~20 MB chargé une fois).
+            Qualité honnête : très bonne sur du piano solo, approximative sur les mixes complexes.
           </p>
         </div>
       </div>
