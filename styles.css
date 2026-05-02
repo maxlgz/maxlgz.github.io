@@ -2126,6 +2126,62 @@ body.modal-locked { overflow: hidden; }
 }
 .yt-intro strong { color: var(--ivory); font-weight: 500; }
 
+/* Direct URL extractor (server.py mode) */
+.yt-direct {
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(212, 160, 73, 0.12), rgba(212, 160, 73, 0.04));
+  border: 1px solid var(--brass);
+  border-radius: var(--rad);
+  margin-bottom: 18px;
+}
+
+.yt-direct[hidden] { display: none; }
+
+.yt-direct-eyebrow {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brass-bright);
+  margin-bottom: 6px;
+}
+
+.yt-direct p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--ivory-dim);
+  line-height: 1.5;
+}
+
+.yt-direct-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.yt-direct-row input[type="url"] {
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  color: var(--ivory);
+  padding: 9px 12px;
+  border-radius: var(--rad);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+.yt-direct-row input[type="url"]:focus {
+  outline: none;
+  border-color: var(--brass);
+  box-shadow: 0 0 0 3px rgba(212, 160, 73, 0.12);
+}
+
+.yt-direct-row .btn-primary {
+  padding: 0 18px;
+  font-size: 11px;
+}
+
 .yt-providers {
   display: grid;
   grid-template-columns: 1fr 1fr;

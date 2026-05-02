@@ -127,9 +127,17 @@
           <button type="button" class="modal-close" data-modal-close aria-label="Fermer">×</button>
         </header>
         <div class="modal-body">
-          <p class="yt-intro">
-            YouTube interdit le téléchargement direct depuis le navigateur (CORS + URLs signées).
-            Utilise un de ces outils <strong>open source</strong> pour extraire l'audio,
+          <div class="yt-direct" id="yt-direct" hidden>
+            <span class="yt-direct-eyebrow">Mode local — yt-dlp détecté</span>
+            <p>Colle directement l'URL YouTube. Le serveur télécharge l'audio puis l'app le transcrit en MIDI.</p>
+            <div class="yt-direct-row">
+              <input type="url" id="yt-url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" />
+              <button type="button" id="yt-fetch-btn" class="btn btn-primary">Extraire →</button>
+            </div>
+          </div>
+
+          <p class="yt-intro" id="yt-providers-intro">
+            Utilise un de ces outils <strong>open source</strong> pour extraire l'audio MP3,
             puis glisse le fichier dans la zone ci-dessous.
           </p>
 
@@ -171,8 +179,107 @@
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay || e.target.hasAttribute('data-modal-close')) closeYouTubeModal();
     });
-    setTimeout(() => wireDropZone(overlay), 0);
+    setTimeout(() => {
+      wireDropZone(overlay);
+      probeServerExtract(overlay);
+    }, 0);
     return overlay;
+  }
+
+  // If a local /api/yt-extract endpoint is available (server.py running),
+  // surface the URL field. Otherwise hide it and keep only providers.
+  async function probeServerExtract(overlay) {
+    const direct = overlay.querySelector('#yt-direct');
+    if (!direct) return;
+    try {
+      // Cheap probe : POST with empty body should give 400 from the API.
+      const res = await fetch('/api/yt-extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      // Both 400 (handled) and 200 mean the endpoint is alive.
+      // 404 / 405 / 500 / network error → no API.
+      if (res.status === 400 || res.status === 200 || res.status === 500) {
+        direct.hidden = false;
+        wireDirectFetch(overlay);
+      }
+    } catch (_) {
+      // No server → keep direct hidden.
+    }
+  }
+
+  function wireDirectFetch(overlay) {
+    const urlInput = overlay.querySelector('#yt-url');
+    const goBtn = overlay.querySelector('#yt-fetch-btn');
+    const status = overlay.querySelector('#yt-status');
+    if (!urlInput || !goBtn) return;
+
+    async function go() {
+      const url = (urlInput.value || '').trim();
+      if (!url) return;
+      goBtn.disabled = true;
+      try {
+        setStatus('loading', 'Extraction de l\'audio via yt-dlp (peut prendre 30 s)…');
+        const res = await fetch('/api/yt-extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ('HTTP ' + res.status));
+        }
+        const blob = await res.blob();
+        const cd = res.headers.get('Content-Disposition') || '';
+        const m = cd.match(/filename="?([^"]+)"?/);
+        const name = m ? m[1] : 'youtube.mp3';
+        const file = new File([blob], name, { type: 'audio/mpeg' });
+        await transcribeFile(overlay, file);
+      } catch (err) {
+        console.error('[yt-extract]', err);
+        setStatus('error', 'Échec : ' + (err.message || err));
+      } finally {
+        goBtn.disabled = false;
+      }
+    }
+
+    function setStatus(state, msg) {
+      status.hidden = false;
+      status.dataset.state = state;
+      status.textContent = msg;
+    }
+
+    goBtn.addEventListener('click', go);
+    urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+  }
+
+  // Shared transcription pipeline used by both drop and direct paths.
+  async function transcribeFile(overlay, file) {
+    const status = overlay.querySelector('#yt-status');
+    function setStatus(state, msg) {
+      status.hidden = false;
+      status.dataset.state = state;
+      status.textContent = msg;
+    }
+    setStatus('loading', `Décodage et conversion en 22 kHz mono de ${file.name}…`);
+    const buf = await fileToAudioBuffer(file);
+    setStatus('loading', `Chargement du modèle basic-pitch (premier usage : ~20 MB)…`);
+    const notes = await transcribe(buf, (p) => {
+      setStatus('loading', `Transcription en cours… ${Math.round(p * 100)} %`);
+    });
+    if (!notes || notes.length === 0) {
+      setStatus('error', 'Aucune note détectée. Le morceau est peut-être trop bruité ou trop court.');
+      return;
+    }
+    setStatus('loading', `${notes.length} notes détectées — génération du MIDI…`);
+    const baseName = file.name.replace(/\.[^.]+$/, '') + '.mid';
+    const midiFile = notesToMidiFile(notes, baseName);
+    if (typeof window.importMidiFile === 'function') {
+      await window.importMidiFile(midiFile);
+    }
+    setStatus('ok', `Importé ! Va dans Difficulté → Importés pour le retrouver.`);
+    setTimeout(() => closeYouTubeModal(), 1800);
   }
 
   function wireDropZone(overlay) {
@@ -199,35 +306,16 @@
 
     async function handle(file) {
       try {
-        setStatus('loading', `Décodage et conversion en 22 kHz mono de ${file.name}…`);
-        const buf = await fileToAudioBuffer(file);
-        setStatus('loading', `Chargement du modèle basic-pitch (premier usage : ~20 MB)…`);
-        const notes = await transcribe(buf, (p) => {
-          const pct = Math.round(p * 100);
-          setStatus('loading', `Transcription en cours… ${pct} %`);
-        });
-        if (!notes || notes.length === 0) {
-          setStatus('error', 'Aucune note détectée. Le morceau est peut-être trop bruité ou trop court.');
-          return;
-        }
-        setStatus('loading', `${notes.length} notes détectées — génération du MIDI…`);
-        const baseName = file.name.replace(/\.[^.]+$/, '') + '.mid';
-        const midiFile = notesToMidiFile(notes, baseName);
-        if (typeof window.importMidiFile === 'function') {
-          await window.importMidiFile(midiFile);
-        }
-        setStatus('ok', `Importé ! Va dans Difficulté → Importés pour le retrouver.`);
-        setTimeout(() => closeYouTubeModal(), 1800);
+        await transcribeFile(overlay, file);
       } catch (err) {
         console.error('[audio-to-midi]', err);
-        setStatus('error', 'Échec : ' + (err.message || err));
+        const status = overlay.querySelector('#yt-status');
+        if (status) {
+          status.hidden = false;
+          status.dataset.state = 'error';
+          status.textContent = 'Échec : ' + (err.message || err);
+        }
       }
-    }
-
-    function setStatus(state, msg) {
-      status.hidden = false;
-      status.dataset.state = state;
-      status.textContent = msg;
     }
   }
 
