@@ -3,7 +3,7 @@
 // Stale-while-revalidate sur les CDN (fontes Google, soundfonts, @tonejs/midi).
 // Network-only (sans cache) sur l'API BitMidi (recherche dynamique).
 
-const VERSION = 'etude-v0.41.1';
+const VERSION = 'etude-v0.41.2';
 const CORE = `${VERSION}-core`;
 const CDN  = `${VERSION}-cdn`;
 

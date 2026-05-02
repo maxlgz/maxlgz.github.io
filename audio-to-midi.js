@@ -34,27 +34,29 @@
 
   async function transcribe(audioBuffer, onProgress) {
     const mod = await loadBasicPitch();
-    const { BasicPitch, noteFramesToTime, addPitchBendsToNoteEvents, outputToNotesPoly } = mod;
+    const { BasicPitch, noteFramesToTime, outputToNotesPoly } = mod;
     const basicPitch = new BasicPitch(MODEL_URL);
 
     const frames = [];
     const onsets = [];
-    const contours = [];
+    // We deliberately skip the contours buffer : we don't need pitch bends
+    // for piano MIDI, and processing them is what froze long tracks.
     await basicPitch.evaluateModel(
       audioBuffer,
-      (f, o, c) => { appendAll(frames, f); appendAll(onsets, o); appendAll(contours, c); },
+      (f, o /*, c */) => { appendAll(frames, f); appendAll(onsets, o); },
       (p) => { if (onProgress) onProgress(p); }
     );
 
-    // Hand back control to the browser before the (possibly heavy) post-processing.
+    // Hand back control to the browser before the post-processing.
     if (onProgress) onProgress(1);
     await yieldToBrowser();
 
-    const polyNotes = outputToNotesPoly(frames, onsets, 0.25, 0.25, 5);
+    // Slightly stricter thresholds + longer minimum note length to get
+    // cleaner output and stop the algorithm from chasing micro-onsets.
+    const polyNotes = outputToNotesPoly(frames, onsets, 0.3, 0.3, 11);
     await yieldToBrowser();
-    const withBends = addPitchBendsToNoteEvents(contours, polyNotes);
-    await yieldToBrowser();
-    const noteEvents = noteFramesToTime(withBends);
+    // No addPitchBendsToNoteEvents() — too slow on long tracks, no value here.
+    const noteEvents = noteFramesToTime(polyNotes);
     return noteEvents; // [{startTimeSeconds, endTimeSeconds, pitchMidi, amplitude, ...}]
   }
 
@@ -157,21 +159,13 @@
           </p>
 
           <div class="yt-providers">
-            <a href="https://cobalt.tools" target="_blank" rel="noopener" class="yt-provider">
-              <strong>cobalt.tools</strong>
-              <span>Source ouverte, sans pub. <em>(parfois indisponible)</em></span>
-            </a>
-            <a href="https://www.y2mate.nu" target="_blank" rel="noopener" class="yt-provider">
-              <strong>y2mate.nu</strong>
-              <span>Web simple, MP3 instantané, des pubs.</span>
-            </a>
-            <a href="https://savefrom.net" target="_blank" rel="noopener" class="yt-provider">
+            <a href="https://fr.savefrom.net/351Dr/" target="_blank" rel="noopener" class="yt-provider">
               <strong>savefrom.net</strong>
-              <span>Web populaire, collage URL → MP3.</span>
+              <span>Colle l'URL → choisis MP3 → télécharge.</span>
             </a>
-            <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener" class="yt-provider">
-              <strong>yt-dlp</strong> <span class="yt-cli">CLI</span>
-              <span>La référence open source. <code>yt-dlp -x --audio-format mp3 URL</code></span>
+            <a href="https://v3.y2mate.nu/" target="_blank" rel="noopener" class="yt-provider">
+              <strong>y2mate.nu</strong>
+              <span>Colle l'URL, MP3 instantané.</span>
             </a>
           </div>
 
