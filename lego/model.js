@@ -213,7 +213,9 @@ function insideHull(x, y, z) {
 }
 
 // --- Verrière : contour de profil × demi-largeur vue de dessus ---------
-const CANOPY = { x0: Math.min(...Object.keys(PR.canopy).map(Number)), x1: Math.max(...Object.keys(PR.canopy).map(Number)) + 1, ribs: [] };
+// Le pare-brise monte en rampe douce sur sept tenons, et l'avant de la
+// bulle est arrondi en plan ; derrière, le toit suit le relevé.
+const CANOPY = { x0: Math.min(...Object.keys(PR.canopy).map(Number)) - 1, x1: Math.max(...Object.keys(PR.canopy).map(Number)) + 1, ramp: 7, ribs: [] };
 { const n = 3, len = CANOPY.x1 - CANOPY.x0; for (let i = 1; i <= n; i++) CANOPY.ribs.push(CANOPY.x0 + len * i / (n + 1)); }
 const canopySide = table(Object.fromEntries(Object.entries(PR.canopy).map(([k, v]) => [k, v[0]])));
 function canopy(x, y, z) {
@@ -222,9 +224,12 @@ function canopy(x, y, z) {
   // sur l'emprise mesurée de profil
   const keys = Object.keys(PR.canopyHalfZ).map(Number);
   const u = Math.min(...keys) + (x - CANOPY.x0) / (CANOPY.x1 - CANOPY.x0) * (Math.max(...keys) - Math.min(...keys));
-  const hz = T.canopyHalfZ(u);
+  const t = clamp((x - CANOPY.x0) / CANOPY.ramp, 0, 1);
+  const hz = T.canopyHalfZ(u) * Math.sqrt(1 - (1 - t) * (1 - t));
   if (!hz || hz < 0.5 || Math.abs(z) > hz) return false;
-  const top = hullTop(x) + (canopySide(x) - hullTop(x)) * Math.sqrt(Math.max(0, 1 - Math.pow(z / hz, 2)));
+  const ease = (1 - Math.cos(Math.PI * t)) / 2;
+  const roof = hullTop(x) + (canopySide(Math.max(x, CANOPY.x0 + CANOPY.ramp)) - hullTop(x)) * ease;
+  const top = hullTop(x) + (roof - hullTop(x)) * Math.sqrt(Math.max(0, 1 - Math.pow(z / hz, 2)));
   if (y > top || y <= hullSurfaceTop(x, z) - 1.5) return null;
   // sous la bulle, le dos est aplani en un pont : la bulle y repose à plat
   return y > hullTop(x) - 1 ? 'verriere' : 'pont';
