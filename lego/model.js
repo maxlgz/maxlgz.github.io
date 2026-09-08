@@ -246,9 +246,13 @@ function dorsalAt(x, y) {
 // profil), l'autre horizontal (vu de dessus). L'arbre de l'hélice est le
 // prolongement de la poutre de châssis, posé par addChassis.
 const SHAFT = { x0: HULL_LEN, x1: 95, hub: 93 };
+const PHOTO_TAIL_AXIS = (T.top(HULL_LEN) + T.bot(HULL_LEN)) / 2;
 function caudal(x, y, z) {
   const xi = Math.floor(x);
   const a = axisY(HULL_LEN);
+  // les intervalles sont relevés sur la photo : sur une coque importée, on
+  // les recale sur l'axe de son pédoncule
+  if (MESH) y -= Math.round(a - PHOTO_TAIL_AXIS);
   // lame verticale, deux tenons d'épaisseur ; la racine s'épaissit à quatre
   const thick = x >= 90 ? 1 : Math.abs(y - a) < 2.5 ? 3 : Math.abs(y - a) < 4.5 ? 2 : 1;
   if (z >= -thick && z < thick) {
@@ -280,7 +284,9 @@ function hangingFin(x, y, z, fin) {
   if (y < yLo - 0.5) return false;
   const az = Math.abs(z);
   const t = clamp((fin.yRoot - y) / fin.depth, 0, 1);
-  const zc = fin.zRoot + (fin.zTip - fin.zRoot) * t;
+  // sur une coque importée plus étroite, la racine se rapproche de l'axe
+  const zRoot = Math.min(fin.zRoot, halfWidth(x) - 1);
+  const zc = zRoot + (Math.max(fin.zTip, zRoot + 3) - zRoot) * t;
   if (Math.abs(az - zc) > 1) return false;
   // sous la coque : jusqu'à la peau, à cet écartement
   const W = halfWidth(x);
@@ -338,10 +344,13 @@ function shell(solid) {
     if (!HOLLOW.has(g)) { skin.set(k, g); continue; }
     const [x, y, z] = k.split('|').map(Number);
     if (!MESH && halfWidth(x + 0.5) < 4.5) { skin.set(k, g); exposedCells.push([x, y, z]); continue; }
+    // exposée au vide, ou en contact avec une nageoire, la bulle, une
+    // dorsale : ce qui s'agrafe à la coque a besoin de sa peau
+    const open = (kk) => { const gg = solid.get(kk); return gg === undefined || !HOLLOW.has(gg); };
     const exposed =
-      !solid.has(key(x + 1, y, z)) || !solid.has(key(x - 1, y, z)) ||
-      !solid.has(key(x, y + 1, z)) || !solid.has(key(x, y - 1, z)) ||
-      !solid.has(key(x, y, z + 1)) || !solid.has(key(x, y, z - 1));
+      open(key(x + 1, y, z)) || open(key(x - 1, y, z)) ||
+      open(key(x, y + 1, z)) || open(key(x, y - 1, z)) ||
+      open(key(x, y, z + 1)) || open(key(x, y, z - 1));
     if (exposed) { skin.set(k, g); exposedCells.push([x, y, z]); }
   }
   const out = new Map(skin);
@@ -376,7 +385,8 @@ function addChassis(cells) {
   const a = Math.floor(axisY(HULL_LEN));
   for (let x = SHAFT.x0; x < SHAFT.x1; x++) {
     for (const [y, wide] of [[a - 1, 90], [a, 88]]) {
-      for (const z of (x < wide ? [-2, -1, 0, 1] : [-1, 0])) cells.set(key(x, y, z), 'chassis');
+      const four = x < wide && (!MESH || halfWidth(x + 0.5) >= 2);   // à la largeur du pédoncule importé
+      for (const z of (four ? [-2, -1, 0, 1] : [-1, 0])) cells.set(key(x, y, z), 'chassis');
     }
   }
 }
@@ -617,7 +627,7 @@ const PARAM_GROUPS = ['verriere', 'dorsale', 'dorsale2', 'caudale', 'pectoraleG'
 export function buildModel(voxels = null) {
   let solid;
   let addPropeller = !voxels;
-  SHAFT.hub = 93; SHAFT.x1 = 95;
+  SHAFT.x0 = HULL_LEN; SHAFT.hub = 93; SHAFT.x1 = 95;
   if (voxels) {
     // Le maillage part de y = 0 : on le surélève pour que l'axe de sa coque
     // tombe à la hauteur de celui du modèle photo (ou d'un lift imposé).
@@ -644,17 +654,35 @@ export function buildModel(voxels = null) {
       const missing = new Set(PARAM_GROUPS.filter((g) => !(voxels.runs[g] && voxels.runs[g].length)));
       if (missing.has('caudale')) {
         MESH.shaft = true;
-        // l'hélice se pose derrière la fin de la coque importée, si la place reste
+        // l'arbre part de l'intérieur de la coque importée ; l'hélice se
+        // pose derrière sa fin, si la place reste
         const hullEnd = Math.max(-1, ...(lifted.coque || []).map((r) => r[0]));
+        SHAFT.x0 = Math.max(60, hullEnd - 5);
         SHAFT.hub = Math.max(93, hullEnd + 1); SHAFT.x1 = SHAFT.hub + 2;
         addPropeller = !(voxels.runs.helice && voxels.runs.helice.length) && SHAFT.hub <= TOTAL_LEN - 2;
       }
       if (missing.size) {
+        const added = [];
         for (let x = 0; x < TOTAL_LEN; x++) for (let y = 0; y < NY; y++) for (let z = Z_MIN; z < Z_MAX; z++) {
           const k = key(x, y, z);
           if (solid.has(k)) continue;
           const g = solidAt(x + 0.5, y + 0.5, z + 0.5);
-          if (g && missing.has(g)) solid.set(k, g);
+          if (g && missing.has(g)) { solid.set(k, g); added.push([x, y, z, g]); }
+        }
+        // La peau de la coque importée n'est pas exactement la section
+        // supposée : les racines des nageoires pendantes montent jusqu'à
+        // la première cellule de coque au-dessus d'elles.
+        const tops = new Map();
+        for (const [x, y, z, g] of added) {
+          if (!/^(pectorale|pelvienne)/.test(g)) continue;
+          const ck = `${x}|${z}`;
+          if (!tops.has(ck) || tops.get(ck)[0] < y) tops.set(ck, [y, g]);
+        }
+        for (const [ck, [y0, g]] of tops) {
+          const [x, z] = ck.split('|').map(Number);
+          let hit = -1;
+          for (let y = y0 + 1; y <= y0 + 15 && y < NY; y++) if (solid.has(key(x, y, z))) { hit = y; break; }
+          if (hit > 0) for (let y = y0 + 1; y < hit; y++) solid.set(key(x, y, z), g);
         }
       }
       voxels.completed = [...missing];

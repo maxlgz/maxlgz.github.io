@@ -68,8 +68,11 @@ function renderImportList() {
     const label = document.createElement('label');
     const dims = p.box ? `${mm(p.box.size[0])} × ${mm(p.box.size[1])} × ${mm(p.box.size[2])} · origine ${p.box.lo.map(mm).join(' / ')}` : kb(p.size);
     label.innerHTML = `<input type="checkbox" ${p.use ? 'checked' : ''} /><span class="name" title="${p.name}">${p.name}</span>` +
-      `<span class="size" title="dimensions et coin bas du fichier, dans ses unités">${dims}</span><select>${IMPORT_GROUPS.map(([v, t]) => `<option value="${v}" ${v === p.group ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+      `<span class="size" title="dimensions et coin bas du fichier, dans ses unités">${dims}</span>` +
+      `<span class="flip"><label title="Retourner cette pièce : demi-coque posée face de coupe sur le plateau"><input type="checkbox" class="flip-box" ${p.flip ? 'checked' : ''} /> ↕</label></span>` +
+      `<select>${IMPORT_GROUPS.map(([v, t]) => `<option value="${v}" ${v === p.group ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
     label.querySelector('input').addEventListener('change', (e) => { importParts[i].use = e.target.checked; });
+    label.querySelector('.flip-box').addEventListener('change', (e) => { importParts[i].flip = e.target.checked; e.stopPropagation(); });
     label.querySelector('select').addEventListener('change', (e) => { importParts[i].group = e.target.value; });
     list.appendChild(label);
   });
@@ -89,6 +92,12 @@ async function inspectImportParts() {
       if (ev.data.type !== 'inspected') return;
       worker.terminate();
       for (const f of ev.data.files) { const p = importParts.find((q) => q.name === f.name); if (p && !f.error) p.box = f; }
+      import('./voxelize.js').then(({ suggestFlips }) => {
+        const flips = suggestFlips(importParts);
+        for (const p of importParts) p.flip = flips.has(p.name);
+        renderImportList();
+        if (flips.size) importStatus(`${flips.size} demi-coque${flips.size > 1 ? 's' : ''} posée${flips.size > 1 ? 's' : ''} face de coupe en bas : retournée${flips.size > 1 ? 's' : ''} (↕) pour l’assemblage.`);
+      });
       renderImportList();
       const used = importParts.filter((p) => p.use && p.box);
       if (used.length >= 2) {
@@ -144,13 +153,14 @@ $('#import-go').addEventListener('click', async () => {
   importStatus('Décompression…');
   try {
     const files = [];
-    for (const p of parts) files.push({ name: p.name, group: p.group, buffer: await p.data() });
+    for (const p of parts) files.push({ name: p.name, group: p.group, flip: !!p.flip, buffer: await p.data() });
     const opts = {
       length: Math.round((Number($('#import-length').value) || 77) * 10 / 8),
       up: $('#import-up').value, nose: $('#import-nose').value,
       keepStand: $('#import-stand').checked,
     };
     const complete = $('#import-complete').checked;
+    if (complete) opts.hullShare = 83 / 96;   // part de la coque dans la longueur totale, sans la caudale
     const worker = new Worker(new URL('./import.worker.js', import.meta.url), { type: 'module' });
     const PHASES = { orientation: 'Orientation du maillage', voxelisation: 'Voxelisation', classement: 'Classement des cellules', 'séries': 'Mise en forme' };
     worker.onmessage = (ev) => {
