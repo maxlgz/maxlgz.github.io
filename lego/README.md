@@ -72,7 +72,13 @@ bordereau, guide et exports. Un bouton ramène au modèle photo.
 Avec un seul fichier, le classement est automatique (coque, verrière, dorsales,
 caudale, nageoires, hélice, socle). Avec plusieurs fichiers, c'est le groupe
 choisi pour chacun qui compte ; ils doivent partager le même repère (export
-« assemblé »). Le même traitement existe en ligne de commande :
+« assemblé »). Les kits d'impression 3D posent souvent chaque pièce à plat sur
+son plateau : la liste affiche l'emprise de chaque fichier et prévient quand
+les fichiers cochés se superposent près de l'origine. Dans ce cas, on garde
+un seul fichier de coque et le **mode hybride** (coché par défaut) complète
+ce qui manque — nageoires, caudale, bulle, hélice — avec le modèle photo,
+accroché à la coque importée dont l'axe est aligné sur le sien. Le même
+traitement existe en ligne de commande :
 
     node lego/tools/voxelize.mjs modele.stl --length 96 --out lego/voxels.json
 

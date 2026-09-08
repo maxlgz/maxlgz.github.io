@@ -372,7 +372,7 @@ function addChassis(cells) {
       }
     }
   }
-  if (MESH) return;
+  if (MESH && !MESH.shaft) return;
   const a = Math.floor(axisY(HULL_LEN));
   for (let x = SHAFT.x0; x < SHAFT.x1; x++) {
     for (const [y, wide] of [[a - 1, 90], [a, 88]]) {
@@ -609,17 +609,53 @@ function useMesh(runs) {
   MESH = { top: smooth(top), bot: smooth(bot), wid: smooth(wid), len: Math.max(...top.keys()) + 1 };
 }
 
+// Groupes que le modèle photo sait fournir quand un maillage ne les a pas
+const PARAM_GROUPS = ['verriere', 'dorsale', 'dorsale2', 'caudale', 'pectoraleG', 'pectoraleD', 'pelvienneG', 'pelvienneD'];
+
 export function buildModel(voxels = null) {
   let solid;
+  let addPropeller = !voxels;
+  SHAFT.hub = 93; SHAFT.x1 = 95;
   if (voxels) {
-    // le maillage part de y = 0 : on le surélève pour laisser la place au socle
-    const lift = voxels.lift ?? 22;
+    // Le maillage part de y = 0 : on le surélève pour que l'axe de sa coque
+    // tombe à la hauteur de celui du modèle photo (ou d'un lift imposé).
+    let lift = voxels.lift;
+    if (lift === undefined) {
+      const probe = {};
+      for (const [g, runs] of Object.entries(voxels.runs)) probe[g] = runs;
+      useMesh(probe);
+      const xs = [40, 36, 44, 48, 32].filter((x) => MESH.top(x) !== undefined);
+      const x = xs[0];
+      lift = x === undefined ? 22 : Math.round(AXIS_Y - (MESH.top(x) + MESH.bot(x)) / 2);
+      lift = Math.max(22, lift);
+    }
     const lifted = {};
     for (const [g, runs] of Object.entries(voxels.runs)) lifted[g] = runs.map(([x, y, z0, z1]) => [x, y + lift, z0, z1]);
     useMesh(lifted);
     solid = new Map();
     for (const [g, runs] of Object.entries(lifted)) {
-      for (const [x, y, z0, z1] of runs) for (let z = z0; z <= z1; z++) solid.set(key(x, y, z), g);
+      for (const [x, y, z0, z1] of runs) for (let z = z0; z <= z1; z++) if (y < NY && z >= Z_MIN && z < Z_MAX) solid.set(key(x, y, z), g);
+    }
+    // Mode hybride : ce que le maillage n'apporte pas (nageoires, caudale,
+    // bulle, hélice) vient du modèle photo, accroché à la coque importée.
+    if (voxels.complete !== false) {
+      const missing = new Set(PARAM_GROUPS.filter((g) => !(voxels.runs[g] && voxels.runs[g].length)));
+      if (missing.has('caudale')) {
+        MESH.shaft = true;
+        // l'hélice se pose derrière la fin de la coque importée, si la place reste
+        const hullEnd = Math.max(-1, ...(lifted.coque || []).map((r) => r[0]));
+        SHAFT.hub = Math.max(93, hullEnd + 1); SHAFT.x1 = SHAFT.hub + 2;
+        addPropeller = !(voxels.runs.helice && voxels.runs.helice.length) && SHAFT.hub <= TOTAL_LEN - 2;
+      }
+      if (missing.size) {
+        for (let x = 0; x < TOTAL_LEN; x++) for (let y = 0; y < NY; y++) for (let z = Z_MIN; z < Z_MAX; z++) {
+          const k = key(x, y, z);
+          if (solid.has(k)) continue;
+          const g = solidAt(x + 0.5, y + 0.5, z + 0.5);
+          if (g && missing.has(g)) solid.set(k, g);
+        }
+      }
+      voxels.completed = [...missing];
     }
   } else {
     MESH = null;
@@ -642,7 +678,7 @@ export function buildModel(voxels = null) {
 
   let pieces = mergeVertical(packed);
   // le maillage apporte sa propre hélice ; le socle, lui, est toujours posé ici
-  pieces = pieces.concat(voxels ? [] : propeller(), stand(cells));
+  pieces = pieces.concat(addPropeller ? propeller() : [], stand(cells));
 
   pieces.sort((a, b) => a.y - b.y || a.x - b.x || a.z - b.z);
   pieces.forEach((p, i) => { p.id = i; });
