@@ -9,18 +9,19 @@ reconstruit en briques par un générateur paramétrique. Page statique, sans bu
 
 Rien n'est modélisé à la main. `model.js` enchaîne six étapes :
 
-1. **Profils** — le corps est décrit par des fonctions continues : demi-largeur,
-   demi-hauteur haute et basse, hauteur d'axe, le tout en fonction de la position
-   le long du museau. Les nageoires et l'empennage sont des solides implicites
-   séparés (aile en flèche, lame verticale, caudale fourchue).
+1. **Profils** — les demi-hauteurs du corps sont relevées sur les photos de la
+   maquette (1 720 px pour 77 cm) et interpolées par une cubique monotone ; la
+   section est ronde. Les nageoires sont des lames décrites par leurs bords
+   d'attaque et de fuite (dorsales, croissant caudal) ou par leur profondeur
+   (pectorales et pelviennes, presque verticales) ; la verrière est une voûte.
 2. **Voxelisation** — l'espace est découpé en cellules de 1 tenon × 1 tenon ×
    1 plaque, et chaque cellule est testée contre la section super-elliptique.
 3. **Évidement** — seules les cellules qui touchent le vide sont conservées :
    il reste une peau d'un tenon d'épaisseur, posée sur un plancher longitudinal.
-4. **Livrée** — peinte par des règles géométriques, d'après la maquette de
-   Tintinimaginatio : dos noir et ventre crème séparés par une frontière qui
-   ondule (somme de deux sinusoïdes), gueule et dents, œil, ouïes, verrière
-   transparente sur le dos et hélice dorée à l'extrême arrière.
+4. **Livrée** — relevée sur la photo de profil : dos noir et ventre blanc
+   séparés par une frontière qui court sous l'axe et remonte en sept pointes
+   aux positions mesurées ; œil annulaire, ouïes, arceaux gris de la verrière,
+   hélice en or perlé.
 5. **Pavage** — un remplissage glouton remplace les cellules par les plus grands
    rectangles disponibles dans le catalogue de pièces réelles.
 6. **Fusion verticale** — trois plaques identiques empilées deviennent une brique.

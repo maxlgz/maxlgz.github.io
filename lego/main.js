@@ -28,7 +28,7 @@ const values = {
   stages: STAGES.length,
   layers: nf.format(new Set(pieces.map((p) => p.y)).size),
   noir: nf.format(countIn((p) => p.color === 'black' && HULL.has(p.group))),
-  creme: nf.format(countIn((p) => p.color === 'tan' && HULL.has(p.group))),
+  blanc: nf.format(countIn((p) => p.color === 'white' && HULL.has(p.group))),
   verriere: nf.format(countIn((p) => p.group === 'verriere')),
   helice: nf.format(countIn((p) => p.group === 'helice')),
   dimx: df(bbox.mm.x / 10),
