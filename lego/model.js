@@ -133,9 +133,10 @@ function pchip(xs, ys) {
 // affinement franc jusqu'à un pédoncule de trois tenons.
 // Le museau est un cône : la demi-hauteur monte d'environ 1,5 plaque
 // par tenon sur les huit premiers tenons, puis s'arrondit vers le renflement.
+// La cote en x = 0 garde la cellule de pointe : le modèle fait 96 tenons.
 const XS = [0, 2, 4, 6, 8, 11, 16, 22, 28, 33, 40, 44, 50, 55, 60, 66, 72, 77, 84];
-const TOP = pchip(XS, [0.6, 3, 6, 8.6, 11, 14.2, 17.2, 19.2, 19.9, 20.2, 19.4, 18, 16, 13.5, 11, 8.5, 6.5, 5, 3.5]);
-const BOT = pchip(XS, [0.6, 2.6, 5.2, 7.6, 9.8, 12.8, 15.8, 17.6, 18.3, 18.6, 18, 17, 15.5, 13, 10.5, 8, 6, 4.5, 3.5]);
+const TOP = pchip(XS, [1.7, 3, 6, 8.6, 11, 14.2, 17.2, 19.2, 19.9, 20.2, 19.4, 18, 16, 13.5, 11, 8.5, 6.5, 5, 3.5]);
+const BOT = pchip(XS, [1.5, 2.6, 5.2, 7.6, 9.8, 12.8, 15.8, 17.6, 18.3, 18.6, 18, 17, 15.5, 13, 10.5, 8, 6, 4.5, 3.5]);
 
 export function halfTop(x)    { return TOP(clamp(x, 0, HULL_LEN)); }
 export function halfBottom(x) { return BOT(clamp(x, 0, HULL_LEN)); }
