@@ -67,16 +67,21 @@ export const PARTS = {
   'brick-2x8': { label: 'Brique 2 × 8', design: '3007', ldraw: '3007.dat', dz: 2, dx: 8, h: 3, kind: 'brick' },
 };
 
-// --- Chapitres de montage, dans l'ordre où l'on construit -----------
-// La coque se monte couche par couche depuis le ventre, poutre comprise ;
-// chaque nageoire est un sous-ensemble monté à plat puis fixé ; le socle
-// vient en dernier, et l'on y pose le modèle.
+// --- Chapitres de montage --------------------------------------------
+// Le modèle se monte du bas vers le haut, toutes pièces confondues :
+// chaque couche contient ce qui s'y trouve — coque, poutre, verrière,
+// dorsales, caudale. Seules les nageoires pendantes (pectorales,
+// pelviennes, lobe inférieur de la caudale), qui n'ont rien sous elles,
+// se montent à plat d'abord, puis se pressent par en dessous au moment
+// où la couche de coque qui les reçoit vient d'être posée. Le socle se
+// monte en dernier et reçoit le sous-marin.
 export const STAGES = [
-  { id: 1, key: 'coque',     label: 'Coque',               blurb: 'Le corps entier, couche par couche depuis le ventre, poutre longitudinale comprise. Le chapitre le plus long : la peau suit la section du corps à chaque hauteur.' },
-  { id: 2, key: 'verriere',  label: 'Verrière',            blurb: 'La voûte transparente du poste de pilotage — 22 tenons sur 13, haute de 17 plaques — et ses trois arceaux gris, posés sur le dos une fois la coque fermée.' },
-  { id: 3, key: 'nageoires', label: 'Nageoires',           blurb: 'Pectorales, pelviennes et les deux dorsales, chacune montée à plat puis fixée. Les pectorales, presque verticales, se construisent de la pointe vers l’attache.' },
-  { id: 4, key: 'empennage', label: 'Empennage & hélice',  blurb: 'Le croissant caudal, qui vient coiffer le pédoncule, puis l’arbre, le plan de plongée et l’hélice dorée à l’extrême arrière.' },
-  { id: 5, key: 'socle',     label: 'Socle',               blurb: 'La plaque noire de 54 × 22 tenons en deux couches croisées, les deux tiges de briques 2 × 2, et la pose du sous-marin dessus.' },
+  { id: 1, key: 'sous-ensembles', label: 'Sous-ensembles',  blurb: 'Les nageoires pendantes, montées à plat de la pointe vers l’attache : deux pectorales, deux pelviennes et le lobe inférieur de la caudale. Elles seront pressées sous la coque au fil du montage.' },
+  { id: 2, key: 'ventre',         label: 'Ventre',          blurb: 'Les premières couches de la coque, depuis la quille, sur une planche plane. La peau suit la section du corps et s’élargit à chaque couche.' },
+  { id: 3, key: 'flancs',         label: 'Flancs',          blurb: 'Les couches à hauteur d’axe : la poutre longitudinale s’intègre, les nageoires pendantes se fixent, la racine de la caudale se pose sur son lobe inférieur.' },
+  { id: 4, key: 'dos',            label: 'Dos',             blurb: 'La coque se referme. La base de la verrière, la dorsale et la seconde dorsale démarrent sur les dernières couches de peau.' },
+  { id: 5, key: 'superstructures', label: 'Verrière, dorsale, caudale', blurb: 'Tout ce qui dépasse du dos : la voûte et ses arceaux, la dorsale en faucille, le lobe supérieur de la caudale, l’arbre et l’hélice.' },
+  { id: 6, key: 'socle',          label: 'Socle',           blurb: 'La plaque noire en deux couches croisées, les deux tiges, puis la pose du sous-marin.' },
 ];
 
 // --- Sous-ensembles (pour l'éclaté) ------------------------------
@@ -536,91 +541,151 @@ export function buildModel() {
   let pieces = mergeVertical(packed);
   pieces = pieces.concat(propeller(), stand());
 
-  pieces.forEach((p, i) => {
-    p.id = i;
-    p.stage = GROUPS[p.group] ? GROUPS[p.group].stage : 7;
-  });
-  pieces.sort((a, b) => a.stage - b.stage || a.y - b.y || a.x - b.x);
+  pieces.sort((a, b) => a.y - b.y || a.x - b.x || a.z - b.z);
   pieces.forEach((p, i) => { p.id = i; });
   markVisibleStuds(pieces);
 
-  const steps = buildSteps(pieces);
+  const steps = buildSteps(pieces);   // affecte aussi p.stage et p.unit
   return { pieces, steps, stats: statsFor(pieces), bbox: bboxFor(pieces), check: analyze(pieces) };
 }
 
 // ================================================================
 // ÉTAPES DE MONTAGE
 // ================================================================
-// Une étape = une couche d'un sous-ensemble. La coque (poutre comprise)
-// se monte d'un seul tenant, couche par couche ; chaque nageoire, la
-// caudale, l'hélice et le socle sont des sous-ensembles à part, montés
-// à plat puis fixés. Les couches sont numérotées depuis le bas de
-// chaque sous-ensemble.
-const STEP_UNIT = {
-  1: { key: 'coque', label: 'Coque', groups: ['chassis', 'avant', 'arriere'] },
+
+// Sous-ensembles pendants : montés à plat, pressés par en dessous.
+const HANGING = {
+  pectoraleG: 'Pectorale bâbord', pectoraleD: 'Pectorale tribord',
+  pelvienneG: 'Pelvienne bâbord', pelvienneD: 'Pelvienne tribord',
+  caudaleBas: 'Lobe inférieur de la caudale',
 };
-const ORDER_IN_STAGE = {
-  3: ['pectoraleG', 'pectoraleD', 'pelvienneG', 'pelvienneD', 'dorsale', 'dorsale2'],
-  4: ['caudale', 'helice'],
-};
+export const HANGING_LABELS = HANGING;
+
+function unitOf(p) {
+  if (HANGING[p.group]) return p.group;
+  if (p.group === 'caudale' && p.y + p.h - 1 < Math.round(axisY(HULL_LEN))) return 'caudaleBas';
+  if (p.group === 'socle') return 'socle';
+  return 'main';
+}
+
+// Bande de hauteur -> chapitre, pour la séquence principale
+function bandOf(y) {
+  if (y < AXIS_Y - 6) return 2;                    // ventre
+  if (y < AXIS_Y + 10) return 3;                   // flancs
+  if (y <= AXIS_Y + Math.ceil(TOP(33)) + 1) return 4;   // dos
+  return 5;                                        // superstructures
+}
 
 export function buildSteps(pieces) {
+  for (const p of pieces) p.unit = unitOf(p);
+  const byId = pieces;
   const steps = [];
   let allocated = 0;
-  for (const st of STAGES) {
-    const inStage = pieces.filter((p) => p.stage === st.id);
-    // sous-ensembles de ce chapitre, dans l'ordre de montage
-    const units = STEP_UNIT[st.id]
-      ? [STEP_UNIT[st.id]]
-      : (ORDER_IN_STAGE[st.id] || [...new Set(inStage.map((p) => p.group))])
-          .filter((g) => inStage.some((p) => p.group === g))
-          .map((g) => ({ key: g, label: GROUPS[g].label, groups: [g] }));
-    for (const unit of units) {
-      const sub = inStage.filter((p) => unit.groups.includes(p.group));
-      const ysAll = [...new Set(sub.map((p) => p.y))].sort((a, b) => a - b);
-      // Les lames minces n'ont qu'une à trois pièces par couche : on
-      // regroupe alors jusqu'à trois couches consécutives (une assise)
-      // tant que l'étape reste sous dix pièces. La coque, elle, garde
-      // une couche par étape.
-      const groups = [];
-      for (const y of ysAll) {
-        const n = sub.filter((p) => p.y === y).length;
-        const last = groups[groups.length - 1];
-        if (last && st.id !== 1 && last.ys.length < 3 && last.n + n <= 10 && y === last.ys[last.ys.length - 1] + 1) {
-          last.ys.push(y); last.n += n;
-        } else groups.push({ ys: [y], n });
-      }
-      const ys = groups.map((g) => g.ys);
-      ys.forEach((yGroup, li) => {
-        const y = yGroup[0];
-        const layer = sub.filter((p) => yGroup.includes(p.y));
-        const gather = new Map();
-        for (const p of layer) {
-          const k = `${p.part}|${p.color}`;
-          gather.set(k, (gather.get(k) || 0) + 1);
-        }
-        allocated += layer.length;
-        steps.push({
-          id: steps.length + 1,
-          stage: st.id,
-          unit: unit.key,
-          unitLabel: unit.label,
-          layer: li + 1,
-          layers: ys.length,
-          y,
-          yTop: yGroup[yGroup.length - 1],
-          title: `${unit.label} · ${yGroup.length > 1 ? `assise ${li + 1}` : `couche ${li + 1}`}`,
-          pieces: layer.map((p) => p.id),
-          gather: [...gather.entries()]
-            .map(([k, qty]) => { const [part, color] = k.split('|'); return { part, color, qty }; })
-            .sort((a, b) => b.qty - a.qty),
-          allocated,
-          first: li === 0,
-          last: li === ys.length - 1,
-        });
+  const gatherOf = (list) => {
+    const g = new Map();
+    for (const p of list) { const k = `${p.part}|${p.color}`; g.set(k, (g.get(k) || 0) + 1); }
+    return [...g.entries()].map(([k, qty]) => { const [part, color] = k.split('|'); return { part, color, qty }; })
+      .sort((a, b) => b.qty - a.qty);
+  };
+  // Découpe une liste en couches, en regroupant jusqu'à trois couches
+  // consécutives quand l'étape reste sous dix pièces (lames minces).
+  const layersOf = (list, mergeSmall) => {
+    const ys = [...new Set(list.map((p) => p.y))].sort((a, b) => a - b);
+    const groups = [];
+    for (const y of ys) {
+      const n = list.filter((p) => p.y === y).length;
+      const last = groups[groups.length - 1];
+      if (mergeSmall && last && last.ys.length < 3 && last.n + n <= 10 && y === last.ys[last.ys.length - 1] + 1) {
+        last.ys.push(y); last.n += n;
+      } else groups.push({ ys: [y], n });
+    }
+    return groups.map((g) => ({ ys: g.ys, pieces: list.filter((p) => g.ys.includes(p.y)) }));
+  };
+  const push = (o) => {
+    allocated += o.counts === false ? 0 : o.pieces.length;
+    steps.push({ id: steps.length + 1, allocated, gather: gatherOf(o.pieces.map((id) => byId[id])), ...o });
+  };
+
+  // --- 1. sous-ensembles pendants, à plat ---------------------------
+  const attachAt = {};   // unité -> couche principale après laquelle on la fixe
+  for (const unit of Object.keys(HANGING)) {
+    const own = pieces.filter((p) => p.unit === unit);
+    if (!own.length) continue;
+    // couche de la coque qui reçoit la couche haute du sous-ensemble :
+    // la plus basse des pièces qui coiffent l'un de ses tenons
+    let L = Infinity;
+    for (const p of own) for (const [, , cover] of p.studs) {
+      if (cover >= 0 && byId[cover].unit !== unit) L = Math.min(L, byId[cover].y);
+    }
+    attachAt[unit] = L === Infinity ? Math.max(...own.map((p) => p.y + p.h)) : L;
+    const layers = layersOf(own, true);
+    layers.forEach((l, li) => {
+      for (const p of l.pieces) p.stage = 1;
+      push({
+        stage: 1, context: 'sub', unit, unitLabel: HANGING[unit],
+        layer: li + 1, layers: layers.length, y: l.ys[0], yTop: l.ys[l.ys.length - 1],
+        title: `${HANGING[unit]} · ${l.ys.length > 1 ? 'assise' : 'couche'} ${li + 1}`,
+        pieces: l.pieces.map((p) => p.id), first: li === 0, last: li === layers.length - 1,
+      });
+    });
+  }
+
+  // --- 2 à 5. séquence principale, du bas vers le haut ---------------
+  const main = pieces.filter((p) => p.unit === 'main');
+  const layers = layersOf(main, false);
+  // regroupement doux des couches hautes et minces (lobe, dorsale, arceaux)
+  const merged = [];
+  for (const l of layers) {
+    const last = merged[merged.length - 1];
+    if (last && last.ys.length < 3 && last.pieces.length + l.pieces.length <= 10
+        && l.ys[0] === last.ys[last.ys.length - 1] + 1 && bandOf(l.ys[0]) === bandOf(last.ys[0])) {
+      last.ys.push(...l.ys); last.pieces.push(...l.pieces);
+    } else merged.push({ ys: [...l.ys], pieces: [...l.pieces] });
+  }
+  const pending = Object.entries(attachAt).sort((a, b) => a[1] - b[1]);
+  const counters = {};
+  for (const l of merged) {
+    const stage = bandOf(l.ys[0]);
+    counters[stage] = (counters[stage] || 0) + 1;
+    const st = STAGES.find((x) => x.id === stage);
+    for (const p of l.pieces) p.stage = stage;
+    const groupsHere = [...new Set(l.pieces.map((p) => GROUPS[p.group].label))];
+    push({
+      stage, context: 'main', unit: 'main', unitLabel: st.label,
+      layer: counters[stage], y: l.ys[0], yTop: l.ys[l.ys.length - 1],
+      title: `${st.label} · ${l.ys.length > 1 ? 'assise' : 'couche'} ${counters[stage]}`,
+      pieces: l.pieces.map((p) => p.id), groupsHere,
+      first: counters[stage] === 1, last: false,
+    });
+    // les sous-ensembles dont la couche d'accueil vient d'être posée
+    while (pending.length && pending[0][1] <= l.ys[l.ys.length - 1]) {
+      const [unit] = pending.shift();
+      push({
+        stage, context: 'attach', unit, unitLabel: HANGING[unit], counts: false,
+        y: l.ys[l.ys.length - 1], yTop: l.ys[l.ys.length - 1],
+        title: `Fixer : ${HANGING[unit].toLowerCase()}`,
+        pieces: pieces.filter((p) => p.unit === unit).map((p) => p.id),
       });
     }
   }
+
+  // --- 6. socle, puis pose du modèle --------------------------------
+  const socle = pieces.filter((p) => p.unit === 'socle');
+  const sl = layersOf(socle, true);
+  sl.forEach((l, li) => {
+    for (const p of l.pieces) p.stage = 6;
+    push({
+      stage: 6, context: 'sub', unit: 'socle', unitLabel: 'Socle',
+      layer: li + 1, layers: sl.length, y: l.ys[0], yTop: l.ys[l.ys.length - 1],
+      title: `Socle · ${l.ys.length > 1 ? 'assise' : 'couche'} ${li + 1}`,
+      pieces: l.pieces.map((p) => p.id), first: li === 0, last: li === sl.length - 1,
+    });
+  });
+  push({
+    stage: 6, context: 'final', unit: 'socle', unitLabel: 'Socle', counts: false,
+    y: 0, yTop: 0, title: 'Poser le sous-marin sur ses tiges',
+    pieces: pieces.filter((p) => p.unit !== 'socle').map((p) => p.id),
+  });
   return steps;
 }
 

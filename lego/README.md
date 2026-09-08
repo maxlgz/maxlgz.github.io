@@ -43,10 +43,12 @@ effectivement rendu à l'écran.
 
 ## Guide de montage
 
-L'onglet « Guide de montage » découpe le modèle en étapes — une couche par
-étape pour la coque, une assise pour les lames minces — dans un ordre de
-montage réel : coque depuis le ventre, verrière, nageoires montées à plat
-puis fixées, empennage et hélice, socle. Un second visualiseur grise le
+L'onglet « Guide de montage » découpe le modèle en étapes, du bas vers le
+haut toutes pièces confondues — rien ne s'insère après coup dans une coque
+refermée. Les nageoires pendantes (pectorales, pelviennes, lobe inférieur de
+la caudale) se montent d'abord à plat ; le guide indique l'étape exacte où
+les presser sous la coque, juste après la couche qui les reçoit. Le socle
+vient en dernier. Un second visualiseur grise le
 déjà-monté et colore en cyan les pièces à poser ; chaque étape donne la
 hauteur de pose, la liste à rassembler et les coordonnées.
 

@@ -3,7 +3,7 @@
 // chiffres, onglets, catalogue, visualiseur, exports.
 // ================================================================
 
-import { buildModel, PARTS, COLORS, STAGES, GROUPS } from './model.js';
+import { buildModel, PARTS, COLORS, STAGES, GROUPS, HANGING_LABELS } from './model.js';
 import { toCSV, toLDraw, toBrickLinkXML, toJSON, toGuide, toGuideHTML, download } from './exports.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -187,27 +187,59 @@ $('#step-total').textContent = steps.length;
 function stepText(s) {
   const st = STAGES.find((x) => x.id === s.stage);
   const h = (s.y * 3.2 / 10).toFixed(1).replace('.', ',');
+  const n = s.pieces.length;
   const lines = [];
+  if (s.context === 'attach') {
+    const where = s.unit === 'caudaleBas'
+      ? 'Glisser le lobe sous le pédoncule : ses pièces hautes se pressent sous la peau de la coque à x = 80–84, et sa racine dépasse derrière, prête à recevoir le lobe supérieur.'
+      : `Presser ${s.unitLabel.toLowerCase()} par en dessous contre le flanc : les tenons de sa couche haute entrent sous les pièces de coque qui viennent d’être posées.`;
+    return [
+      `La couche qui reçoit ce sous-ensemble vient d’être posée (dessous à ${s.y} plaques, ${h} cm). C’est le moment de le fixer — une fois la couche suivante posée, il ne s’insère plus.`,
+      where,
+      `Le sous-ensemble a été monté au chapitre 1 (${n} pièces). Vérifier l’aplomb avant de poursuivre.`,
+    ];
+  }
+  if (s.context === 'final') {
+    return [
+      'Le socle est terminé. Soulever le sous-marin par la coque, sous les pectorales, à deux mains.',
+      'Le descendre sur les deux tiges : leur sommet vient sous le ventre, à x = 25 et x = 62, dans le plan de symétrie. Presser doucement jusqu’au contact.',
+      'Vérifier l’aplomb et la stabilité. Les tiges 2 × 2 sont le point fragile du modèle : ne pas le déplacer par le socle.',
+    ];
+  }
   if (s.first) {
-    lines.push(s.unit === 'coque'
-      ? 'Commencer la coque sur une planche rigide et plane. Le museau est à x = 0, la queue vers x = 84 ; le plan de symétrie est z = 0.'
+    lines.push(s.context === 'sub' && s.unit !== 'socle'
+      ? `Commencer ${s.unitLabel.toLowerCase()} à plat, pointe sur la table : la couche 1 est la plus basse, l’attache viendra en dernier. Ce sous-ensemble sera pressé sous la coque au chapitre ${s.unit.startsWith('pelv') || s.unit === 'caudaleBas' ? '3' : '2'}.`
       : s.unit === 'socle'
         ? 'Monter la plaque de base à plat : c’est elle qui reçoit les deux tiges, puis le sous-marin.'
-        : `Commencer ${s.unitLabel.toLowerCase()} à plat, sur une surface dégagée. Ce sous-ensemble sera fixé sur la coque à la fin du chapitre.`);
+        : st.id === 2
+          ? 'Commencer la coque sur une planche rigide et plane, quille en bas. Le museau est à x = 0, la queue vers x = 84 ; le plan de symétrie est z = 0.'
+          : `Chapitre ${st.id} — ${st.label} : ${st.blurb}`);
   }
-  lines.push(`Poser ces ${s.pieces.length} pièce${s.pieces.length > 1 ? 's' : ''} avec le dessous à ${s.y} plaque${s.y > 1 ? 's' : ''} (${h} cm) au-dessus de la base${s.yTop > s.y ? `, sur ${s.yTop - s.y + 1} couches` : ''}. Respecter les emprises et coordonnées ci-dessous ; presser sur la couche du dessous.`);
-  if (s.last && s.unit !== 'coque' && s.unit !== 'socle') {
-    lines.push(s.unit.startsWith('pectorale') || s.unit.startsWith('pelvienne')
-      ? 'Sous-ensemble terminé : le fixer sur le flanc par son attache haute, tenons vers le haut, contre la peau de la coque. Le tester avant de monter le second.'
-      : s.unit === 'caudale'
-        ? 'Sous-ensemble terminé : glisser le croissant sur le pédoncule, sa racine coiffe la coque par-dessus et par-dessous.'
-        : s.unit === 'helice'
-          ? 'Engager l’arbre dans le canal de la racine caudale ; l’hélice dépasse à l’extrême arrière.'
-          : `Sous-ensemble terminé : le poser sur le dos, à sa place sur la coque.`);
-  }
-  if (s.last && s.unit === 'socle') lines.push('Descendre le sous-marin sur les deux tiges, ventre en appui ; vérifier l’aplomb avant de lâcher.');
-  if (s.first && st) lines.unshift(`Chapitre ${st.id} — ${st.label} : ${st.blurb}`);
+  lines.push(`Poser ces ${n} pièce${n > 1 ? 's' : ''} avec le dessous à ${s.y} plaque${s.y > 1 ? 's' : ''} (${h} cm) au-dessus de la base${s.yTop > s.y ? `, sur ${s.yTop - s.y + 1} couches` : ''}. Respecter les emprises et coordonnées ci-dessous ; presser sur la couche du dessous.`);
+  if (s.groupsHere && s.groupsHere.length > 1) lines.push(`Cette couche contient : ${s.groupsHere.join(', ').toLowerCase()}.`);
+  if (s.last && s.context === 'sub' && s.unit !== 'socle') lines.push('Sous-ensemble terminé : le mettre de côté, attache vers le haut. Il sera fixé à l’étape indiquée dans le chapitre de la coque.');
   return lines;
+}
+
+// Ce qui est déjà en place à une étape donnée dépend du contexte : un
+// sous-ensemble à plat ne voit que ses propres couches ; la séquence
+// principale voit tout ce qui a été posé et fixé avant elle.
+function builtBefore(i) {
+  const s = steps[i];
+  const built = new Set();
+  if (s.context === 'sub') {
+    for (let k = 0; k < i; k++) if (steps[k].unit === s.unit && steps[k].context === 'sub') steps[k].pieces.forEach((id) => built.add(id));
+    return built;
+  }
+  if (s.context === 'final') {
+    for (let k = 0; k < i; k++) if (steps[k].unit === 'socle') steps[k].pieces.forEach((id) => built.add(id));
+    return built;
+  }
+  for (let k = 0; k < i; k++) {
+    const t = steps[k];
+    if (t.context === 'main' || t.context === 'attach') t.pieces.forEach((id) => built.add(id));
+  }
+  return built;
 }
 
 function showStep(i) {
@@ -215,8 +247,7 @@ function showStep(i) {
   stepIndex = Math.max(0, Math.min(steps.length - 1, i));
   const s = steps[stepIndex];
 
-  const built = new Set();
-  for (let k = 0; k < stepIndex; k++) for (const id of steps[k].pieces) built.add(id);
+  const built = builtBefore(stepIndex);
   const add = new Set(s.pieces);
   guideViewer?.setBuild({ built, add, only: $('#only-step').checked }, DIRS[dirIndex]);
 
@@ -226,12 +257,17 @@ function showStep(i) {
   $('#step-select').value = String(stepIndex);
   $('#step-title').textContent = s.title;
   $('#step-text').innerHTML = stepText(s).map((t) => `<li>${t}</li>`).join('');
-  $('#step-gather').innerHTML = s.gather.map((g) => `
-    <div class="assembly-part">
-      <i class="sw" style="background:${COLORS[g.color].hex}"></i>
-      <div><b>${g.qty} × ${PARTS[g.part].label}</b><span>${COLORS[g.color].name} · réf. ${PARTS[g.part].design}</span></div>
-    </div>`).join('');
-  $('#step-coords').innerHTML = s.pieces.map((id) => pieces[id]).map((p) => `
+  const gatherEl = $('#step-gather');
+  if (s.context === 'attach' || s.context === 'final') {
+    gatherEl.innerHTML = `<div class="assembly-part" style="grid-column:1/-1"><i class="sw" style="background:#1fb6c9"></i><div><b>Rien à rassembler</b><span>${s.context === 'attach' ? 'Le sous-ensemble est déjà monté' : 'Le sous-marin est terminé'}</span></div></div>`;
+  } else {
+    gatherEl.innerHTML = s.gather.map((g) => `
+      <div class="assembly-part">
+        <i class="sw" style="background:${COLORS[g.color].hex}"></i>
+        <div><b>${g.qty} × ${PARTS[g.part].label}</b><span>${COLORS[g.color].name} · réf. ${PARTS[g.part].design}</span></div>
+      </div>`).join('');
+  }
+  $('#step-coords').innerHTML = (s.context === 'attach' || s.context === 'final') ? '' : s.pieces.map((id) => pieces[id]).map((p) => `
     <tr><td>${PARTS[p.part].label}</td><td>${COLORS[p.color].name}</td>
     <td class="right mono">${p.x}</td><td class="right mono">${p.z}</td>
     <td>${p.dx === p.dz ? '—' : p.dx > p.dz ? 'en long' : 'en travers'}</td></tr>`).join('');

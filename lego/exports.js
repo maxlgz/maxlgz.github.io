@@ -3,7 +3,7 @@
 // coordonnées JSON et guide de montage.
 // ================================================================
 
-import { PARTS, COLORS, STAGES, GROUPS, STUD_MM, PLATE_MM, unitPrice } from './model.js';
+import { PARTS, COLORS, STAGES, GROUPS, HANGING_LABELS, STUD_MM, PLATE_MM, unitPrice } from './model.js';
 
 const LDU_STUD = 20;   // 1 tenon = 20 LDU
 const LDU_PLATE = 8;   // 1 plaque = 8 LDU
@@ -129,7 +129,11 @@ export function toGuideHTML(model) {
   function plan(step) {
     const add = step.pieces.map((id) => pieces[id]);
     const yPrev = step.y - 1;
-    const under = pieces.filter((p) => p.y + p.h - 1 === yPrev || (p.y <= yPrev && p.y + p.h > yPrev));
+    // couche du dessous : dans le même contexte seulement (un
+    // sous-ensemble à plat ne repose pas sur la coque)
+    const same = (p) => step.context === 'sub' ? p.unit === step.unit
+      : step.context === 'main' ? (p.unit === 'main' || p.unit in HANGING_LABELS) : false;
+    const under = pieces.filter((p) => same(p) && p.y <= yPrev && p.y + p.h > yPrev);
     const all = [...under, ...add];
     const x0 = Math.min(...all.map((p) => p.x)) - 1, x1 = Math.max(...all.map((p) => p.x + p.dx)) + 1;
     const z0 = Math.min(...all.map((p) => p.z)) - 1, z1 = Math.max(...all.map((p) => p.z + p.dz)) + 1;
@@ -161,11 +165,15 @@ export function toGuideHTML(model) {
       <section class="step" id="etape-${s.id}">
         <header><span class="no">Étape ${s.id} / ${steps.length}</span><h3>${esc(s.title)}</h3>
           <span class="alloc">${s.allocated} / ${stats.count} pièces posées</span></header>
-        <p class="lead">Dessous des pièces à <b>${s.y} plaques</b> (${cm(s.y * PLATE_MM)} cm) au-dessus de la base${s.yTop > s.y ? `, sur ${s.yTop - s.y + 1} couches` : ''}.
-          ${s.first && s.unit !== 'coque' && s.unit !== 'socle' ? 'Premier rang du sous-ensemble : le monter à plat.' : ''}
-          ${s.last && s.unit !== 'coque' && s.unit !== 'socle' ? 'Dernier rang : fixer le sous-ensemble sur la coque.' : ''}</p>
+        <p class="lead">${s.context === 'attach'
+          ? `La couche d’accueil vient d’être posée (dessous à ${s.y} plaques) : presser <b>${esc(s.unitLabel.toLowerCase())}</b> par en dessous, maintenant — une fois la couche suivante posée, il ne s’insère plus.`
+          : s.context === 'final'
+            ? 'Descendre le sous-marin sur les deux tiges, à x = 25 et x = 62 dans le plan de symétrie.'
+            : `Dessous des pièces à <b>${s.y} plaques</b> (${cm(s.y * PLATE_MM)} cm) au-dessus de la base${s.yTop > s.y ? `, sur ${s.yTop - s.y + 1} couches` : ''}.
+          ${s.first && s.context === 'sub' && s.unit !== 'socle' ? 'Premier rang du sous-ensemble : le monter à plat, pointe sur la table.' : ''}
+          ${s.groupsHere && s.groupsHere.length > 1 ? `Cette couche contient : ${esc(s.groupsHere.join(', ').toLowerCase())}.` : ''}`}</p>
         <div class="cols">
-          <div class="plan">${plan(s)}</div>
+          <div class="plan">${s.context === 'final' ? '' : plan(s)}</div>
           <div>
             <p class="lab">À rassembler</p>
             <ul class="gather">${s.gather.map((g) => `<li><i style="background:${COLORS[g.color].hex}"></i><b>${g.qty} ×</b> ${esc(PARTS[g.part].label)} <span>${COLORS[g.color].name} · ${PARTS[g.part].design}</span></li>`).join('')}</ul>
