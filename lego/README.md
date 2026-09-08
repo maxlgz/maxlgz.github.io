@@ -17,8 +17,10 @@ Rien n'est modélisé à la main. `model.js` enchaîne six étapes :
    1 plaque, et chaque cellule est testée contre la section super-elliptique.
 3. **Évidement** — seules les cellules qui touchent le vide sont conservées :
    il reste une peau d'un tenon d'épaisseur, posée sur un plancher longitudinal.
-4. **Colorisation** — la livrée est peinte par des règles géométriques :
-   ventre blanc, ligne de gueule et dents, œil cerclé, ouïes, hublot transparent.
+4. **Livrée** — peinte par des règles géométriques, d'après la maquette de
+   Tintinimaginatio : dos noir et ventre crème séparés par une frontière qui
+   ondule (somme de deux sinusoïdes), gueule et dents, œil, ouïes, verrière
+   transparente sur le dos et hélice dorée à l'extrême arrière.
 5. **Pavage** — un remplissage glouton remplace les cellules par les plus grands
    rectangles disponibles dans le catalogue de pièces réelles.
 6. **Fusion verticale** — trois plaques identiques empilées deviennent une brique.
@@ -33,6 +35,7 @@ effectivement rendu à l'écran.
 | --- | --- |
 | `model.js` | générateur : profils, voxelisation, pavage, catalogue de pièces |
 | `viewer.js` | rendu three.js par instanciation, cadrages, éclaté, sélection |
+| `styles.css` | charte reprise du site de référence : fond blanc, Arial, accent rouge |
 | `exports.js` | CSV, LDraw `.ldr`, liste de manque BrickLink, JSON, guide Markdown |
 | `main.js` | câblage de la page |
 | `vendor/` | three.js et OrbitControls embarqués — la page ne dépend d'aucun CDN |
@@ -45,9 +48,10 @@ effectivement rendu à l'écran.
 
 ## Réserves
 
-Les recouvrements et la connectivité des tenons sont vérifiés couche par couche,
-mais les nageoires en porte-à-faux, l'ancrage de l'empennage et le montage de
-l'hélice sont des propositions non éprouvées physiquement. Les prix sont une
+Les recouvrements et la connectivité des tenons sont vérifiés couche par couche
+et le résultat est affiché sur la page, mais les nageoires en porte-à-faux,
+l'ancrage de l'empennage et le montage de l'hélice sont des propositions non
+éprouvées physiquement. Les prix sont une
 estimation paramétrique (plancher par pièce + coût proportionnel à la surface),
 pas un tarif relevé chez un revendeur.
 
