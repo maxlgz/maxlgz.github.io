@@ -41,11 +41,22 @@ effectivement rendu à l'écran.
 | `main.js` | câblage de la page |
 | `vendor/` | three.js et OrbitControls embarqués — la page ne dépend d'aucun CDN |
 
+## Guide de montage
+
+L'onglet « Guide de montage » découpe le modèle en étapes — une couche par
+étape pour la coque, une assise pour les lames minces — dans un ordre de
+montage réel : coque depuis le ventre, verrière, nageoires montées à plat
+puis fixées, empennage et hélice, socle. Un second visualiseur grise le
+déjà-monté et colore en cyan les pièces à poser ; chaque étape donne la
+hauteur de pose, la liste à rassembler et les coordonnées.
+
 ## Exports
 
+- **guide `.html`** — autonome, une section par étape avec le plan de pose de
+  la couche vu de dessus ; imprimable en PDF depuis le navigateur.
 - **`.ldr`** — s'ouvre dans Studio, LeoCAD ou LDView.
 - **`.xml`** — s'importe comme liste de manque sur BrickLink.
-- **`.csv`**, **`.json`**, **`.md`** — bordereau, coordonnées de chaque pièce, guide de montage.
+- **`.csv`**, **`.json`**, **`.md`** — bordereau, coordonnées de chaque pièce, résumé par chapitre.
 
 ## Réserves
 

@@ -18,6 +18,8 @@ const STUD_H = 0.22;
 
 const ACCENT = new THREE.Color('#c92b30');   // le rouge du site
 const BG = '#f0f3f7';
+const ADD = new THREE.Color('#1fb6c9');      // mode montage : à poser
+const BUILT = new THREE.Color('#c7ced7');    // mode montage : déjà monté
 
 export function createViewer(canvas, model) {
   const { pieces } = model;
@@ -130,13 +132,15 @@ export function createViewer(canvas, model) {
   }
 
   // --- état -----------------------------------------------------
-  const state = { stage: 0, explode: 0, highlight: null, groupFilter: null };
+  const state = { stage: 0, explode: 0, highlight: null, groupFilter: null, build: null };
   const mat4 = new THREE.Matrix4();
   const col = new THREE.Color();
   const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
 
-  const visible = (p) => (state.stage === 0 || p.stage <= state.stage)
-    && (!state.groupFilter || p.group === state.groupFilter);
+  const visible = (p) => {
+    if (state.build) return state.build.add.has(p.id) || (!state.build.only && state.build.built.has(p.id));
+    return (state.stage === 0 || p.stage <= state.stage) && (!state.groupFilter || p.group === state.groupFilter);
+  };
 
   function offsetFor(p) {
     if (!state.explode) return [0, 0, 0];
@@ -182,6 +186,10 @@ export function createViewer(canvas, model) {
   }
 
   function tint(p) {
+    if (state.build) {
+      col.copy(state.build.add.has(p.id) ? ADD : BUILT);
+      return col;
+    }
     col.set(COLORS[p.color].hex);
     if (!state.highlight) return col;
     const h = state.highlight;
@@ -219,21 +227,29 @@ export function createViewer(canvas, model) {
             CORNERS[i++] = ax - cx;
             CORNERS[i++] = (ay - y0) * PLATE_U;
             CORNERS[i++] = az - cz;
-            CORNERS[i++] = ax;                 // x modèle, pour filtrer
+            CORNERS[i++] = pieces.indexOf(p);  // index de la pièce, pour filtrer
           }
         }
       }
     }
   }
 
+  const BUILD_DIRS = {
+    montage: [0.7, 0.75, 0.9],
+    dessus:  [0.10, 1.0, 0.45],
+    profil:  [0.05, 0.25, 1.0],
+    arriere: [1.0, 0.45, 0.6],
+  };
+  const before = (x1) => (p) => p.x < x1;
+  const after = (x0) => (p) => p.x + p.dx > x0;
   const VIEWS = {
     ensemble:  { dir: [0.78, 0.40, 1.0], fov: 34, margin: 1.2 },   // marge : la rotation lente ne doit rien rogner
-    tete:      { dir: [-0.85, 0.28, 0.9], fov: 34, x1: 34, margin: 1.3 },
+    tete:      { dir: [-0.85, 0.28, 0.9], fov: 34, filter: before(34), margin: 1.3 },
     babord:    { dir: [0.02, 0.13, 1.0], fov: 30 },
     // L'empennage monte trop haut pour être cadré plus serré sans couper
     // le lobe supérieur : la vue reste un trois-quarts arrière, qui met
     // la caudale et l'hélice au premier plan.
-    empennage: { dir: [0.95, 0.28, 0.7], fov: 34, x0: 70, margin: 1.1 },
+    empennage: { dir: [0.95, 0.28, 0.7], fov: 34, filter: after(70), margin: 1.1 },
     // pas tout à fait à la verticale : à l'aplomb, le « haut » de la
     // caméra devient ambigu et la vue roule en diagonale
     dessus:    { dir: [0.10, 1.0, 0.55], fov: 34 },
@@ -242,7 +258,8 @@ export function createViewer(canvas, model) {
   const UP = new THREE.Vector3(0, 1, 0);
   function frame(v) {
     const margin = v.margin ?? 1.06;
-    const x0 = v.x0 ?? -Infinity, x1 = v.x1 ?? Infinity;
+    const keep = v.filter || (() => true);
+    const mask = pieces.map(keep);
     const dir = new THREE.Vector3(...v.dir).normalize();
     const fwd = dir.clone().negate();
     const right = new THREE.Vector3().crossVectors(fwd, UP).normalize();
@@ -253,7 +270,7 @@ export function createViewer(canvas, model) {
     // centre = milieu de la boîte des points retenus
     let ax0 = Infinity, ax1 = -Infinity, ay0 = Infinity, ay1 = -Infinity, az0 = Infinity, az1 = -Infinity;
     for (let i = 0; i < CORNERS.length; i += 4) {
-      if (CORNERS[i + 3] < x0 || CORNERS[i + 3] > x1) continue;
+      if (!mask[CORNERS[i + 3]]) continue;
       ax0 = Math.min(ax0, CORNERS[i]); ax1 = Math.max(ax1, CORNERS[i]);
       ay0 = Math.min(ay0, CORNERS[i + 1]); ay1 = Math.max(ay1, CORNERS[i + 1]);
       az0 = Math.min(az0, CORNERS[i + 2]); az1 = Math.max(az1, CORNERS[i + 2]);
@@ -262,7 +279,7 @@ export function createViewer(canvas, model) {
 
     let d = 0;
     for (let i = 0; i < CORNERS.length; i += 4) {
-      if (CORNERS[i + 3] < x0 || CORNERS[i + 3] > x1) continue;
+      if (!mask[CORNERS[i + 3]]) continue;
       const px = CORNERS[i] - c.x, py = CORNERS[i + 1] - c.y, pz = CORNERS[i + 2] - c.z;
       const f = px * fwd.x + py * fwd.y + pz * fwd.z;
       const r = Math.abs(px * right.x + py * right.y + pz * right.z);
@@ -270,12 +287,13 @@ export function createViewer(canvas, model) {
       const need = Math.max(r / th, u / tv) - f;
       if (need > d) d = need;
     }
-    return { pos: c.clone().addScaledVector(dir, d * margin), tgt: c, fov: v.fov };
+    d = Math.max(d * margin, v.minDist ?? 0);   // une seule pièce ne doit pas coller à l'objectif
+    return { pos: c.clone().addScaledVector(dir, d), tgt: c, fov: v.fov };
   }
 
   let anim = null;
   function setView(name, instant = false) {
-    const v = VIEWS[name] || VIEWS.ensemble;
+    const v = typeof name === 'string' ? (VIEWS[name] || VIEWS.ensemble) : name;
     const f = frame(v);
     controls.autoRotate = false;
     if (instant) {
@@ -317,6 +335,7 @@ export function createViewer(canvas, model) {
 
   // --- boucle ---------------------------------------------------
   let raf = 0;
+  let active = true;
   function resize() {
     const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
     if (canvas.width !== w * renderer.getPixelRatio() || canvas.height !== h * renderer.getPixelRatio()) {
@@ -331,6 +350,7 @@ export function createViewer(canvas, model) {
   function loop() {
     raf = requestAnimationFrame(loop);
     const dt = Math.min(clock.getDelta(), 0.25);
+    if (!active) return;
     if (anim) {
       // indexée sur le temps, pas sur les images : la transition dure
       // le même temps sur un portable poussif que sur une carte dédiée
@@ -372,6 +392,16 @@ export function createViewer(canvas, model) {
     setGroupFilter(g) { state.groupFilter = g; updateMatrices(); },
     setHighlight(h) { state.highlight = h; updateColors(); },
     setView,
+    // Mode montage : `built` déjà posé (gris), `add` à poser (cyan),
+    // `only` n'affiche que les additions. La caméra cadre les additions.
+    setBuild(b, dirName = 'montage') {
+      state.build = b;
+      updateMatrices(); updateColors();
+      if (!b) return;
+      const ids = b.add;
+      setView({ dir: BUILD_DIRS[dirName] || BUILD_DIRS.montage, fov: 30, margin: 1.6, minDist: 22, filter: (p) => ids.has(p.id) });
+    },
+    setActive(v) { active = v; if (v) { clock.getDelta(); resize(); } },
     onPick(fn) { listeners.push(fn); },
     resize,
     dispose() { cancelAnimationFrame(raf); controls.dispose(); renderer.dispose(); },
