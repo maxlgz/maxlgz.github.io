@@ -249,7 +249,9 @@ function showStep(i) {
 
   const built = builtBefore(stepIndex);
   const add = new Set(s.pieces);
-  guideViewer?.setBuild({ built, add, only: $('#only-step').checked }, DIRS[dirIndex]);
+  // une nageoire pendante se lit de profil, pas d'en haut
+  const dir = s.context === 'attach' && dirIndex === 0 ? 'profil' : DIRS[dirIndex];
+  guideViewer?.setBuild({ built, add, only: $('#only-step').checked }, dir);
 
   $('#step-no').textContent = s.id;
   $('#step-alloc').textContent = nf.format(s.allocated);
