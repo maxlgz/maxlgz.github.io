@@ -404,9 +404,11 @@ function colorAt(x, y, z, group) {
   const dEye = Math.hypot(cx - PR.eye.x, (cy - PR.eye.y) * 0.4);
   if (onFlank && dEye < PR.eye.r + 0.6) return dEye < 0.55 ? 'black' : 'white';
 
-  // Ouïes : quatre fentes, positions relevées
+  // Ouïes : la photo en montre quatre à un tenon d'écart, qui se
+  // toucheraient en briques ; on en pose trois, noires, séparées de blanc
   if (onFlank && cy > PR.gills.y[0] && cy < PR.gills.y[1]) {
-    for (const gx of PR.gills.x) if (Math.abs(cx - gx) < 0.45) return 'lgrey';
+    const first = Math.round(Math.max(...PR.gills.x));
+    for (const gx of [first, first - 2, first - 4]) if (Math.floor(cx) === gx) return 'black';
   }
 
   // Nageoires : entièrement noires, comme sur la maquette
