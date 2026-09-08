@@ -67,32 +67,33 @@ export const PARTS = {
   'brick-2x8': { label: 'Brique 2 × 8', design: '3007', ldraw: '3007.dat', dz: 2, dx: 8, h: 3, kind: 'brick' },
 };
 
-// --- Étapes de montage -------------------------------------------
+// --- Chapitres de montage, dans l'ordre où l'on construit -----------
+// La coque se monte couche par couche depuis le ventre, poutre comprise ;
+// chaque nageoire est un sous-ensemble monté à plat puis fixé ; le socle
+// vient en dernier, et l'on y pose le modèle.
 export const STAGES = [
-  { id: 1, key: 'chassis',   label: 'Châssis & quille',        blurb: 'La poutre longitudinale qui porte tout le reste : deux assises de briques à joints croisés, du museau au pédoncule caudal.' },
-  { id: 2, key: 'avant',     label: 'Coque avant (la tête)',   blurb: 'La partie la plus dense. Les couches montent en terrasses ; la ligne de livrée commence à onduler dès le museau.' },
-  { id: 3, key: 'arriere',   label: 'Coque arrière',           blurb: 'Le fuselage s’affine jusqu’au pédoncule caudal, large de deux tenons seulement.' },
-  { id: 4, key: 'verriere',  label: 'Verrière & poste',        blurb: 'La voûte transparente du poste de pilotage — 22 tenons sur 13, haute de 17 plaques — et ses trois arceaux gris, posés sur le dos une fois la coque fermée.' },
-  { id: 5, key: 'nageoires', label: 'Nageoires',               blurb: 'Pectorales, pelviennes et les deux dorsales. Les pectorales sont des ailes plates en flèche, tombantes vers le bout.' },
-  { id: 6, key: 'empennage', label: 'Empennage & hélice',      blurb: 'Le croissant caudal, qui coiffe le pédoncule, puis l’arbre, le plan de plongée et l’hélice dorée à l’extrême arrière.' },
-  { id: 7, key: 'socle',     label: 'Socle',                   blurb: 'La plaque noire de 54 × 22 tenons en deux couches croisées, et les deux tiges de briques 2 × 2 qui portent le sous-marin dix-huit centimètres au-dessus.' },
+  { id: 1, key: 'coque',     label: 'Coque',               blurb: 'Le corps entier, couche par couche depuis le ventre, poutre longitudinale comprise. Le chapitre le plus long : la peau suit la section du corps à chaque hauteur.' },
+  { id: 2, key: 'verriere',  label: 'Verrière',            blurb: 'La voûte transparente du poste de pilotage — 22 tenons sur 13, haute de 17 plaques — et ses trois arceaux gris, posés sur le dos une fois la coque fermée.' },
+  { id: 3, key: 'nageoires', label: 'Nageoires',           blurb: 'Pectorales, pelviennes et les deux dorsales, chacune montée à plat puis fixée. Les pectorales, presque verticales, se construisent de la pointe vers l’attache.' },
+  { id: 4, key: 'empennage', label: 'Empennage & hélice',  blurb: 'Le croissant caudal, qui vient coiffer le pédoncule, puis l’arbre, le plan de plongée et l’hélice dorée à l’extrême arrière.' },
+  { id: 5, key: 'socle',     label: 'Socle',               blurb: 'La plaque noire de 54 × 22 tenons en deux couches croisées, les deux tiges de briques 2 × 2, et la pose du sous-marin dessus.' },
 ];
 
 // --- Sous-ensembles (pour l'éclaté) ------------------------------
 export const GROUPS = {
-  chassis:    { label: 'Châssis',             stage: 1, dir: [0, -1, 0] },
-  avant:      { label: 'Coque avant',         stage: 2, dir: [-1, 0.2, 0] },
-  arriere:    { label: 'Coque arrière',       stage: 3, dir: [1, 0.2, 0] },
-  verriere:   { label: 'Verrière',            stage: 4, dir: [0, 1, 0] },
-  pectoraleD: { label: 'Pectorale tribord',   stage: 5, dir: [0, -0.2, 1] },
-  pectoraleG: { label: 'Pectorale bâbord',    stage: 5, dir: [0, -0.2, -1] },
-  pelvienneD: { label: 'Pelvienne tribord',   stage: 5, dir: [0, -0.6, 1] },
-  pelvienneG: { label: 'Pelvienne bâbord',    stage: 5, dir: [0, -0.6, -1] },
-  dorsale:    { label: 'Dorsale',             stage: 5, dir: [0, 1, 0] },
-  dorsale2:   { label: 'Dorsale secondaire',  stage: 5, dir: [0, 1, 0] },
-  caudale:    { label: 'Caudale',             stage: 6, dir: [1, 0.3, 0] },
-  helice:     { label: 'Hélice',              stage: 6, dir: [1, 0, 0] },
-  socle:      { label: 'Socle',               stage: 7, dir: [0, -1, 0] },
+  chassis:    { label: 'Poutre longitudinale', stage: 1, dir: [0, -1, 0] },
+  avant:      { label: 'Coque avant',          stage: 1, dir: [-1, 0.2, 0] },
+  arriere:    { label: 'Coque arrière',        stage: 1, dir: [1, 0.2, 0] },
+  verriere:   { label: 'Verrière',             stage: 2, dir: [0, 1, 0] },
+  pectoraleD: { label: 'Pectorale tribord',    stage: 3, dir: [0, -0.2, 1] },
+  pectoraleG: { label: 'Pectorale bâbord',     stage: 3, dir: [0, -0.2, -1] },
+  pelvienneD: { label: 'Pelvienne tribord',    stage: 3, dir: [0, -0.6, 1] },
+  pelvienneG: { label: 'Pelvienne bâbord',     stage: 3, dir: [0, -0.6, -1] },
+  dorsale:    { label: 'Dorsale',              stage: 3, dir: [0, 1, 0] },
+  dorsale2:   { label: 'Dorsale secondaire',   stage: 3, dir: [0, 1, 0] },
+  caudale:    { label: 'Caudale',              stage: 4, dir: [1, 0.3, 0] },
+  helice:     { label: 'Hélice',               stage: 4, dir: [1, 0, 0] },
+  socle:      { label: 'Socle',                stage: 5, dir: [0, -1, 0] },
 };
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -543,7 +544,84 @@ export function buildModel() {
   pieces.forEach((p, i) => { p.id = i; });
   markVisibleStuds(pieces);
 
-  return { pieces, stats: statsFor(pieces), bbox: bboxFor(pieces), check: analyze(pieces) };
+  const steps = buildSteps(pieces);
+  return { pieces, steps, stats: statsFor(pieces), bbox: bboxFor(pieces), check: analyze(pieces) };
+}
+
+// ================================================================
+// ÉTAPES DE MONTAGE
+// ================================================================
+// Une étape = une couche d'un sous-ensemble. La coque (poutre comprise)
+// se monte d'un seul tenant, couche par couche ; chaque nageoire, la
+// caudale, l'hélice et le socle sont des sous-ensembles à part, montés
+// à plat puis fixés. Les couches sont numérotées depuis le bas de
+// chaque sous-ensemble.
+const STEP_UNIT = {
+  1: { key: 'coque', label: 'Coque', groups: ['chassis', 'avant', 'arriere'] },
+};
+const ORDER_IN_STAGE = {
+  3: ['pectoraleG', 'pectoraleD', 'pelvienneG', 'pelvienneD', 'dorsale', 'dorsale2'],
+  4: ['caudale', 'helice'],
+};
+
+export function buildSteps(pieces) {
+  const steps = [];
+  let allocated = 0;
+  for (const st of STAGES) {
+    const inStage = pieces.filter((p) => p.stage === st.id);
+    // sous-ensembles de ce chapitre, dans l'ordre de montage
+    const units = STEP_UNIT[st.id]
+      ? [STEP_UNIT[st.id]]
+      : (ORDER_IN_STAGE[st.id] || [...new Set(inStage.map((p) => p.group))])
+          .filter((g) => inStage.some((p) => p.group === g))
+          .map((g) => ({ key: g, label: GROUPS[g].label, groups: [g] }));
+    for (const unit of units) {
+      const sub = inStage.filter((p) => unit.groups.includes(p.group));
+      const ysAll = [...new Set(sub.map((p) => p.y))].sort((a, b) => a - b);
+      // Les lames minces n'ont qu'une à trois pièces par couche : on
+      // regroupe alors jusqu'à trois couches consécutives (une assise)
+      // tant que l'étape reste sous dix pièces. La coque, elle, garde
+      // une couche par étape.
+      const groups = [];
+      for (const y of ysAll) {
+        const n = sub.filter((p) => p.y === y).length;
+        const last = groups[groups.length - 1];
+        if (last && st.id !== 1 && last.ys.length < 3 && last.n + n <= 10 && y === last.ys[last.ys.length - 1] + 1) {
+          last.ys.push(y); last.n += n;
+        } else groups.push({ ys: [y], n });
+      }
+      const ys = groups.map((g) => g.ys);
+      ys.forEach((yGroup, li) => {
+        const y = yGroup[0];
+        const layer = sub.filter((p) => yGroup.includes(p.y));
+        const gather = new Map();
+        for (const p of layer) {
+          const k = `${p.part}|${p.color}`;
+          gather.set(k, (gather.get(k) || 0) + 1);
+        }
+        allocated += layer.length;
+        steps.push({
+          id: steps.length + 1,
+          stage: st.id,
+          unit: unit.key,
+          unitLabel: unit.label,
+          layer: li + 1,
+          layers: ys.length,
+          y,
+          yTop: yGroup[yGroup.length - 1],
+          title: `${unit.label} · ${yGroup.length > 1 ? `couches ${li + 1}` : `couche ${li + 1}`}`,
+          pieces: layer.map((p) => p.id),
+          gather: [...gather.entries()]
+            .map(([k, qty]) => { const [part, color] = k.split('|'); return { part, color, qty }; })
+            .sort((a, b) => b.qty - a.qty),
+          allocated,
+          first: li === 0,
+          last: li === ys.length - 1,
+        });
+      });
+    }
+  }
+  return steps;
 }
 
 // Un tenon n'est dessiné que s'il n'est pas coiffé par une pièce.

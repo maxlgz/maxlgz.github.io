@@ -217,36 +217,91 @@
       <!-- ==================== onglet : guide ==================== -->
       <section data-panel="guide" hidden>
         <div class="assembly-guide">
-          <div class="assembly-layout">
+          <div class="section-heading">
             <div>
-              <p class="eyebrow">Sept étapes</p>
-              <h2 style="font-size:26px;margin-bottom:18px">Du châssis au socle</h2>
-              <div class="assembly-steps" id="assembly-steps"></div>
-              <p class="assembly-hint">
-                Choisir une étape la montre seule dans le modèle 3D, sur l’onglet précédent.
+              <p class="eyebrow">De la première plaque à la dernière pale</p>
+              <h2>Guide de montage</h2>
+            </div>
+            <button class="download" type="button" data-dl="html">↓ Télécharger le guide HTML</button>
+          </div>
+
+          <p class="assembly-note">
+            Guide dérivé du modèle. Les positions des pièces sont contrôlées numériquement — chevauchements et
+            liaisons par tenons — mais la tenue physique n’a pas été éprouvée : les pectorales quasi verticales
+            et les deux tiges du socle demandent un montage d’essai. Le PDF s’obtient depuis le guide HTML par
+            « Imprimer » dans le navigateur.
+          </p>
+
+          <details class="assembly-prep">
+            <summary><b>Avant de commencer</b> · plan de travail, repère et ordre de montage</summary>
+            <div class="description" style="margin-top:12px">
+              <p>
+                Repère : <b>x</b> du museau vers la queue, <b>z</b> de bâbord à tribord (0 = plan de symétrie),
+                <b>y</b> en plaques depuis le dessus de la plaque de base. 1 tenon = 8 mm, 1 plaque = 3,2 mm,
+                1 brique = 3 plaques. Chaque étape indique la hauteur du dessous des pièces à poser.
+              </p>
+              <p>
+                La <b>coque</b> se monte d’un seul tenant, couche par couche depuis le ventre, sur une planche
+                rigide ; la poutre longitudinale s’y intègre à sa hauteur. La <b>verrière</b> se pose une fois
+                le dos fermé. Chaque <b>nageoire</b> et le <b>croissant caudal</b> se montent à plat, couche par
+                couche depuis leur base, puis se fixent sur la coque en fin de chapitre — les pectorales par leur
+                attache haute, la caudale en venant coiffer le pédoncule. Le <b>socle</b> se monte en dernier ;
+                on y descend le sous-marin, ventre sur les deux tiges.
+              </p>
+              <p>
+                Compter une pièce de rechange par famille, et prévoir de tester la première pectorale avant de
+                monter la seconde.
               </p>
             </div>
-            <div>
-              <div class="assembly-prep">
-                <p class="eyebrow">Avant de commencer</p>
-                <p class="description">
-                  Repère : <b>x</b> du museau vers la queue, <b>z</b> de bâbord à tribord (0 = plan de symétrie),
-                  <b>y</b> en plaques depuis le bas du socle. 1 tenon = 8 mm, 1 plaque = 3,2 mm.
-                  Les couches se montent du bas vers le haut ; la poutre longitudinale se pose en premier et sert
-                  de référence pour tout le reste.
-                </p>
+          </details>
+
+          <div class="assembly-chapters" id="chapters"></div>
+
+          <div class="assembly-layout">
+            <div class="assembly-visual">
+              <div class="assembly-viewer">
+                <canvas id="scene2"></canvas>
+                <div class="canvas-error" id="canvas-error-2" hidden>Le rendu 3D n’a pas pu démarrer.</div>
               </div>
-              <div class="assembly-coordinates">
-                <p class="eyebrow">Fichiers de montage</p>
-                <p class="description" style="margin-bottom:14px">
-                  Le fichier <b>.ldr</b> s’ouvre dans Studio, LeoCAD ou LDView et donne le montage pas à pas ;
-                  le <b>.json</b> contient les coordonnées exactes de chaque pièce.
-                </p>
-                <div class="download-links" style="margin-top:0">
-                  <button type="button" data-dl="ldr">↓ Modèle LDraw (.ldr)</button>
-                  <button type="button" data-dl="json">↓ Coordonnées (.json)</button>
-                  <button type="button" data-dl="guide">↓ Guide (.md)</button>
+              <div class="assembly-view-tools">
+                <span class="assembly-legend">
+                  <i class="sw" style="background:#1fb6c9"></i> À poser
+                  <i class="sw" style="background:#c7ced7;margin-left:14px"></i> Déjà monté
+                </span>
+                <button class="assembly-toggle" type="button" id="cycle-view">⟳ Changer de vue</button>
+              </div>
+              <label class="assembly-toggle"><input type="checkbox" id="only-step" /> N’afficher que les pièces de l’étape</label>
+              <p class="assembly-hint">Glisser pour orbiter · Molette pour zoomer · La caméra cadre les pièces à poser</p>
+            </div>
+
+            <div>
+              <div class="assembly-progress">
+                <span>ÉTAPE <b id="step-no">—</b> / <span id="step-total">—</span></span>
+                <span><b id="step-alloc">—</b> / <span data-fill="count">—</span> pièces posées</span>
+              </div>
+              <div class="progress"><div class="progress__bar" id="progress-bar"></div></div>
+
+              <div class="assembly-jump">
+                <label for="step-select">Aller à l’étape</label>
+                <select id="step-select"></select>
+              </div>
+
+              <h2 class="step-title" id="step-title">—</h2>
+              <ol class="step-text" id="step-text"></ol>
+
+              <p class="control-label" style="margin:22px 0 10px">À rassembler pour cette étape</p>
+              <div class="assembly-parts" id="step-gather"></div>
+
+              <details class="assembly-coords">
+                <summary>Coordonnées des pièces de l’étape</summary>
+                <div class="table-scroll" style="max-height:260px">
+                  <table class="coords"><thead><tr><th>Pièce</th><th>Couleur</th><th class="right">x</th><th class="right">z</th><th>Sens</th></tr></thead><tbody id="step-coords"></tbody></table>
                 </div>
+              </details>
+
+              <div class="assembly-navigation">
+                <button class="download" type="button" id="step-prev">← Précédente</button>
+                <button class="bag-link" type="button" id="step-next">Étape suivante →</button>
               </div>
             </div>
           </div>
