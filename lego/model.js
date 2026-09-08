@@ -76,6 +76,7 @@ export const CROSS_N = 2.2;    // exposant de la super-ellipse de section
 export const COLORS = {
   black: { key: 'black', name: 'Noir',                 ldraw: 0,   bl: 11,  hex: '#1b1e21' },
   white: { key: 'white', name: 'Blanc',                ldraw: 15,  bl: 1,   hex: '#f2f3ee' },
+  tan:   { key: 'tan',   name: 'Beige',                ldraw: 19,  bl: 2,   hex: '#dcc79c' },
   lgrey: { key: 'lgrey', name: 'Gris pierre clair',    ldraw: 71,  bl: 86,  hex: '#9aa1a6' },
   dgrey: { key: 'dgrey', name: 'Gris pierre foncé',    ldraw: 72,  bl: 85,  hex: '#5b6167' },
   gold:  { key: 'gold',  name: 'Or perlé',             ldraw: 297, bl: 115, hex: '#c9a13b' },
@@ -396,6 +397,13 @@ function addChassis(cells) {
 // ================================================================
 export function liveryY(x) { return T.livery(Math.min(x, HULL_LEN)); }
 
+// Bouche, par tenon : plages de plaques blanches puis bord noir
+const MOUTH = {
+  16: { white: [52, 59], black: [60, 60] },
+  15: { white: [52, 56], black: [57, 58] },
+  14: { white: [52, 53], black: [54, 55] },
+  13: { white: [0, -1], black: [52, 53] },
+};
 function colorAt(x, y, z, group) {
   const cx = x + 0.5, cy = y + 0.5, cz = z + 0.5;
 
@@ -408,23 +416,39 @@ function colorAt(x, y, z, group) {
     return (rib && surface) || cy < hullTop(cx) + 0.5 ? 'lgrey' : 'trans';   // anneau de base chromé
   }
 
-  const onFlank = Math.abs(cz) > halfWidth(cx) - 1.5;
+  // sur la peau du flanc, à la largeur locale de la section (le ventre
+  // se resserre sous l'axe)
+  const dyF = cy - axisY(cx);
+  const HF = dyF >= 0 ? halfTop(cx) : halfBottom(cx);
+  const localW = halfWidth(cx) * Math.pow(Math.max(0, 1 - Math.pow(Math.abs(dyF) / Math.max(HF, 0.1), CROSS_N)), 1 / CROSS_N);
+  const onFlank = Math.abs(cz) > localW - 1.5;
 
   // Œil : anneau blanc à centre noir, à sa place sur la photo
   const dEye = Math.hypot(cx - PR.eye.x, (cy - PR.eye.y) * 0.4);
   if (onFlank && dEye < PR.eye.r + 0.6) return dEye < 0.55 ? 'black' : 'white';
 
-  // Ouïes : la photo en montre quatre à un tenon d'écart, qui se
-  // toucheraient en briques ; on en pose trois, noires, séparées de blanc
+  // Ouïes : quatre fentes noires. Sur la photo elles sont à un tenon
+  // d'écart et se toucheraient en briques : on les espace de deux.
   if (onFlank && cy > PR.gills.y[0] && cy < PR.gills.y[1]) {
     const first = Math.round(Math.max(...PR.gills.x));
-    for (const gx of [first, first - 2, first - 4]) if (Math.floor(cx) === gx) return 'black';
+    for (const gx of [first, first - 2, first - 4, first - 6]) if (Math.floor(cx) === gx) return 'black';
+  }
+
+  // Bouche : le triangle blanc sous les dents, bordé de noir sur sa
+  // pente, relevé sur la photo de profil
+  if (onFlank) {
+    const col = MOUTH[Math.floor(cx)];
+    if (col) {
+      if (cy > col.white[0] && cy < col.white[1] + 1) return 'white';
+      if (cy > col.black[0] && cy < col.black[1] + 1) return 'black';
+    }
   }
 
   // Nageoires : entièrement noires, comme sur la maquette
   if (fam(group) !== 'coque') return 'black';
 
-  return cy >= liveryY(cx) ? 'black' : 'white';
+  // le ventre crème de la maquette : beige, la couleur LEGO la plus proche
+  return cy >= liveryY(cx) ? 'black' : 'tan';
 }
 
 // ================================================================

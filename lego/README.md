@@ -26,9 +26,10 @@ Rien n'est modélisé à la main. `model.js` enchaîne six étapes :
    les anneaux se recouvrent ; museau et pédoncule restent pleins, la bulle de
    la verrière aussi. Une poutre à mi-hauteur traverse la coque de bord à bord
    et se prolonge en arbre d'hélice à travers la racine de la caudale.
-4. **Livrée** — la ligne noir / blanc relevée sur la photo de profil, tenon
-   par tenon ; œil annulaire, ouïes, anneau de base et arceaux gris de la
-   verrière, hélice en or perlé.
+4. **Livrée** — la ligne noir / beige relevée sur la photo de profil, tenon
+   par tenon (le crème de la maquette devient du Tan) ; œil annulaire,
+   bouche blanche bordée de noir, quatre ouïes, anneau de base et arceaux
+   gris de la verrière, hélice en or perlé.
 5. **Pavage** — un remplissage glouton remplace les cellules par les plus grands
    rectangles disponibles dans le catalogue de pièces réelles. Une assise sur
    deux est pavée en miroir, depuis l'autre bout du modèle, et la première
