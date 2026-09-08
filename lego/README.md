@@ -47,12 +47,34 @@ effectivement rendu à l'écran.
 | --- | --- |
 | `model.js` | générateur : profils, voxelisation, pavage, catalogue de pièces, étapes |
 | `profile.js` | contours relevés sur les photos, tenon par tenon |
-| `tools/voxelize.mjs` | optionnel : voxelise un STL en `voxels.json`, qui prime alors sur les profils |
+| `voxelize.js` | d'un maillage STL aux cellules : lecture, orientation, voxelisation, classement |
+| `zip.js` | lecteur ZIP minimal (répertoire central + `DecompressionStream`) |
+| `import.worker.js` | voxelisation dans un Web Worker, pour l'import depuis la page |
+| `tools/voxelize.mjs` | la même chaîne en ligne de commande : écrit `voxels.json`, qui prime alors sur les profils |
 | `viewer.js` | rendu three.js par instanciation, cadrages, éclaté, sélection |
 | `styles.css` | charte reprise du site de référence : fond blanc, Arial, accent rouge |
 | `exports.js` | CSV, LDraw `.ldr`, liste de manque BrickLink, JSON, guide Markdown |
 | `main.js` | câblage de la page |
 | `vendor/` | three.js et OrbitControls embarqués — la page ne dépend d'aucun CDN |
+
+## Importer un maillage
+
+Le panneau « Importer un maillage » de l'onglet Modèle 3D accepte un STL
+(binaire ou ASCII) ou un ZIP de STL. Tout se passe dans le navigateur : le
+ZIP est dézippé par `DecompressionStream`, chaque fichier est listé avec une
+case à cocher et un groupe (coque, verrière, caudale, socle… ou « auto »),
+puis le maillage est orienté (grand axe → x, museau en x = 0), mis à la
+longueur demandée (77 cm par défaut), voxelisé par enroulement de rayons,
+comblé et classé dans un Web Worker. Le résultat est conservé dans le
+navigateur (`localStorage`) et la page se reconstruit dessus — visualiseur,
+bordereau, guide et exports. Un bouton ramène au modèle photo.
+
+Avec un seul fichier, le classement est automatique (coque, verrière, dorsales,
+caudale, nageoires, hélice, socle). Avec plusieurs fichiers, c'est le groupe
+choisi pour chacun qui compte ; ils doivent partager le même repère (export
+« assemblé »). Le même traitement existe en ligne de commande :
+
+    node lego/tools/voxelize.mjs modele.stl --length 96 --out lego/voxels.json
 
 ## Guide de montage
 

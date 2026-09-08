@@ -102,6 +102,40 @@
             <div class="control-label"><label for="explode">Éclater les sous-ensembles</label><span id="explode-val">0 %</span></div>
             <input type="range" id="explode" min="0" max="100" value="0" />
 
+            <div class="panel-rule"></div>
+
+            <p class="import-banner" id="import-banner" hidden>
+              Modèle reconstruit depuis <b id="import-source"></b>.
+              <button class="locate" type="button" id="import-reset">Revenir au modèle photo ↺</button>
+            </p>
+
+            <details class="import-mesh" id="import-mesh">
+              <summary><b>Importer un maillage</b><span>STL, ou ZIP de STL</span></summary>
+              <p class="description">
+                Le sous-marin est alors reconstruit en briques à partir du fichier, à la place des contours
+                relevés sur les photos : même voxelisation, même pavage, même guide. Les fichiers d’un ZIP
+                doivent partager le même repère (export assemblé) ; décocher ceux qui ne font pas partie
+                du modèle. Tout se calcule dans le navigateur, rien n’est envoyé.
+              </p>
+              <input type="file" id="import-file" accept=".stl,.zip,model/stl,application/zip,application/x-zip-compressed" />
+              <div class="import-list" id="import-list" hidden></div>
+              <div class="import-options">
+                <label>Longueur <input type="number" id="import-length" value="77" min="20" max="200" step="1" /> cm</label>
+                <label>Dessus
+                  <select id="import-up">
+                    <option value="auto">auto</option><option value="y">+y</option><option value="-y">−y</option>
+                    <option value="z">+z</option><option value="-z">−z</option><option value="x">+x</option><option value="-x">−x</option>
+                  </select>
+                </label>
+                <label>Museau
+                  <select id="import-nose"><option value="auto">auto</option><option value="+x">+x</option><option value="-x">−x</option></select>
+                </label>
+                <label><input type="checkbox" id="import-stand" /> garder le socle du fichier</label>
+              </div>
+              <button class="import-go" type="button" id="import-go" disabled>Générer le modèle en briques</button>
+              <p class="stage-description import-status" id="import-status"></p>
+            </details>
+
             <div class="panel-foot">
               <span class="dim"><span data-fill="dimx">—</span> × <span data-fill="dimz">—</span> × <span data-fill="dimy">—</span> cm</span>
               <span class="cap">Encombrement assemblé, socle compris — 96 tenons du museau à l’hélice</span>

@@ -13,15 +13,127 @@ const nf = new Intl.NumberFormat('fr-FR');
 const cf = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
 const df = (v) => v.toFixed(1).replace('.', ',');
 
-// Un voxels.json (issu de tools/voxelize.mjs et d'un maillage STL) prime
-// sur les profils relevés sur les photos ; sans lui, la page se construit comme avant.
+// Un maillage importé dans la page (conservé dans le navigateur), sinon
+// un voxels.json (issu de tools/voxelize.mjs), prime sur les profils
+// relevés sur les photos ; sans l'un ni l'autre, la page se construit
+// comme avant.
+const IMPORT_KEY = 'lego-voxels';
 let voxels = null;
+let imported = null;
 try {
-  const r = await fetch('./voxels.json', { cache: 'no-cache' });
-  if (r.ok) voxels = await r.json();
-} catch { /* pas de maillage : profils photo */ }
+  const saved = localStorage.getItem(IMPORT_KEY);
+  if (saved) { voxels = JSON.parse(saved); imported = voxels; }
+} catch { /* stockage indisponible */ }
+if (!voxels) {
+  try {
+    const r = await fetch('./voxels.json', { cache: 'no-cache' });
+    if (r.ok) voxels = await r.json();
+  } catch { /* pas de maillage : profils photo */ }
+}
 const model = buildModel(voxels);
 const { pieces, steps, stats, bbox, check } = model;
+
+// ---------------------------------------------------------------
+// 0. Import d'un maillage : STL seul ou ZIP de STL, voxelisé dans un
+//    Web Worker, conservé dans le navigateur, puis la page se
+//    reconstruit dessus.
+// ---------------------------------------------------------------
+if (imported) {
+  $('#import-banner').hidden = false;
+  $('#import-source').textContent = `${(imported.source || []).join(', ')} — ${nf.format(imported.triangles || 0)} triangles`;
+}
+$('#import-reset').addEventListener('click', () => {
+  try { localStorage.removeItem(IMPORT_KEY); } catch { /* rien à retirer */ }
+  location.reload();
+});
+
+const IMPORT_GROUPS = [
+  ['auto', 'auto'], ['coque', 'coque'], ['verriere', 'verrière'], ['dorsale', 'dorsale'], ['dorsale2', 'dorsale arrière'],
+  ['caudale', 'caudale'], ['pectoraleG', 'pectorale bâbord'], ['pectoraleD', 'pectorale tribord'],
+  ['pelvienneG', 'pelvienne bâbord'], ['pelvienneD', 'pelvienne tribord'], ['helice', 'hélice'], ['socle', 'socle'],
+  ['ignorer', 'ignorer'],
+];
+let importParts = [];   // { name, size, group, use, data: () => Promise<ArrayBuffer> }
+const importStatus = (msg) => { $('#import-status').textContent = msg; };
+const kb = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)} Mo` : `${Math.round(n / 1e3)} ko`);
+
+function renderImportList() {
+  const list = $('#import-list');
+  list.innerHTML = '';
+  list.hidden = importParts.length < 2;
+  importParts.forEach((p, i) => {
+    const label = document.createElement('label');
+    label.innerHTML = `<input type="checkbox" ${p.use ? 'checked' : ''} /><span class="name" title="${p.name}">${p.name}</span>` +
+      `<span class="size">${kb(p.size)}</span><select>${IMPORT_GROUPS.map(([v, t]) => `<option value="${v}" ${v === p.group ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+    label.querySelector('input').addEventListener('change', (e) => { importParts[i].use = e.target.checked; });
+    label.querySelector('select').addEventListener('change', (e) => { importParts[i].group = e.target.value; });
+    list.appendChild(label);
+  });
+  $('#import-go').disabled = !importParts.length;
+}
+
+$('#import-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  importParts = [];
+  renderImportList();
+  if (!file) return;
+  importStatus('Lecture…');
+  try {
+    const { guessGroup } = await import('./voxelize.js');
+    if (/\.zip$/i.test(file.name)) {
+      const { readZip } = await import('./zip.js');
+      const entries = (await readZip(await file.arrayBuffer())).filter((en) => /\.stl$/i.test(en.name));
+      if (!entries.length) throw new Error('aucun fichier .stl dans cette archive');
+      importParts = entries.map((en) => {
+        const g = guessGroup(en.name.split('/').pop());
+        return { name: en.name.split('/').pop(), size: en.size, group: g, use: g !== 'socle', data: en.data };
+      });
+      importStatus(`${entries.length} fichier${entries.length > 1 ? 's' : ''} STL dans l’archive.`);
+    } else {
+      importParts = [{ name: file.name, size: file.size, group: 'auto', use: true, data: () => file.arrayBuffer() }];
+      importStatus(`${file.name} — ${kb(file.size)}.`);
+    }
+  } catch (err) {
+    importStatus(`Impossible de lire ce fichier : ${err.message}`);
+  }
+  renderImportList();
+});
+
+$('#import-go').addEventListener('click', async () => {
+  const parts = importParts.filter((p) => p.use);
+  if (!parts.length) { importStatus('Cocher au moins un fichier.'); return; }
+  $('#import-go').disabled = true;
+  importStatus('Décompression…');
+  try {
+    const files = [];
+    for (const p of parts) files.push({ name: p.name, group: p.group, buffer: await p.data() });
+    const opts = {
+      length: Math.round((Number($('#import-length').value) || 77) * 10 / 8),
+      up: $('#import-up').value, nose: $('#import-nose').value,
+      keepStand: $('#import-stand').checked,
+    };
+    const worker = new Worker(new URL('./import.worker.js', import.meta.url), { type: 'module' });
+    const PHASES = { orientation: 'Orientation du maillage', voxelisation: 'Voxelisation', classement: 'Classement des cellules', 'séries': 'Mise en forme' };
+    worker.onmessage = (ev) => {
+      const m = ev.data;
+      if (m.type === 'progress') importStatus(`${PHASES[m.phase] || m.phase}… ${m.frac ? Math.round(m.frac * 100) + ' %' : ''}`);
+      else if (m.type === 'error') { importStatus(`Échec : ${m.message}`); $('#import-go').disabled = false; worker.terminate(); }
+      else if (m.type === 'done') {
+        worker.terminate();
+        const v = { ...m.voxels, importedAt: new Date().toISOString() };
+        try { localStorage.setItem(IMPORT_KEY, JSON.stringify(v)); }
+        catch (err) { importStatus(`Le navigateur refuse de conserver le modèle (${err.message}).`); $('#import-go').disabled = false; return; }
+        importStatus(`${nf.format(Object.values(v.cells).reduce((a, b) => a + b, 0))} cellules — reconstruction de la page…`);
+        location.reload();
+      }
+    };
+    worker.onerror = (err) => { importStatus(`Échec : ${err.message}`); $('#import-go').disabled = false; };
+    worker.postMessage({ files, opts }, files.map((f) => f.buffer));
+  } catch (err) {
+    importStatus(`Échec : ${err.message}`);
+    $('#import-go').disabled = false;
+  }
+});
 
 // ---------------------------------------------------------------
 // 1. Chiffres de la page
