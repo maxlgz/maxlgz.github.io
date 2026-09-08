@@ -97,6 +97,7 @@ export function orient(tris, opts = {}) {
 // Cellules : x en tenons, y en plaques, z en tenons ; rayons le long de z.
 export function voxelize(tris, map, scale, opts = {}) {
   const cells = new Map();   // "x|y|z" -> true
+  const envelope = new Map();   // idem, plein du premier au dernier impact
   const bin = new Map();     // "x|y" -> [tri]
   const T = tris.map((t) => t.map((v) => { const m = map(v); return [m[0] * scale / STUD, m[1] * scale / PLATE, m[2] * scale / STUD]; }));
   let maxX = 0, maxY = 0, minZ = Infinity, maxZ = -Infinity;
@@ -151,8 +152,39 @@ export function voxelize(tris, map, scale, opts = {}) {
       const z0 = Math.ceil(h0 - 0.5), z1 = Math.floor(h1 - 0.5);
       for (let z = z0; z <= z1; z++) cells.set(`${x}|${y}|${z}`, true);
     }
+    const e0 = Math.ceil(hits[0][0] - 0.5), e1 = Math.floor(hits[hits.length - 1][0] - 0.5);
+    for (let z = e0; z <= e1; z++) envelope.set(`${x}|${y}|${z}`, true);
   }
-  return fillCavities({ cells, maxX: Math.ceil(maxX), maxY: Math.ceil(maxY), minZ: Math.floor(minZ), maxZ: Math.ceil(maxZ) });
+  // Une coque d'impression 3D est une paroi creuse, ouverte par le poste :
+  // le solide n'en retient que la paroi. Si le volume trouvé est bien plus
+  // petit que l'enveloppe (du premier au dernier impact de chaque rayon),
+  // c'est l'enveloppe qui fait foi.
+  const hollow = opts.fill === 'envelope' || (opts.fill !== 'solid' && cells.size < 0.6 * envelope.size);
+  const out = fillCavities({ cells: hollow ? envelope : cells, maxX: Math.ceil(maxX), maxY: Math.ceil(maxY), minZ: Math.floor(minZ), maxZ: Math.ceil(maxZ) });
+  out.fillMode = hollow ? 'envelope' : 'solid';
+  // Deux moitiés d'impression se rejoignent sur une feuillure : la bande
+  // autour du plan de coupe est vide de parois. On referme les vides
+  // verticaux courts de chaque colonne.
+  if (hollow) closeGaps(out, opts.closeGaps ?? 10);
+  return out;
+}
+
+export function closeGaps(vox, maxGap) {
+  const cols = new Map();
+  for (const k of vox.cells.keys()) {
+    const [x, y, z] = k.split('|').map(Number);
+    const ck = `${x}|${z}`;
+    if (!cols.has(ck)) cols.set(ck, []);
+    cols.get(ck).push(y);
+  }
+  for (const [ck, ys] of cols) {
+    ys.sort((a, b) => a - b);
+    const [x, z] = ck.split('|');
+    for (let i = 1; i < ys.length; i++) {
+      const gap = ys[i] - ys[i - 1] - 1;
+      if (gap > 0 && gap <= maxGap) for (let y = ys[i - 1] + 1; y < ys[i]; y++) vox.cells.set(`${x}|${y}|${z}`, true);
+    }
+  }
 }
 
 // Tout ce qui n'est pas atteignable depuis l'extérieur est plein : un
@@ -289,6 +321,9 @@ export function toRuns(groups) {
   return { runs, count };
 }
 
+// En dessous, un groupe classé automatiquement n'est qu'un accident du contour
+export const MIN_CELLS = { verriere: 800, dorsale: 150, dorsale2: 60, caudale: 400, pectoraleG: 100, pectoraleD: 100, pelvienneG: 40, pelvienneD: 40, helice: 4, socle: 200 };
+
 // Groupes reconnus dans le nom d'un fichier : « canopy », « hull », etc.
 export const GROUP_HINTS = [
   ['ignorer', /mold|mould|moule|smoke|fum|dashboard|steering|volant|cabin|interior|int[ée]rieur|figure|tintin|milou|snowy|eye|oeil|œil|yeux/i],
@@ -320,12 +355,36 @@ export function inspect(tris) {
   return { triangles: tris.length, lo: b.lo, hi: b.hi, size: b.size };
 }
 
+// Une demi-coque d'impression est posée face de coupe sur le plateau :
+// la retourner, c'est la réfléchir le long de son axe le plus court.
+export function flipPart(tris) {
+  const b = bounds(tris);
+  const a = b.size.indexOf(Math.min(...b.size));
+  return tris.map((t) => [t[2], t[1], t[0]].map((v) => { const w = v.slice(); w[a] = -w[a] + 2 * b.lo[a]; return w; }));
+}
+// Deux fichiers qui partagent leur emprise en plan et partent tous deux
+// de zéro sur leur axe court sont deux moitiés posées chacune sur son
+// plateau : celle qui se nomme « bottom », « bas »… est à retourner.
+export function suggestFlips(files) {
+  const out = new Map();
+  const isBottom = (n) => /bottom|bas\b|lower|under|ventre|dessous/i.test(n);
+  for (const f of files) {
+    if (!f.box || !isBottom(f.name)) continue;
+    const a = f.box.size.indexOf(Math.min(...f.box.size));
+    const mate = files.find((g) => g !== f && g.box && !isBottom(g.name) &&
+      [0, 1, 2].filter((i) => i !== a).every((i) => Math.abs(g.box.size[i] - f.box.size[i]) < 0.25 * f.box.size[i] && Math.abs(g.box.lo[i] - f.box.lo[i]) < 0.25 * f.box.size[i]) &&
+      Math.abs(g.box.lo[a]) < 0.05 * g.box.size[a] && Math.abs(f.box.lo[a]) < 0.05 * f.box.size[a]);
+    if (mate) out.set(f.name, true);
+  }
+  return out;
+}
+
 // ---------------------------------------------------- chaîne complète
-// parts : [{ name, tris, group }], group ∈ auto | ignorer | coque | … ;
-// opts : { length (tenons), up, nose, canopy, keepStand, progress(phase, frac) }
+// parts : [{ name, tris, group, flip }], group ∈ auto | ignorer | coque | … ;
+// opts : { length (tenons), up, nose, canopy, keepStand, hullShare, progress(phase, frac) }
 export function meshToVoxels(parts, opts = {}) {
   const progress = opts.progress || (() => {});
-  const used = parts.filter((p) => p.group !== 'ignorer' && p.tris.length);
+  const used = parts.filter((p) => p.group !== 'ignorer' && p.tris.length).map((p) => (p.flip ? { ...p, tris: flipPart(p.tris) } : p));
   if (!used.length) throw new Error('aucun triangle à voxeliser');
   const all = used.flatMap((p) => p.tris);
   progress('orientation', 0);
@@ -334,29 +393,48 @@ export function meshToVoxels(parts, opts = {}) {
   const scale = (studs * STUD) / length;   // unités du fichier -> mm
   const groups = new Map();
   let vox = null;
+  let hullOnly = false;
   // un seul fichier, sans groupe imposé : le classement automatique
   // sépare coque, verrière, nageoires, hélice et socle
   const auto = used.length === 1 && (!used[0].group || used[0].group === 'auto' || used[0].group === 'coque');
   if (auto) {
-    progress('voxelisation', 0);
-    vox = voxelize(all, map, scale, { progress: (f) => progress('voxelisation', f) });
-    progress('classement', 0);
-    for (const [k, g] of classify(vox, opts)) groups.set(k, g);
+    let s = scale;
+    for (let pass = 0; pass < 2; pass++) {
+      progress('voxelisation', 0);
+      vox = voxelize(all, map, s, { ...opts, progress: (f) => progress('voxelisation', f) });
+      progress('classement', 0);
+      groups.clear();
+      const count = {};
+      for (const [k, g] of classify(vox, opts)) { groups.set(k, g); count[g] = (count[g] || 0) + 1; }
+      // Un groupe trop petit n'en est pas un (bord du museau pris pour une
+      // dorsale, rebord du poste pris pour la bulle) : il rejoint la coque.
+      for (const [k, g] of groups) if (g !== 'coque' && (count[g] || 0) < (MIN_CELLS[g] ?? 0)) groups.set(k, 'coque');
+      const hasTail = (count.caudale || 0) >= MIN_CELLS.caudale;
+      // Sans caudale dans le maillage, c'est la coque seule qui a été
+      // mise à la longueur totale : on la ramène à sa part (museau ->
+      // pédoncule), la caudale et l'hélice viendront du modèle photo.
+      if (pass === 0 && !hasTail && opts.hullShare && opts.hullShare < 1) { s = scale * opts.hullShare; hullOnly = true; continue; }
+      break;
+    }
   } else {
     // Sans classement automatique, les fichiers « auto » sont de la coque.
+    // Sans fichier de caudale, la coque seule est ramenée à sa part de la
+    // longueur totale.
+    let s = scale;
+    if (!used.some((p) => p.group === 'caudale') && opts.hullShare && opts.hullShare < 1) { s = scale * opts.hullShare; hullOnly = true; }
     used.forEach((p, i) => {
       progress('voxelisation', i / used.length);
-      const v = voxelize(p.tris, map, scale, { progress: (f) => progress('voxelisation', (i + f) / used.length) });
+      const v = voxelize(p.tris, map, s, { ...opts, progress: (f) => progress('voxelisation', (i + f) / used.length) });
       const g = !p.group || p.group === 'auto' ? 'coque' : p.group;
       for (const k of v.cells.keys()) groups.set(k, g);
-      vox = vox ? { ...vox, maxX: Math.max(vox.maxX, v.maxX), maxY: Math.max(vox.maxY, v.maxY) } : v;
+      vox = vox ? { ...vox, maxX: Math.max(vox.maxX, v.maxX), maxY: Math.max(vox.maxY, v.maxY), fillMode: v.fillMode } : v;
     });
   }
   if (!opts.keepStand) for (const [k, g] of groups) if (g === 'socle') groups.delete(k);
   progress('séries', 0);
   const { runs, count } = toRuns(groups);
   return {
-    source: used.map((p) => p.name), length: studs, maxY: vox.maxY, cells: count, runs,
+    source: used.map((p) => p.name), length: studs, hullOnly, maxY: vox.maxY, cells: count, runs, fillMode: vox.fillMode,
     triangles: all.length, fileLength: length, scale, axes: info,
   };
 }

@@ -11,7 +11,7 @@ self.onmessage = (e) => {
       self.postMessage({ type: 'inspected', files: out });
       return;
     }
-    const parts = files.map((f) => ({ name: f.name, group: f.group, tris: parseSTL(f.buffer) }));
+    const parts = files.map((f) => ({ name: f.name, group: f.group, flip: !!f.flip, tris: parseSTL(f.buffer) }));
     const progress = (phase, frac) => self.postMessage({ type: 'progress', phase, frac });
     const voxels = meshToVoxels(parts, { ...opts, progress });
     self.postMessage({ type: 'done', voxels });
