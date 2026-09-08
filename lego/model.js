@@ -1,11 +1,12 @@
 // ================================================================
 // BRIQUE STUDIO — MODÈLE 002 · SOUS-MARIN REQUIN
-// Générateur paramétrique, d'après la maquette de Tintinimaginatio :
-// dos noir, ventre crème séparés par une ligne ondulée, verrière
-// transparente sur le dos, hélice dorée à l'extrême arrière.
+// Générateur d'après la maquette de Tintinimaginatio, dont les contours
+// ont été relevés sur les photos officielles (profile.js) : dos noir,
+// ventre crème séparés par une ligne ondulée, verrière transparente sur
+// le dos, hélice dorée à l'extrême arrière.
 //
 // Chaîne de traitement :
-//   1. fonctions de profil  -> solide implicite (coque, nageoires…)
+//   1. tables de profil     -> solide implicite (coque, nageoires…)
 //   2. voxelisation         -> cellules 1 × 1 × 1 plaque
 //   3. évidement            -> peau + poutre longitudinale
 //   4. livrée               -> noir / crème, gueule, œil, ouïes
@@ -15,18 +16,60 @@
 // Aucune dépendance : tourne dans le navigateur comme sous Node.
 // ================================================================
 
+import { PROFILE as RAW } from './profile.js';
+
+// Corrections des relevés photo : là où l'œil, une nageoire, l'hélice ou
+// une tige du socle mordent sur le contour, la ligne est rétablie par
+// interpolation entre les tenons sains voisins ; les pointes cachées sur
+// la photo sont complétées à la main.
+function interp(obj, from, to) {
+  const a = obj[from - 1], b = obj[to + 1];
+  for (let x = from; x <= to; x++) obj[x] = a + (b - a) * (x - from + 1) / (to - from + 2);
+}
+function patchProfile(raw) {
+  const p = JSON.parse(JSON.stringify(raw));
+  interp(p.bot, 10, 10);            // l'œil coupe le contour du ventre
+  interp(p.bot, 23, 25);            // racine de la pectorale
+  interp(p.halfw, 27, 34);          // pectorales vues de dessus
+  interp(p.livery, 9, 10);          // œil
+  interp(p.livery, 38, 42);         // reflets de la verrière
+  interp(p.canopyHalfZ, 30, 34);    // passagers vus à travers la verrière
+  interp(p.pectoralHalfZ, 28, 29);
+  // pointe de la pectorale, derrière la tige du socle sur la photo :
+  // bord de fuite libre puis pointe, mesurés sur le poster
+  Object.assign(p.pectoral, { 31: [38.0, 28.4], 32: [32.0, 25.9], 33: [26.3, 23.4], 34: [23.0, 21.5] });
+  // lobe inférieur de la caudale, symétrique du supérieur autour de l'arbre
+  const ax = 68.7;
+  for (const x of [90, 91, 92]) { const [y0, y1] = p.caudalV[x][0]; p.caudalV[x].push([2 * ax - y1, 2 * ax - y0]); }
+  p.caudalV[96].push([2 * ax - 114.3, 2 * ax - 113.9]);
+  // la verrière court sous la dorsale jusqu'à x = 49,5 ; son toit y
+  // redescend et la dorsale naît dessus, à x = 44,5
+  delete p.canopy[25]; delete p.canopy[50];
+  for (const [x, t] of [[44, 101], [45, 101], [46, 100.5], [47, 99], [48, 96], [49, 92]]) p.canopy[x][0] = t;
+  delete p.dorsal[42]; delete p.dorsal[43];
+  delete p.caudalH[82];
+  // les pointes de la lame horizontale sont rognées d'un demi-tenon : au
+  // bout, une cellule seule ne s'agrafe à rien
+  for (const x of Object.keys(p.caudalH)) {
+    p.caudalH[x] = p.caudalH[x].map(([z0, z1]) => [Math.max(z0, -16.4), Math.min(z1, 16.4)]).filter(([z0, z1]) => z1 - z0 > 0.6);
+    if (!p.caudalH[x].length) delete p.caudalH[x];
+  }
+  return p;
+}
+const PR = patchProfile(RAW);
+
 export const STUD_MM = 8;      // 1 tenon = 8 mm
 export const PLATE_MM = 3.2;   // 1 plaque = 3,2 mm (1 brique = 3 plaques)
 
 // --- Enveloppe générale (tenons en X/Z, plaques en Y) ------------
-// Cotes relevées sur la photo de la maquette (1 740 px pour 96 tenons).
-export const HULL_LEN = 84;    // museau -> racine de la caudale
+// Toutes les cotes viennent de profile.js, relevé sur les photos
+// officielles ; y = 0 est le dessus de la plaque du socle.
+export const HULL_LEN = 83;    // museau -> racine de la caudale
 export const TOTAL_LEN = 96;   // hélice comprise = 76,8 cm
-export const AXIS_Y = 62;      // couche de l'axe : le sous-marin flotte haut
-                               // sur ses tiges, les nageoires plongent sous lui
+export const AXIS_Y = 67;      // hauteur moyenne de l'axe, pour les bandes de montage
 export const NY = 120;
-export const Z_MIN = -14;
-export const Z_MAX = 14;
+export const Z_MIN = -19;
+export const Z_MAX = 19;
 export const CROSS_N = 2.2;    // exposant de la super-ellipse de section
 
 // --- Couleurs LEGO utilisées -------------------------------------
@@ -104,61 +147,56 @@ export const GROUPS = {
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 // ================================================================
-// 1. PROFILS — relevés sur la maquette, interpolés
+// 1. PROFILS — tables relevées sur les photos, interpolées par tenon
 // ================================================================
 
-// Interpolation cubique monotone (Fritsch-Carlson) : passe par les
-// cotes relevées sans onduler entre elles.
-function pchip(xs, ys) {
-  const n = xs.length, h = [], d = [];
-  for (let i = 0; i < n - 1; i++) { h.push(xs[i + 1] - xs[i]); d.push((ys[i + 1] - ys[i]) / h[i]); }
-  const m = new Array(n);
-  m[0] = d[0]; m[n - 1] = d[n - 2];
-  for (let i = 1; i < n - 1; i++) {
-    if (d[i - 1] * d[i] <= 0) m[i] = 0;
-    else { const w1 = 2 * h[i] + h[i - 1], w2 = h[i] + 2 * h[i - 1]; m[i] = (w1 + w2) / (w1 / d[i - 1] + w2 / d[i]); }
-  }
+// Interpolation linéaire entre tenons entiers, valeur tenue aux bords.
+function table(obj, shift = 0) {
+  const keys = Object.keys(obj).map(Number).sort((a, b) => a - b);
+  const get = (k) => obj[k];
   return (x) => {
-    if (x <= xs[0]) return ys[0];
-    if (x >= xs[n - 1]) return ys[n - 1];
-    let i = 0; while (xs[i + 1] < x) i++;
-    const t = (x - xs[i]) / h[i], t2 = t * t, t3 = t2 * t;
-    return (2 * t3 - 3 * t2 + 1) * ys[i] + (t3 - 2 * t2 + t) * h[i] * m[i]
-         + (-2 * t3 + 3 * t2) * ys[i + 1] + (t3 - t2) * h[i] * m[i + 1];
+    x -= shift;
+    if (!keys.length) return undefined;
+    if (x <= keys[0]) return get(keys[0]);
+    if (x >= keys[keys.length - 1]) return get(keys[keys.length - 1]);
+    let i = 0; while (keys[i + 1] < x) i++;
+    const a = keys[i], b = keys[i + 1];
+    if (b === undefined) return get(a);
+    const va = get(a), vb = get(b);
+    if (typeof va !== 'number') return va;
+    return va + (vb - va) * (x - a) / (b - a);
   };
 }
+const inRange = (obj, x) => { const k = Object.keys(obj).map(Number); return x >= Math.min(...k) && x <= Math.max(...k) + 1; };
 
-// Demi-hauteurs en plaques, du museau (x = 0) à la racine de la
-// caudale (x = 84). Museau en pointe, corps le plus haut vers x = 33,
-// affinement franc jusqu'à un pédoncule de trois tenons.
-// Le museau est un cône : la demi-hauteur monte d'environ 1,5 plaque
-// par tenon sur les huit premiers tenons, puis s'arrondit vers le renflement.
-// La cote en x = 0 garde la cellule de pointe : le modèle fait 96 tenons.
-const XS = [0, 2, 4, 6, 8, 11, 16, 22, 28, 33, 40, 44, 50, 55, 60, 66, 72, 77, 84];
-const TOP = pchip(XS, [1.7, 3, 6, 8.6, 11, 14.2, 17.2, 19.2, 19.9, 20.2, 19.4, 18, 16, 13.5, 11, 8.5, 6.5, 5, 3.5]);
-const BOT = pchip(XS, [1.5, 2.6, 5.2, 7.6, 9.8, 12.8, 15.8, 17.6, 18.3, 18.6, 18, 17, 15.5, 13, 10.5, 8, 6, 4.5, 3.5]);
+const T = {
+  top: table(PR.top), bot: table(PR.bot), halfw: table(PR.halfw),
+  livery: table(PR.livery),
+  canopyHalfZ: table(PR.canopyHalfZ),
+  dorsal: table(PR.dorsal), dorsal2: table(PR.dorsal2),
+};
 
 const mx = (x) => Math.max(0, Math.min(MESH.len - 1, Math.floor(x)));
 export function halfTop(x) {
   if (MESH) { const t = MESH.top(mx(x)), b = MESH.bot(mx(x)); return t !== undefined ? (t - b) / 2 : 0; }
-  return TOP(clamp(x, 0, HULL_LEN));
+  return x > HULL_LEN ? 0 : (T.top(x) - T.bot(x)) / 2;
 }
-export function halfBottom(x) {
-  if (MESH) return halfTop(x);
-  return BOT(clamp(x, 0, HULL_LEN));
-}
+export function halfBottom(x) { return halfTop(x); }
 export function halfWidth(x) {
   if (MESH) { const w = MESH.wid(mx(x)); return w !== undefined ? Math.max(0.5, w) : 0.5; }
-  return Math.max(0.5, 0.40 * halfTop(x));   // 20 plaques = 8 tenons : section ronde
+  if (x > HULL_LEN) return 0;
+  // au-delà de x = 79, la vue de dessus est parasitée par la caudale :
+  // on file en ligne droite vers le pédoncule
+  if (x > 79) return Math.max(0.8, T.halfw(79) * (1 - (x - 79) / 6));
+  return Math.max(0.5, T.halfw(x));
 }
 export function axisY(x) {
   if (MESH) { const t = MESH.top(mx(x)), b = MESH.bot(mx(x)); return t !== undefined ? (t + b) / 2 : AXIS_Y; }
-  return AXIS_Y + 2 * clamp(x / HULL_LEN, 0, 1);
+  return (T.top(Math.min(x, HULL_LEN)) + T.bot(Math.min(x, HULL_LEN))) / 2;
 }
 export function hullTop(x)    { return axisY(x) + halfTop(x); }
 export function hullBottom(x) { return axisY(x) - halfBottom(x); }
 
-// Hauteur de la peau du dos à l'aplomb de (x, z)
 function hullSurfaceTop(x, z) {
   const W = halfWidth(x);
   const k = Math.max(0, 1 - Math.pow(Math.abs(z / W), CROSS_N));
@@ -174,92 +212,89 @@ function insideHull(x, y, z) {
   return Math.pow(Math.abs(z / W), CROSS_N) + Math.pow(Math.abs(dy / H), CROSS_N) <= 1;
 }
 
-// --- Verrière : une voûte de 22 tenons sur 13, haute de 17 plaques ------
-// Sur la maquette, la bulle couvre presque toute la largeur du dos, avec
-// trois arceaux chromés et un bandeau de base. Les extrémités sont
-// arrondies, la section est un arc elliptique.
-const CANOPY = { x0: 28, x1: 50, halfZ: 6.5, rise: 17, ribs: [33, 39, 45] };
-function canopyEnd(x) {
-  const t = (x - CANOPY.x0) / (CANOPY.x1 - CANOPY.x0);
-  return Math.sqrt(Math.max(0, 1 - Math.pow(2 * t - 1, 6)));
-}
+// --- Verrière : contour de profil × demi-largeur vue de dessus ---------
+const CANOPY = { x0: Math.min(...Object.keys(PR.canopy).map(Number)), x1: Math.max(...Object.keys(PR.canopy).map(Number)) + 1, ribs: [] };
+{ const n = 3, len = CANOPY.x1 - CANOPY.x0; for (let i = 1; i <= n; i++) CANOPY.ribs.push(CANOPY.x0 + len * i / (n + 1)); }
+const canopySide = table(Object.fromEntries(Object.entries(PR.canopy).map(([k, v]) => [k, v[0]])));
 function canopy(x, y, z) {
   if (x < CANOPY.x0 || x > CANOPY.x1) return false;
-  const end = canopyEnd(x);
-  const hz = CANOPY.halfZ * end;
-  if (hz < 0.5 || Math.abs(z) > hz) return false;
-  const top = hullTop(x) + CANOPY.rise * Math.sqrt(Math.max(0, 1 - Math.pow(z / hz, 2))) * end;
-  return y > hullSurfaceTop(x, z) - 1.5 && y <= top;
+  // vue de dessus (plus proche de l'objectif, donc plus longue) recalée
+  // sur l'emprise mesurée de profil
+  const keys = Object.keys(PR.canopyHalfZ).map(Number);
+  const u = Math.min(...keys) + (x - CANOPY.x0) / (CANOPY.x1 - CANOPY.x0) * (Math.max(...keys) - Math.min(...keys));
+  const hz = T.canopyHalfZ(u);
+  if (!hz || hz < 0.5 || Math.abs(z) > hz) return false;
+  const top = hullTop(x) + (canopySide(x) - hullTop(x)) * Math.sqrt(Math.max(0, 1 - Math.pow(z / hz, 2)));
+  if (y > top || y <= hullSurfaceTop(x, z) - 1.5) return null;
+  // sous la bulle, le dos est aplani en un pont : la bulle y repose à plat
+  return y > hullTop(x) - 1 ? 'verriere' : 'pont';
 }
 
-// --- Lames verticales (dorsales, caudale) ---------------------------
-// Une lame est décrite par ses bords d'attaque et de fuite en fonction
-// de la hauteur relative t : bord d'attaque convexe qui recule en
-// montant, bord de fuite concave, pointe rejetée en arrière — le profil
-// d'une nageoire de requin, pas un triangle.
-function blade(x, h, H, LE, TE) {
-  if (h < -1 || h > H) return false;
-  const t = clamp(h / H, 0, 1);
-  return x >= LE(t) && x <= TE(t);
+// --- Dorsales : contour de profil, lame de deux tenons ------------------
+function dorsalAt(x, y) {
+  if (inRange(PR.dorsal, x) && y > hullTop(x) - 1 && y <= T.dorsal(x)) return 'dorsale';
+  if (inRange(PR.dorsal2, x) && y > hullTop(x) - 1 && y <= T.dorsal2(x)) return 'dorsale2';
+  return null;
 }
-const DORSAL  = { H: 26, LE: (t) => 46 + 11 * Math.pow(t, 1.6), TE: (t) => 59 - 12 * t * Math.sqrt(1 - t) };
-const DORSAL2 = { H: 10, LE: (t) => 70 + 5 * Math.pow(t, 1.5),  TE: (t) => 76 - 4 * t * (1 - t) };
 
-// La caudale est un croissant mince : lobe supérieur de 53 plaques,
-// inférieur de 38, tous deux rejetés en arrière, deux à trois tenons
-// de corde seulement. La racine s'ancre sur le pédoncule entre x = 84
-// et 88, et l'échancrure du bord de fuite se creuse jusqu'à x = 88.
-// La racine part de x = 80, quatre tenons avant la fin du pédoncule :
-// la peau de la coque garde la priorité, la lame vient donc coiffer le
-// pédoncule par-dessus et par-dessous, et s'y lie par les tenons.
-const CAUD = {
-  up:   { H: 53, LE: (t) => 80 + 14 * Math.pow(t, 1.3), TE: (t) => 88 + 8 * t - 2 * Math.sin(Math.PI * t) },
-  down: { H: 38, LE: (t) => 80 + 13 * Math.pow(t, 1.3), TE: (t) => 88 + 8 * t - 2 * Math.sin(Math.PI * t) },
-};
-const SHAFT = { x0: 84 };   // ligne d'arbre de l'hélice
+// --- Caudale en croix : deux croissants identiques, l'un vertical (vu de
+// profil), l'autre horizontal (vu de dessus). L'arbre de l'hélice est le
+// prolongement de la poutre de châssis, posé par addChassis.
+const SHAFT = { x0: HULL_LEN, x1: 95, hub: 93 };
 function caudal(x, y, z) {
-  if (z < -1 || z >= 1) return false;
+  const xi = Math.floor(x);
   const a = axisY(HULL_LEN);
-  const dy = y - a;
-  const lobe = dy >= 0 ? CAUD.up : CAUD.down;
-  if (!blade(x, Math.abs(dy), lobe.H, lobe.LE, lobe.TE)) return false;
-  // canal d'arbre : deux plaques percées dans la racine
-  if (x >= SHAFT.x0 && y > a - 1 && y < a + 1) return false;
-  return true;
+  // lame verticale, deux tenons d'épaisseur ; la racine s'épaissit à quatre
+  const thick = x >= 90 ? 1 : Math.abs(y - a) < 2.5 ? 3 : Math.abs(y - a) < 4.5 ? 2 : 1;
+  if (z >= -thick && z < thick) {
+    const runs = PR.caudalV[xi];
+    if (runs) for (const [y0, y1] of runs) if (y >= y0 && y <= y1) return true;
+  }
+  // lame horizontale : intervalles en z, trois plaques d'épaisseur sur l'axe
+  if (y >= a - 1 && y < a + 2) {
+    const runs = PR.caudalH[xi];
+    if (runs) for (const [z0, z1] of runs) if (z >= z0 && z <= z1) return true;
+  }
+  return false;
 }
 
-// --- Nageoires latérales : lames pendantes -----------------------------
-// La pectorale de la maquette est presque verticale : elle plonge de 37
-// plaques sous son attache et ne s'écarte que de six tenons du flanc.
-// On la décrit donc par la profondeur d, de 0 à D : à chaque couche, la
-// lame occupe deux tenons de large autour d'une ligne qui s'écarte
-// lentement du flanc, et une corde qui se resserre vers la pointe.
-function hangingFin(x, y, z, cfg) {
-  const root = axisY(x) - cfg.drop * halfBottom(x);
-  const d = root - y;
-  if (d < -1 || d > cfg.D) return false;
-  const t = clamp(d / cfg.D, 0, 1);
-  const zc = cfg.r0 + (cfg.r1 - cfg.r0) * t;
-  if (Math.abs(Math.abs(z) - zc) > 1) return false;
-  const xLE = cfg.xLE0 + (cfg.xLE1 - cfg.xLE0) * t;
-  const xTE = cfg.xTE0 + (cfg.xTE1 - cfg.xTE0) * t;
-  return x >= xLE && x <= xTE;
+// --- Nageoires pendantes -------------------------------------------
+// Vue de profil : bord de fuite et bord d'attaque par tenon. Vue de
+// dessus : la nageoire s'écarte du flanc à mesure qu'elle descend, de
+// zRoot (sous le flanc) à zTip (écartement mesuré à la pointe). Elle
+// remonte jusqu'à la peau de la coque pour s'y agrafer sur toute sa
+// racine ; deux tenons d'épaisseur.
+const FINS = {
+  pectoral: { side: PR.pectoral, yRoot: 47.5, depth: 25, zRoot: 6.3, zTip: 12.4 },
+  pelvic:   { side: PR.pelvic,   yRoot: 55.5, depth: 7.5, zRoot: 4.3, zTip: 6.8 },
+};
+function hangingFin(x, y, z, fin) {
+  const v = fin.side[Math.floor(x)];
+  if (!v) return false;
+  const [yHi, yLo] = v[0] > v[1] ? v : [v[1], v[0]];
+  if (y < yLo - 0.5) return false;
+  const az = Math.abs(z);
+  const t = clamp((fin.yRoot - y) / fin.depth, 0, 1);
+  const zc = fin.zRoot + (fin.zTip - fin.zRoot) * t;
+  if (Math.abs(az - zc) > 1) return false;
+  // sous la coque : jusqu'à la peau, à cet écartement
+  const W = halfWidth(x);
+  const zz = Math.min(az, Math.max(0, W - 0.8));
+  const k = Math.max(0, 1 - Math.pow(zz / W, CROSS_N));
+  const surf = axisY(x) - halfBottom(x) * Math.pow(k, 1 / CROSS_N);
+  const yMax = yHi >= hullBottom(x) - 1.5 ? surf : yHi;   // racine sur le ventre : jusqu'à la peau
+  return y <= yMax + 0.5;
 }
-const PECTORAL = { D: 37, r0: 6.5, r1: 12.5, xLE0: 24, xLE1: 33, xTE0: 31, xTE1: 36.5, drop: 0.30 };
-const PELVIC   = { D: 12, r0: 2.0, r1: 5.0,  xLE0: 67, xLE1: 71, xTE0: 72, xTE1: 73,   drop: 0.55 };
 
 // --- Solide complet ----------------------------------------------
 function solidAt(x, y, z) {
   if (insideHull(x, y, z)) return x < 38 ? 'avant' : 'arriere';
-  if (canopy(x, y, z)) return 'verriere';
+  const c = canopy(x, y, z);
+  if (c) return c === 'pont' ? (x < 38 ? 'avant' : 'arriere') : 'verriere';
   if (caudal(x, y, z)) return 'caudale';
-  if (z >= -1 && z < 1) {
-    const h = y - hullTop(x);
-    if (blade(x, h, DORSAL.H, DORSAL.LE, DORSAL.TE)) return 'dorsale';
-    if (blade(x, h, DORSAL2.H, DORSAL2.LE, DORSAL2.TE)) return 'dorsale2';
-  }
-  if (hangingFin(x, y, z, PECTORAL)) return z > 0 ? 'pectoraleD' : 'pectoraleG';
-  if (hangingFin(x, y, z, PELVIC))   return z > 0 ? 'pelvienneD' : 'pelvienneG';
+  if (z >= -1 && z < 1) { const d = dorsalAt(x, y); if (d) return d; }
+  if (hangingFin(x, y, z, FINS.pectoral)) return z > 0 ? 'pectoraleD' : 'pectoraleG';
+  if (hangingFin(x, y, z, FINS.pelvic))   return z > 0 ? 'pelvienneD' : 'pelvienneG';
   return null;
 }
 
@@ -284,29 +319,31 @@ function voxelize() {
   return solid;
 }
 
-// La peau brute ne tient pas debout : sur le dos et sous le ventre,
-// les anneaux de deux couches voisines sont côte à côte et non
-// superposés. On la dilate d'une cellule en hauteur — sans effet sur
-// les flancs verticaux — pour que les anneaux se recouvrent.
-const HOLLOW = new Set(['avant', 'arriere', 'verriere', 'coque']);
+// La peau brute ne tient pas debout : deux anneaux voisins sont côte à
+// côte et non superposés, et deux colonnes voisines du flanc peuvent ne
+// pas se toucher quand la largeur change d'un tenon. On dilate la peau
+// de deux cellules en hauteur et d'une en longueur, vers l'intérieur :
+// les anneaux se recouvrent et les colonnes se rejoignent. Museau et
+// pédoncule, trop étroits pour être creux, restent pleins.
+const HOLLOW = new Set(['avant', 'arriere', 'coque']);   // la verrière reste pleine
 function shell(solid) {
   const skin = new Map();
+  const exposedCells = [];
   for (const [k, g] of solid) {
     if (!HOLLOW.has(g)) { skin.set(k, g); continue; }
     const [x, y, z] = k.split('|').map(Number);
+    if (!MESH && halfWidth(x + 0.5) < 4.5) { skin.set(k, g); exposedCells.push([x, y, z]); continue; }
     const exposed =
       !solid.has(key(x + 1, y, z)) || !solid.has(key(x - 1, y, z)) ||
       !solid.has(key(x, y + 1, z)) || !solid.has(key(x, y - 1, z)) ||
       !solid.has(key(x, y, z + 1)) || !solid.has(key(x, y, z - 1));
-    if (exposed) skin.set(k, g);
+    if (exposed) { skin.set(k, g); exposedCells.push([x, y, z]); }
   }
   const out = new Map(skin);
-  for (const [k, g] of skin) {
-    if (!HOLLOW.has(g)) continue;
-    const [x, y, z] = k.split('|').map(Number);
-    for (const dy of [-1, 1]) {
-      const kk = key(x, y + dy, z);
-      if (solid.has(kk) && !out.has(kk)) out.set(kk, g);
+  for (const [x, y, z] of exposedCells) {
+    for (const [dx, dy] of [[0, -2], [0, -1], [0, 1], [0, 2], [-1, 0], [1, 0]]) {
+      const kk = key(x + dx, y + dy, z);
+      if (solid.has(kk) && !out.has(kk)) out.set(kk, solid.get(kk));
     }
   }
   return out;
@@ -314,6 +351,8 @@ function shell(solid) {
 
 // Poutre longitudinale, sur six plaques : deux assises de briques à
 // joints croisés. Une seule assise resterait un plancher flottant.
+// Au-delà de la coque, elle continue sur deux plaques et deux tenons :
+// c'est l'arbre de l'hélice, qui traverse la racine de la caudale.
 function addChassis(cells) {
   const len = MESH ? MESH.len : HULL_LEN;
   for (let x = 0; x < len; x++) {
@@ -328,64 +367,45 @@ function addChassis(cells) {
       }
     }
   }
+  if (MESH) return;
+  const a = Math.floor(axisY(HULL_LEN));
+  for (let x = SHAFT.x0; x < SHAFT.x1; x++) {
+    for (const [y, wide] of [[a - 1, 90], [a, 88]]) {
+      for (const z of (x < wide ? [-2, -1, 0, 1] : [-1, 0])) cells.set(key(x, y, z), 'chassis');
+    }
+  }
 }
 
 // ================================================================
-// 4. LIVRÉE — dos noir, ventre blanc, frontière en pointes
+// 4. LIVRÉE — la frontière noir / blanc relevée au pixel sur le profil
 // ================================================================
-
-const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-
-// Relevé sur la photo de profil : la frontière court quatre plaques
-// sous l'axe, et le blanc du ventre y monte en sept pointes vives,
-// jusqu'à neuf plaques au-dessus de l'axe ; entre deux pointes, le noir
-// redescend en lobes arrondis. Sur la tête, la ligne suit la gueule.
-const PEAKS = [24, 31, 37, 50, 59, 69, 77];
-export function liveryY(x) {
-  const a = axisY(x);
-  if (x < 12) {
-    // gueule : du bout du museau, la ligne descend puis rejoint la base
-    return a - 1 - 6 * smooth(0, 8, x) + 3 * smooth(8, 12, x);
-  }
-  // pointes en cosinus surélevé, 4,3 tenons de demi-base : des crêtes
-  // pleines et des creux arrondis, comme sur la maquette, plutôt que
-  // des aiguilles
-  let P = 0;
-  for (const px of PEAKS) {
-    const d = Math.abs(x - px) / 4.3;
-    if (d < 1) P = Math.max(P, Math.pow(0.5 * (1 + Math.cos(Math.PI * d)), 0.8));
-  }
-  return a - 4 + 12.5 * P;
-}
+export function liveryY(x) { return T.livery(Math.min(x, HULL_LEN)); }
 
 function colorAt(x, y, z, group) {
   const cx = x + 0.5, cy = y + 0.5, cz = z + 0.5;
 
   if (group === 'socle') return 'black';
-  if (group === 'chassis') return 'dgrey';
   if (group === 'helice') return 'gold';
   if (group === 'verriere') {
+    // nervures chromées en surface seulement ; l'intérieur reste en verre
     const rib = CANOPY.ribs.some((r) => Math.abs(cx - r) < 0.6);
-    return rib || cy < hullTop(cx) - 0.5 ? 'lgrey' : 'trans';
+    const surface = !solidAt(cx, cy + 1, cz) || !solidAt(cx, cy, cz + 1) || !solidAt(cx, cy, cz - 1);
+    return (rib && surface) || cy < hullTop(cx) + 0.5 ? 'lgrey' : 'trans';   // anneau de base chromé
   }
 
   const onFlank = Math.abs(cz) > halfWidth(cx) - 1.5;
 
-  // Œil : un anneau blanc à centre noir, sept plaques au-dessus de
-  // l'axe, onze tenons derrière le museau
-  const eyeX = 11, eyeY = axisY(eyeX) + 7;
-  const dEye = Math.hypot(cx - eyeX, (cy - eyeY) * 0.4);
-  if (onFlank && dEye < 1.55) return dEye < 0.6 ? 'black' : 'white';
+  // Œil : anneau blanc à centre noir, à sa place sur la photo
+  const dEye = Math.hypot(cx - PR.eye.x, (cy - PR.eye.y) * 0.4);
+  if (onFlank && dEye < PR.eye.r + 0.6) return dEye < 0.55 ? 'black' : 'white';
 
-  // Ouïes : quatre fentes fines derrière la tête, à hauteur d'axe
-  if (onFlank && cy > axisY(cx) - 2 && cy < axisY(cx) + 6) {
-    for (let i = 0; i < 4; i++) {
-      if (Math.abs(cx - (19.5 + i * 2.2)) < 0.5) return 'lgrey';
-    }
+  // Ouïes : quatre fentes, positions relevées
+  if (onFlank && cy > PR.gills.y[0] && cy < PR.gills.y[1]) {
+    for (const gx of PR.gills.x) if (Math.abs(cx - gx) < 0.45) return 'lgrey';
   }
 
   // Nageoires : entièrement noires, comme sur la maquette
-  if (group !== 'avant' && group !== 'arriere') return 'black';
+  if (fam(group) !== 'coque') return 'black';
 
   return cy >= liveryY(cx) ? 'black' : 'white';
 }
@@ -402,6 +422,20 @@ const RECTS = [
   [1, 3], [3, 1], [1, 2], [2, 1], [1, 1],
 ];
 const RECTS_SHORT = RECTS.filter(([dz, dx]) => dz <= 4 && dx <= 4);
+// La lame horizontale de la caudale n'a que deux plaques d'épaisseur :
+// on la pave en rangs sur une assise et en colonnes sur l'autre, pour
+// que les deux nappes se croisent.
+const RECTS_ROWS = RECTS.filter(([dz]) => dz <= 2);
+const RECTS_COLS = RECTS.filter(([, dx]) => dx <= 2);
+// Une assise sur deux est pavée en miroir, depuis l'autre bout du modèle :
+// les joints des nappes plates (ventre, dos, caudale, socle) tombent
+// ailleurs d'une assise à l'autre et les plaques s'agrafent.
+function mirrored(layer, flip) {
+  if (!flip) return layer;
+  const m = new Map();
+  for (const [k, v] of layer) { const [x, z] = k.split('|').map(Number); m.set(`${TOTAL_LEN - 1 - x}|${-1 - z}`, v); }
+  return m;
+}
 
 function partKeyFor(dz, dx, kind) {
   const a = Math.min(dz, dx), b = Math.max(dz, dx);
@@ -414,17 +448,31 @@ function partKeyFor(dz, dx, kind) {
 // assises se verrouillent. Sans ce décalage, toutes les couches
 // seraient pavées à l'identique et le modèle se réduirait à des piles
 // de briques indépendantes.
-function packLayer(layer, phase) {
+// La poutre de châssis se pave d'un seul tenant avec la peau des flancs :
+// ses plaques traversent la coque de bord à bord, c'est ce qui la
+// contrevente. Elle prend donc la couleur de la livrée.
+const FAMILY = { avant: 'coque', arriere: 'coque', chassis: 'coque' };
+const fam = (g) => FAMILY[g] || g;
+function packLayer(layer0, phase, y) {
+  const flip = phase === 1;
+  const layer = mirrored(layer0, flip);
   const used = new Set();
   const rects = [];
-  for (let z = Z_MIN; z < Z_MAX; z++) {
-    for (let x = 0; x < TOTAL_LEN; x++) {
+  // ordre de balayage : par rangées en z sur une assise, par colonnes en
+  // x sur l'autre, pour que la première pièce de chaque file change
+  const cellsInOrder = [];
+  if (phase === 0) { for (let z = Z_MIN; z < Z_MAX; z++) for (let x = 0; x < TOTAL_LEN; x++) cellsInOrder.push([x, z]); }
+  else { for (let x = 0; x < TOTAL_LEN; x++) for (let z = Z_MIN; z < Z_MAX; z++) cellsInOrder.push([x, z]); }
+  for (const [x, z] of cellsInOrder) {
+    {
       const k = `${x}|${z}`;
       if (used.has(k) || !layer.has(k)) continue;
       const cell = layer.get(k);
       const left = layer.get(`${x - 1}|${z}`);
-      const runStart = !left || left.color !== cell.color || left.group !== cell.group;
-      const order = phase === 1 && runStart ? RECTS_SHORT : RECTS;
+      const runStart = !left || left.color !== cell.color || fam(left.group) !== fam(cell.group);
+      const blade = cell.group === 'caudale' && Math.abs(z + 0.5) > 1.5;
+      const order = blade ? (y % 2 ? RECTS_COLS : RECTS_ROWS)
+        : phase === 1 && runStart ? RECTS_SHORT : RECTS;
       let placed = null;
       for (const [dz, dx] of order) {
         let ok = true;
@@ -432,14 +480,16 @@ function packLayer(layer, phase) {
           for (let i = 0; i < dx; i++) {
             const kk = `${x + i}|${z + j}`;
             const c = layer.get(kk);
-            if (!c || used.has(kk) || c.color !== cell.color || c.group !== cell.group) { ok = false; break; }
+            if (!c || used.has(kk) || c.color !== cell.color || fam(c.group) !== fam(cell.group)) { ok = false; break; }
           }
         }
         if (ok) { placed = [dz, dx]; break; }
       }
       const [dz, dx] = placed;
       for (let j = 0; j < dz; j++) for (let i = 0; i < dx; i++) used.add(`${x + i}|${z + j}`);
-      rects.push({ x, z, dx, dz, color: cell.color, group: cell.group });
+      rects.push(flip
+        ? { x: TOTAL_LEN - x - dx, z: -z - dz, dx, dz, color: cell.color, group: cell.group }
+        : { x, z, dx, dz, color: cell.color, group: cell.group });
     }
   }
   return rects;
@@ -479,39 +529,30 @@ function mergeVertical(byLayer) {
 // SOUS-ENSEMBLES POSÉS À LA MAIN
 // ================================================================
 
-// L'hélice est à l'extrême arrière, derrière la caudale. L'arbre
-// traverse la racine de l'empennage par un canal de deux plaques ;
-// c'est un doublage à joints décalés, donc une poutre.
+// L'hélice est à l'extrême arrière, au bout de l'arbre : quatre pales en
+// croix et un moyeu, en or perlé, agrafés sur la poutre.
 function propeller() {
   const out = [];
-  const a = Math.round(axisY(HULL_LEN));
+  const a = Math.floor(axisY(HULL_LEN));
   const P = (x, y, z, dx, dz, h, color, part) =>
     out.push({ x, y, z, dx, dz, h, color, group: 'helice', part });
-
-  for (const z of [-1, 0]) {
-    P(84, a - 1, z, 8, 1, 1, 'dgrey', 'plate-1x8');    // couche basse
-    P(92, a - 1, z, 4, 1, 1, 'dgrey', 'plate-1x4');
-    P(84, a, z, 4, 1, 1, 'dgrey', 'plate-1x4');        // couche haute, joints décalés
-    P(88, a, z, 8, 1, 1, 'dgrey', 'plate-1x8');
-  }
-  // plan de plongée horizontal, large et mince, à hauteur d'arbre
-  P(90, a + 1, -4, 2, 8, 1, 'dgrey', 'plate-2x8');
-  P(92, a + 1, -4, 2, 8, 1, 'dgrey', 'plate-2x8');
-  // hélice : moyeu et pales en or perlé
-  P(94, a + 1, -3, 1, 6, 1, 'gold', 'plate-1x6');
-  P(94, a + 2, -1, 1, 2, 1, 'gold', 'plate-1x2');
-  P(94, a + 3, -1, 1, 2, 1, 'gold', 'plate-1x2');
-  P(94, a - 2, -1, 1, 2, 1, 'gold', 'plate-1x2');
-  P(94, a - 3, -1, 1, 2, 1, 'gold', 'plate-1x2');
-  P(95, a + 1, -1, 1, 2, 1, 'gold', 'plate-1x2');
+  const hx = SHAFT.hub;
+  P(hx, a + 1, -3, 1, 6, 1, 'gold', 'plate-1x6');
+  P(hx, a - 2, -3, 1, 6, 1, 'gold', 'plate-1x6');
+  P(hx, a + 2, -1, 1, 2, 1, 'gold', 'plate-1x2');
+  P(hx, a + 3, -1, 1, 2, 1, 'gold', 'plate-1x2');
+  P(hx, a - 3, -1, 1, 2, 1, 'gold', 'plate-1x2');
+  P(hx, a - 4, -1, 1, 2, 1, 'gold', 'plate-1x2');
+  P(hx + 1, a + 1, -1, 1, 2, 1, 'gold', 'plate-1x2');
+  P(hx + 1, a - 2, -1, 1, 2, 1, 'gold', 'plate-1x2');
   return out;
 }
 
 // Le socle de la maquette : une plaque noire de 54 × 22 tenons, et deux
-// tiges qui portent le sous-marin dix-huit centimètres au-dessus.
+// tiges qui portent le sous-marin quinze centimètres au-dessus.
 // Les tiges sont des colonnes de briques 2 × 2 ; c'est le point le plus
 // fragile du modèle en briques, et la page le dit.
-function stand() {
+function stand(cells) {
   const out = [];
   const P = (x, y, z, dx, dz, h, part) =>
     out.push({ x, y, z, dx, dz, h, color: 'black', group: 'socle', part });
@@ -528,9 +569,12 @@ function stand() {
     for (const [z, dz] of [[-11, 1], [-10, 8], [-2, 8], [6, 4], [10, 1]]) S(1, x, z, dx, dz);
   }
   // deux tiges de briques 2 × 2, jusqu'au contact du ventre
-  for (const cx of [25, 62]) {
-    // la tige s'arrête sous le point le plus bas de son emprise
-    const topY = Math.floor(Math.min(hullBottom(cx), hullBottom(cx + 1)));
+  for (const cx of [24, 61]) {   // positions relevées sur la photo
+    // la tige monte jusqu'à la première cellule de coque de son emprise
+    let topY = NY;
+    for (const x of [cx, cx + 1]) for (const z of [-1, 0]) {
+      for (let y = 0; y < NY; y++) if (cells.has(key(x, y, z))) { topY = Math.min(topY, y); break; }
+    }
     for (let y = 2; y < topY; y += 3) {
       const h = Math.min(3, topY - y);
       P(cx, y, -1, 2, 2, h, h === 3 ? 'brick-2x2' : 'plate-2x2');
@@ -589,11 +633,11 @@ export function buildModel(voxels = null) {
   }
 
   const packed = new Map();
-  for (const [y, layer] of byLayer) packed.set(y, packLayer(layer, Math.floor(y / 3) % 2));
+  for (const [y, layer] of byLayer) packed.set(y, packLayer(layer, Math.floor(y / 3) % 2, y));
 
   let pieces = mergeVertical(packed);
   // le maillage apporte sa propre hélice ; le socle, lui, est toujours posé ici
-  pieces = pieces.concat(voxels ? [] : propeller(), stand());
+  pieces = pieces.concat(voxels ? [] : propeller(), stand(cells));
 
   pieces.sort((a, b) => a.y - b.y || a.x - b.x || a.z - b.z);
   pieces.forEach((p, i) => { p.id = i; });
@@ -617,7 +661,7 @@ export const HANGING_LABELS = HANGING;
 
 function unitOf(p) {
   if (HANGING[p.group]) return p.group;
-  if (p.group === 'caudale' && p.y + p.h - 1 < Math.round(axisY(HULL_LEN))) return 'caudaleBas';
+  if (p.group === 'caudale' && p.y + p.h - 1 < Math.floor(axisY(HULL_LEN)) - 1) return 'caudaleBas';
   if (p.group === 'socle') return 'socle';
   return 'main';
 }
@@ -626,7 +670,7 @@ function unitOf(p) {
 function bandOf(y) {
   if (y < AXIS_Y - 6) return 2;                    // ventre
   if (y < AXIS_Y + 10) return 3;                   // flancs
-  if (y <= AXIS_Y + Math.ceil(TOP(33)) + 1) return 4;   // dos
+  if (y <= Math.ceil(hullTop(33)) + 1) return 4;        // dos
   return 5;                                        // superstructures
 }
 
