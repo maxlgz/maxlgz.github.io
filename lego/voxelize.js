@@ -291,20 +291,33 @@ export function toRuns(groups) {
 
 // Groupes reconnus dans le nom d'un fichier : « canopy », « hull », etc.
 export const GROUP_HINTS = [
+  ['ignorer', /mold|mould|moule|smoke|fum|dashboard|steering|volant|cabin|interior|int[ée]rieur|figure|tintin|milou|snowy|eye|oeil|œil|yeux/i],
   ['verriere', /canop|verri|glass|dome|cockpit|bubble|window|vitre|bulle/i],
   ['helice', /prop|helic|hélice|screw/i],
   ['socle', /stand|socle|base|support|display|pied|tige|rod|plinth/i],
   ['caudale', /caud|tail|queue|fluke/i],
   ['dorsale', /dors|back.?fin/i],
+  ['pelvienneD', /pelv|ventral|mid.?fin|small.?fin/i],
   ['pectoraleG', /(pector|wing|aile|side.?fin).*(left|gauche|_l\b|-l\b|\bl\b)/i],
   ['pectoraleD', /(pector|wing|aile|side.?fin).*(right|droit|_r\b|-r\b|\br\b)/i],
   ['pectoraleD', /pector|wing|aile|side.?fin/i],
-  ['pelvienneD', /pelv|ventral/i],
-  ['coque', /hull|body|coque|corps|shark|requin|sub/i],
+  ['coque', /hull|body|coque|corps|shark|requin|sub|top|bottom|haut|bas/i],
 ];
 export function guessGroup(name) {
   for (const [g, re] of GROUP_HINTS) if (re.test(name)) return g;
   return 'auto';
+}
+// Coché d'office ? Non pour le socle, les pièces à ignorer, et les
+// morceaux (« part_01 ») quand un fichier « complete » existe à côté.
+export function defaultUse(name, group, names = []) {
+  if (group === 'ignorer' || group === 'socle') return false;
+  if (/part[_-]?\d/i.test(name) && names.some((n) => /complete|full|entier|assembl/i.test(n))) return false;
+  return true;
+}
+// Emprise d'un fichier, pour juger si les fichiers partagent un repère
+export function inspect(tris) {
+  const b = bounds(tris);
+  return { triangles: tris.length, lo: b.lo, hi: b.hi, size: b.size };
 }
 
 // ---------------------------------------------------- chaîne complète

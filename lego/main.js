@@ -40,7 +40,9 @@ const { pieces, steps, stats, bbox, check } = model;
 // ---------------------------------------------------------------
 if (imported) {
   $('#import-banner').hidden = false;
-  $('#import-source').textContent = `${(imported.source || []).join(', ')} — ${nf.format(imported.triangles || 0)} triangles`;
+  const done = (model.completed || imported.completed || []);
+  $('#import-source').textContent = `${(imported.source || []).join(', ')} — ${nf.format(imported.triangles || 0)} triangles` +
+    (done.length ? ` ; complété par le modèle photo : ${done.length} groupe${done.length > 1 ? 's' : ''}` : '');
 }
 $('#import-reset').addEventListener('click', () => {
   try { localStorage.removeItem(IMPORT_KEY); } catch { /* rien à retirer */ }
@@ -57,19 +59,51 @@ let importParts = [];   // { name, size, group, use, data: () => Promise<ArrayBu
 const importStatus = (msg) => { $('#import-status').textContent = msg; };
 const kb = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)} Mo` : `${Math.round(n / 1e3)} ko`);
 
+const mm = (v) => (Math.abs(v) >= 100 ? Math.round(v) : Math.round(v * 10) / 10);
 function renderImportList() {
   const list = $('#import-list');
   list.innerHTML = '';
   list.hidden = importParts.length < 2;
   importParts.forEach((p, i) => {
     const label = document.createElement('label');
+    const dims = p.box ? `${mm(p.box.size[0])} × ${mm(p.box.size[1])} × ${mm(p.box.size[2])} · origine ${p.box.lo.map(mm).join(' / ')}` : kb(p.size);
     label.innerHTML = `<input type="checkbox" ${p.use ? 'checked' : ''} /><span class="name" title="${p.name}">${p.name}</span>` +
-      `<span class="size">${kb(p.size)}</span><select>${IMPORT_GROUPS.map(([v, t]) => `<option value="${v}" ${v === p.group ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+      `<span class="size" title="dimensions et coin bas du fichier, dans ses unités">${dims}</span><select>${IMPORT_GROUPS.map(([v, t]) => `<option value="${v}" ${v === p.group ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
     label.querySelector('input').addEventListener('change', (e) => { importParts[i].use = e.target.checked; });
     label.querySelector('select').addEventListener('change', (e) => { importParts[i].group = e.target.value; });
     list.appendChild(label);
   });
   $('#import-go').disabled = !importParts.length;
+}
+
+// Emprises mesurées dans le worker ; si les fichiers cochés se
+// chevauchent tous près de l'origine, ils sont posés chacun sur son
+// plateau d'impression et non assemblés : on prévient.
+async function inspectImportParts() {
+  if (importParts.length < 2) return;
+  try {
+    const files = [];
+    for (const p of importParts) files.push({ name: p.name, buffer: await p.data() });
+    const worker = new Worker(new URL('./import.worker.js', import.meta.url), { type: 'module' });
+    worker.onmessage = (ev) => {
+      if (ev.data.type !== 'inspected') return;
+      worker.terminate();
+      for (const f of ev.data.files) { const p = importParts.find((q) => q.name === f.name); if (p && !f.error) p.box = f; }
+      renderImportList();
+      const used = importParts.filter((p) => p.use && p.box);
+      if (used.length >= 2) {
+        const big = Math.max(...used.map((p) => Math.max(...p.box.size)));
+        const lo = [0, 1, 2].map((a) => Math.min(...used.map((p) => p.box.lo[a])));
+        const hi = [0, 1, 2].map((a) => Math.max(...used.map((p) => p.box.hi[a])));
+        const span = Math.max(...hi.map((h, a) => h - lo[a]));
+        const near = used.filter((p) => p.box.lo.every((v) => Math.abs(v) < big * 0.05)).length;
+        if (span < big * 1.15 && near >= 2) {
+          importStatus('Attention : les fichiers cochés se superposent près de l’origine — ils sont sans doute posés chacun pour l’impression, pas assemblés. Garder un seul fichier de coque, le reste sera complété par le modèle photo.');
+        }
+      }
+    };
+    worker.postMessage({ type: 'inspect', files }, files.map((f) => f.buffer));
+  } catch { /* mesure facultative */ }
 }
 
 $('#import-file').addEventListener('change', async (e) => {
@@ -88,7 +122,11 @@ $('#import-file').addEventListener('change', async (e) => {
         const g = guessGroup(en.name.split('/').pop());
         return { name: en.name.split('/').pop(), size: en.size, group: g, use: g !== 'socle', data: en.data };
       });
-      importStatus(`${entries.length} fichier${entries.length > 1 ? 's' : ''} STL dans l’archive.`);
+      const names = importParts.map((p) => p.name);
+      const { defaultUse } = await import('./voxelize.js');
+      for (const p of importParts) p.use = defaultUse(p.name, p.group, names);
+      importStatus(`${entries.length} fichier${entries.length > 1 ? 's' : ''} STL dans l’archive — mesure des emprises…`);
+      inspectImportParts();
     } else {
       importParts = [{ name: file.name, size: file.size, group: 'auto', use: true, data: () => file.arrayBuffer() }];
       importStatus(`${file.name} — ${kb(file.size)}.`);
@@ -112,6 +150,7 @@ $('#import-go').addEventListener('click', async () => {
       up: $('#import-up').value, nose: $('#import-nose').value,
       keepStand: $('#import-stand').checked,
     };
+    const complete = $('#import-complete').checked;
     const worker = new Worker(new URL('./import.worker.js', import.meta.url), { type: 'module' });
     const PHASES = { orientation: 'Orientation du maillage', voxelisation: 'Voxelisation', classement: 'Classement des cellules', 'séries': 'Mise en forme' };
     worker.onmessage = (ev) => {
@@ -120,7 +159,7 @@ $('#import-go').addEventListener('click', async () => {
       else if (m.type === 'error') { importStatus(`Échec : ${m.message}`); $('#import-go').disabled = false; worker.terminate(); }
       else if (m.type === 'done') {
         worker.terminate();
-        const v = { ...m.voxels, importedAt: new Date().toISOString() };
+        const v = { ...m.voxels, complete, importedAt: new Date().toISOString() };
         try { localStorage.setItem(IMPORT_KEY, JSON.stringify(v)); }
         catch (err) { importStatus(`Le navigateur refuse de conserver le modèle (${err.message}).`); $('#import-go').disabled = false; return; }
         importStatus(`${nf.format(Object.values(v.cells).reduce((a, b) => a + b, 0))} cellules — reconstruction de la page…`);
