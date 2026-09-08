@@ -609,7 +609,7 @@ export function buildSteps(pieces) {
           layers: ys.length,
           y,
           yTop: yGroup[yGroup.length - 1],
-          title: `${unit.label} · ${yGroup.length > 1 ? `couches ${li + 1}` : `couche ${li + 1}`}`,
+          title: `${unit.label} · ${yGroup.length > 1 ? `assise ${li + 1}` : `couche ${li + 1}`}`,
           pieces: layer.map((p) => p.id),
           gather: [...gather.entries()]
             .map(([k, qty]) => { const [part, color] = k.split('|'); return { part, color, qty }; })
