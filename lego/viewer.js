@@ -234,7 +234,9 @@ export function createViewer(canvas, model) {
     // le lobe supérieur : la vue reste un trois-quarts arrière, qui met
     // la caudale et l'hélice au premier plan.
     empennage: { dir: [0.95, 0.28, 0.7], fov: 34, x0: 70, margin: 1.1 },
-    dessus:    { dir: [0.04, 1.0, 0.16], fov: 34 },
+    // pas tout à fait à la verticale : à l'aplomb, le « haut » de la
+    // caméra devient ambigu et la vue roule en diagonale
+    dessus:    { dir: [0.10, 1.0, 0.55], fov: 34 },
   };
 
   const UP = new THREE.Vector3(0, 1, 0);
