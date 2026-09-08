@@ -9,6 +9,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { COLORS, GROUPS } from './model.js';
 
 const PLATE_U = 0.4;        // 1 plaque = 0,4 tenon (3,2 / 8 mm)
@@ -41,6 +42,11 @@ export function createViewer(canvas, model) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(BG);
+  // Un environnement neutre pour les reflets : le plastique brille un peu,
+  // et la verrière, transparente et laquée, se lit enfin comme du verre.
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
   scene.fog = new THREE.Fog(BG, span * 2.2, span * 4.6);
 
   const camera = new THREE.PerspectiveCamera(36, 1, 0.5, 2000);
@@ -103,10 +109,11 @@ export function createViewer(canvas, model) {
   const studGeo = new THREE.CylinderGeometry(STUD_R, STUD_R, STUD_H, 10);
   studGeo.translate(0, STUD_H / 2, 0);
 
-  const solidMat = () => new THREE.MeshStandardMaterial({ roughness: 0.42, metalness: 0.03 });
+  const solidMat = () => new THREE.MeshStandardMaterial({ roughness: 0.38, metalness: 0.02, envMapIntensity: 0.45 });
   const clearMat = () => new THREE.MeshPhysicalMaterial({
-    roughness: 0.06, metalness: 0, transparent: true, opacity: 0.3,
-    transmission: 0.35, thickness: 2, clearcoat: 0.8,
+    color: '#eaf6fb', roughness: 0.04, metalness: 0, transparent: true, opacity: 0.22,
+    transmission: 0.55, thickness: 1.5, ior: 1.5, clearcoat: 1, clearcoatRoughness: 0.04,
+    envMapIntensity: 1.2, depthWrite: false, side: THREE.DoubleSide,
   });
 
   function makeSet(list, material) {

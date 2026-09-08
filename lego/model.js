@@ -131,9 +131,11 @@ function pchip(xs, ys) {
 // Demi-hauteurs en plaques, du museau (x = 0) à la racine de la
 // caudale (x = 84). Museau en pointe, corps le plus haut vers x = 33,
 // affinement franc jusqu'à un pédoncule de trois tenons.
-const XS = [0, 3, 6, 11, 16, 22, 28, 33, 40, 44, 50, 55, 60, 66, 72, 77, 84];
-const TOP = pchip(XS, [0.8, 6, 10, 13.5, 16, 18.5, 19.5, 20, 19, 18, 16, 13.5, 11, 8.5, 6.5, 5, 3.5]);
-const BOT = pchip(XS, [0.8, 5, 9, 12.5, 15, 17, 18, 18.5, 18, 17, 15.5, 13, 10.5, 8, 6, 4.5, 3.5]);
+// Le museau est un cône : la demi-hauteur monte d'environ 1,5 plaque
+// par tenon sur les huit premiers tenons, puis s'arrondit vers le renflement.
+const XS = [0, 2, 4, 6, 8, 11, 16, 22, 28, 33, 40, 44, 50, 55, 60, 66, 72, 77, 84];
+const TOP = pchip(XS, [0.6, 3, 6, 8.6, 11, 14.2, 17.2, 19.2, 19.9, 20.2, 19.4, 18, 16, 13.5, 11, 8.5, 6.5, 5, 3.5]);
+const BOT = pchip(XS, [0.6, 2.6, 5.2, 7.6, 9.8, 12.8, 15.8, 17.6, 18.3, 18.6, 18, 17, 15.5, 13, 10.5, 8, 6, 4.5, 3.5]);
 
 export function halfTop(x)    { return TOP(clamp(x, 0, HULL_LEN)); }
 export function halfBottom(x) { return BOT(clamp(x, 0, HULL_LEN)); }
@@ -330,12 +332,15 @@ export function liveryY(x) {
     // gueule : du bout du museau, la ligne descend puis rejoint la base
     return a - 1 - 6 * smooth(0, 8, x) + 3 * smooth(8, 12, x);
   }
+  // pointes en cosinus surélevé, 4,3 tenons de demi-base : des crêtes
+  // pleines et des creux arrondis, comme sur la maquette, plutôt que
+  // des aiguilles
   let P = 0;
   for (const px of PEAKS) {
-    const d = Math.abs(x - px) / 3.5;
-    if (d < 1) P = Math.max(P, Math.pow(1 - d, 0.8));
+    const d = Math.abs(x - px) / 4.3;
+    if (d < 1) P = Math.max(P, Math.pow(0.5 * (1 + Math.cos(Math.PI * d)), 0.8));
   }
-  return a - 4 + 13 * P;
+  return a - 4 + 12.5 * P;
 }
 
 function colorAt(x, y, z, group) {
