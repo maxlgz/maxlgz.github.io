@@ -529,7 +529,8 @@ function stand() {
   }
   // deux tiges de briques 2 × 2, jusqu'au contact du ventre
   for (const cx of [25, 62]) {
-    const topY = Math.floor(hullBottom(cx + 1));
+    // la tige s'arrête sous le point le plus bas de son emprise
+    const topY = Math.floor(Math.min(hullBottom(cx), hullBottom(cx + 1)));
     for (let y = 2; y < topY; y += 3) {
       const h = Math.min(3, topY - y);
       P(cx, y, -1, 2, 2, h, h === 3 ? 'brick-2x2' : 'plate-2x2');
