@@ -230,7 +230,7 @@ export function createViewer(canvas, model) {
     ensemble:  { dir: [0.78, 0.40, 1.0], fov: 34, margin: 1.2 },   // marge : la rotation lente ne doit rien rogner
     tete:      { dir: [-0.85, 0.28, 0.9], fov: 34, x1: 34, margin: 1.3 },
     babord:    { dir: [0.02, 0.13, 1.0], fov: 30 },
-    empennage: { dir: [0.95, 0.28, 0.7], fov: 34, x0: 66, margin: 1.3 },
+    empennage: { dir: [0.95, 0.28, 0.7], fov: 34, x0: 70, margin: 1.1 },
     dessus:    { dir: [0.04, 1.0, 0.16], fov: 34 },
   };
 
