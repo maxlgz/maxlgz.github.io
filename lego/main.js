@@ -14,12 +14,12 @@ const cf = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }
 const df = (v) => v.toFixed(1).replace('.', ',');
 
 // Un voxels.json (issu de tools/voxelize.mjs et d'un maillage STL) prime
-// sur les profils paramétriques ; sans lui, la page se construit comme avant.
+// sur les profils relevés sur les photos ; sans lui, la page se construit comme avant.
 let voxels = null;
 try {
   const r = await fetch('./voxels.json', { cache: 'no-cache' });
   if (r.ok) voxels = await r.json();
-} catch { /* pas de maillage : profils paramétriques */ }
+} catch { /* pas de maillage : profils photo */ }
 const model = buildModel(voxels);
 const { pieces, steps, stats, bbox, check } = model;
 
