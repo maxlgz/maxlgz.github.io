@@ -168,8 +168,9 @@ export function createViewer(canvas, model) {
           s.bodies.setMatrixAt(i, HIDDEN);
         }
         const top = py + h / 2 - GAP * 0.25;
-        for (const [a, c] of p.studs) {
-          if (shown) {
+        for (const [a, c, cover] of p.studs) {
+          // le tenon se voit si la pièce qui le coiffe n'est pas affichée
+          if (shown && (cover < 0 || !visible(pieces[cover]))) {
             mat4.makeScale(1, 1, 1);
             mat4.setPosition(p.x + a + 0.5 - cx + ox, top, p.z + c + 0.5 - cz + oz);
             s.studs.setMatrixAt(si, mat4);
