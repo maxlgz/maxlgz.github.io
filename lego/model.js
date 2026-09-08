@@ -624,13 +624,16 @@ export function buildSteps(pieces) {
   return steps;
 }
 
-// Un tenon n'est dessiné que s'il n'est pas coiffé par une pièce.
+// Pour chaque tenon, on note la pièce qui le coiffe (-1 si aucune). Le
+// visualiseur le dessine quand cette pièce n'est pas affichée : dans le
+// modèle complet, seuls les tenons libres apparaissent ; en montage, la
+// dernière couche posée montre les siens.
 function markVisibleStuds(pieces) {
-  const filled = new Set();
+  const occ = new Map();
   for (const p of pieces) {
     for (let a = 0; a < p.dx; a++) {
       for (let c = 0; c < p.dz; c++) {
-        for (let k = 0; k < p.h; k++) filled.add(`${p.x + a}|${p.y + k}|${p.z + c}`);
+        for (let k = 0; k < p.h; k++) occ.set(`${p.x + a}|${p.y + k}|${p.z + c}`, p.id);
       }
     }
   }
@@ -639,7 +642,8 @@ function markVisibleStuds(pieces) {
     p.studs = [];
     for (let a = 0; a < p.dx; a++) {
       for (let c = 0; c < p.dz; c++) {
-        if (!filled.has(`${p.x + a}|${top}|${p.z + c}`)) p.studs.push([a, c]);
+        const cover = occ.get(`${p.x + a}|${top}|${p.z + c}`);
+        p.studs.push([a, c, cover === undefined ? -1 : cover]);
       }
     }
   }

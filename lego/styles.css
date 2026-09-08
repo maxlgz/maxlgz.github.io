@@ -297,16 +297,17 @@ td { padding: 12px 14px; font-size: 14px; vertical-align: middle; }
 .step-title { font-size: 26px; letter-spacing: -0.02em; margin: 0 0 12px; }
 .step-text { margin: 0; padding-left: 22px; font-size: 14.5px; line-height: 1.6; color: var(--ink-soft); }
 .step-text li { margin-bottom: 8px; }
-.assembly-parts { display: grid; gap: 8px; }
-.assembly-part { display: flex; align-items: center; gap: 14px; border: 1px solid #e5eaf0; border-radius: 8px; padding: 10px 14px; }
-.assembly-part .sw { display: block; width: 55px; height: 25px; border-radius: 3px; border: 1px solid #0002; flex: none; }
-.assembly-part b { font-size: 14px; }
-.assembly-part span { display: block; color: var(--muted-foreground); font-size: 13px; }
+.assembly-parts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.assembly-part { display: flex; align-items: center; gap: 10px; border: 1px solid #e5eaf0; border-radius: 6px; padding: 6px 10px; min-width: 0; }
+.assembly-part .sw { display: block; width: 34px; height: 16px; border-radius: 3px; border: 1px solid #0002; flex: none; }
+.assembly-part b { font-size: 13px; white-space: nowrap; }
+.assembly-part span { display: block; color: var(--muted-foreground); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .assembly-coords { margin-top: 18px; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 13px; }
 .assembly-coords summary { cursor: pointer; }
 .assembly-coords .table-scroll { border: 0; margin-top: 8px; }
 table.coords td, table.coords th { padding: 6px 8px; font-size: 13px; }
 .assembly-navigation { display: flex; justify-content: space-between; gap: 12px; margin: 24px 0; }
+.assembly-navigation--top { margin: 0 0 22px; }
 .assembly-navigation button:disabled { opacity: 0.45; cursor: default; }
 
 /* ---------------- pied ---------------- */

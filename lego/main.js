@@ -236,12 +236,15 @@ function showStep(i) {
     <td class="right mono">${p.x}</td><td class="right mono">${p.z}</td>
     <td>${p.dx === p.dz ? '—' : p.dx > p.dz ? 'en long' : 'en travers'}</td></tr>`).join('');
   $$('[data-chapter]').forEach((b) => b.setAttribute('aria-current', String(Number(b.dataset.chapter) === s.stage)));
-  $('#step-prev').disabled = stepIndex === 0;
-  $('#step-next').disabled = stepIndex === steps.length - 1;
+  $$('#step-prev, #step-prev-2').forEach((b) => { b.disabled = stepIndex === 0; });
+  $$('#step-next, #step-next-2').forEach((b) => { b.disabled = stepIndex === steps.length - 1; });
 }
 
-$('#step-prev').addEventListener('click', () => showStep(stepIndex - 1));
-$('#step-next').addEventListener('click', () => showStep(stepIndex + 1));
+$$('#step-prev, #step-prev-2').forEach((b) => b.addEventListener('click', () => showStep(stepIndex - 1)));
+$$('#step-next, #step-next-2').forEach((b) => b.addEventListener('click', () => {
+  showStep(stepIndex + 1);
+  $('.assembly-layout').scrollIntoView({ block: 'start' });
+}));
 $('#step-select').addEventListener('change', (e) => showStep(Number(e.target.value)));
 $('#only-step').addEventListener('change', () => showStep(stepIndex));
 $('#cycle-view').addEventListener('click', () => { dirIndex = (dirIndex + 1) % DIRS.length; showStep(stepIndex); });
