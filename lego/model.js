@@ -138,10 +138,23 @@ const XS = [0, 2, 4, 6, 8, 11, 16, 22, 28, 33, 40, 44, 50, 55, 60, 66, 72, 77, 8
 const TOP = pchip(XS, [1.7, 3, 6, 8.6, 11, 14.2, 17.2, 19.2, 19.9, 20.2, 19.4, 18, 16, 13.5, 11, 8.5, 6.5, 5, 3.5]);
 const BOT = pchip(XS, [1.5, 2.6, 5.2, 7.6, 9.8, 12.8, 15.8, 17.6, 18.3, 18.6, 18, 17, 15.5, 13, 10.5, 8, 6, 4.5, 3.5]);
 
-export function halfTop(x)    { return TOP(clamp(x, 0, HULL_LEN)); }
-export function halfBottom(x) { return BOT(clamp(x, 0, HULL_LEN)); }
-export function halfWidth(x)  { return Math.max(0.5, 0.40 * halfTop(x)); }   // 20 plaques = 8 tenons : section ronde
-export function axisY(x)      { return AXIS_Y + 2 * clamp(x / HULL_LEN, 0, 1); }
+const mx = (x) => Math.max(0, Math.min(MESH.len - 1, Math.floor(x)));
+export function halfTop(x) {
+  if (MESH) { const t = MESH.top(mx(x)), b = MESH.bot(mx(x)); return t !== undefined ? (t - b) / 2 : 0; }
+  return TOP(clamp(x, 0, HULL_LEN));
+}
+export function halfBottom(x) {
+  if (MESH) return halfTop(x);
+  return BOT(clamp(x, 0, HULL_LEN));
+}
+export function halfWidth(x) {
+  if (MESH) { const w = MESH.wid(mx(x)); return w !== undefined ? Math.max(0.5, w) : 0.5; }
+  return Math.max(0.5, 0.40 * halfTop(x));   // 20 plaques = 8 tenons : section ronde
+}
+export function axisY(x) {
+  if (MESH) { const t = MESH.top(mx(x)), b = MESH.bot(mx(x)); return t !== undefined ? (t + b) / 2 : AXIS_Y; }
+  return AXIS_Y + 2 * clamp(x / HULL_LEN, 0, 1);
+}
 export function hullTop(x)    { return axisY(x) + halfTop(x); }
 export function hullBottom(x) { return axisY(x) - halfBottom(x); }
 
@@ -275,7 +288,7 @@ function voxelize() {
 // les anneaux de deux couches voisines sont côte à côte et non
 // superposés. On la dilate d'une cellule en hauteur — sans effet sur
 // les flancs verticaux — pour que les anneaux se recouvrent.
-const HOLLOW = new Set(['avant', 'arriere', 'verriere']);
+const HOLLOW = new Set(['avant', 'arriere', 'verriere', 'coque']);
 function shell(solid) {
   const skin = new Map();
   for (const [k, g] of solid) {
@@ -302,7 +315,8 @@ function shell(solid) {
 // Poutre longitudinale, sur six plaques : deux assises de briques à
 // joints croisés. Une seule assise resterait un plancher flottant.
 function addChassis(cells) {
-  for (let x = 0; x < HULL_LEN; x++) {
+  const len = MESH ? MESH.len : HULL_LEN;
+  for (let x = 0; x < len; x++) {
     const cx = x + 0.5;
     const a = Math.floor(axisY(cx));
     for (const y of [a - 3, a - 2, a - 1, a, a + 1, a + 2]) {
@@ -528,9 +542,41 @@ function stand() {
 // ASSEMBLAGE
 // ================================================================
 
-export function buildModel() {
-  const solid = voxelize();
+// Profils de coque relevés sur un maillage voxelisé : tables par x,
+// substituées aux fonctions paramétriques quand un voxels.json est chargé.
+let MESH = null;
+function useMesh(runs) {
+  const top = new Map(), bot = new Map(), wid = new Map();
+  for (const [x, y, z0, z1] of runs.coque || []) {
+    top.set(x, Math.max(top.get(x) ?? -Infinity, y + 1));
+    bot.set(x, Math.min(bot.get(x) ?? Infinity, y));
+    wid.set(x, Math.max(wid.get(x) ?? 0, Math.max(Math.abs(z0 + 0.5), Math.abs(z1 + 0.5))));
+  }
+  const smooth = (m) => (x) => {
+    const xs = [x, x - 1, x + 1, x - 2, x + 2].filter((i) => m.has(i));
+    return xs.length ? m.get(xs[0]) : undefined;
+  };
+  MESH = { top: smooth(top), bot: smooth(bot), wid: smooth(wid), len: Math.max(...top.keys()) + 1 };
+}
+
+export function buildModel(voxels = null) {
+  let solid;
+  if (voxels) {
+    // le maillage part de y = 0 : on le surélève pour laisser la place au socle
+    const lift = voxels.lift ?? 22;
+    const lifted = {};
+    for (const [g, runs] of Object.entries(voxels.runs)) lifted[g] = runs.map(([x, y, z0, z1]) => [x, y + lift, z0, z1]);
+    useMesh(lifted);
+    solid = new Map();
+    for (const [g, runs] of Object.entries(lifted)) {
+      for (const [x, y, z0, z1] of runs) for (let z = z0; z <= z1; z++) solid.set(key(x, y, z), g);
+    }
+  } else {
+    MESH = null;
+    solid = voxelize();
+  }
   const cells = shell(solid);
+  if (voxels) for (const [k, g] of cells) if (g === 'coque') cells.set(k, Number(k.split('|')[0]) < 38 ? 'avant' : 'arriere');
   addChassis(cells);
 
   const byLayer = new Map();
@@ -545,7 +591,8 @@ export function buildModel() {
   for (const [y, layer] of byLayer) packed.set(y, packLayer(layer, Math.floor(y / 3) % 2));
 
   let pieces = mergeVertical(packed);
-  pieces = pieces.concat(propeller(), stand());
+  // le maillage apporte sa propre hélice ; le socle, lui, est toujours posé ici
+  pieces = pieces.concat(voxels ? [] : propeller(), stand());
 
   pieces.sort((a, b) => a.y - b.y || a.x - b.x || a.z - b.z);
   pieces.forEach((p, i) => { p.id = i; });
