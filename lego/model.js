@@ -328,9 +328,11 @@ function colorAt(x, y, z, group) {
 
   const onFlank = Math.abs(cz) > halfWidth(cx) - 1.5;
 
-  // Œil : petit cercle blanc cerclé de noir, sur la joue
-  const eyeX = 10.5, eyeY = axisY(eyeX) + 4.5;
-  if (onFlank && Math.hypot(cx - eyeX, (cy - eyeY) * 0.45) < 1.4) return 'white';
+  // Œil : petit cercle blanc cerclé de noir, haut sur la joue. Un rayon
+  // plus large donnait une tache carrée de trois tenons, très loin du
+  // petit cercle de la maquette.
+  const eyeX = 10.5, eyeY = axisY(eyeX) + 5;
+  if (onFlank && Math.hypot(cx - eyeX, (cy - eyeY) * 0.42) < 1.0) return 'white';
 
   // Ouïes : quatre fentes fines derrière la tête
   if (onFlank && cy > axisY(cx) - 3 && cy < axisY(cx) + 6) {
