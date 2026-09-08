@@ -16,8 +16,8 @@ const GAP = 0.04;           // jeu de rendu : laisse voir les joints
 const STUD_R = 0.305;
 const STUD_H = 0.22;
 
-const ACCENT = new THREE.Color('#ff5a1f');
-const DIM = 0.16;
+const ACCENT = new THREE.Color('#c92b30');   // le rouge du site
+const BG = '#f0f3f7';
 
 export function createViewer(canvas, model) {
   const { pieces } = model;
@@ -35,11 +35,11 @@ export function createViewer(canvas, model) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.0;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#0a1218');
-  scene.fog = new THREE.Fog('#0a1218', span * 1.9, span * 4.2);
+  scene.background = new THREE.Color(BG);
+  scene.fog = new THREE.Fog(BG, span * 2.2, span * 4.6);
 
   const camera = new THREE.PerspectiveCamera(36, 1, 0.5, 2000);
   camera.position.set(span * 0.9, span * 0.5, span * 1.05);
@@ -56,10 +56,10 @@ export function createViewer(canvas, model) {
   controls.addEventListener('start', () => { controls.autoRotate = false; });
 
   // --- lumières -------------------------------------------------
-  scene.add(new THREE.HemisphereLight('#8fc4d8', '#2a2114', 0.62));
-  scene.add(new THREE.AmbientLight('#ffffff', 0.22));
+  scene.add(new THREE.HemisphereLight('#ffffff', '#c3ccd6', 0.85));
+  scene.add(new THREE.AmbientLight('#ffffff', 0.42));
 
-  const key = new THREE.DirectionalLight('#fff6e2', 1.35);
+  const key = new THREE.DirectionalLight('#ffffff', 1.15);
   key.position.set(span * 0.6, span * 0.95, span * 0.45);
   key.castShadow = true;
   key.shadow.mapSize.set(1536, 1536);
@@ -68,27 +68,27 @@ export function createViewer(canvas, model) {
   key.shadow.bias = -0.0012;
   scene.add(key);
 
-  const fill = new THREE.DirectionalLight('#7fb6cc', 0.55);
+  const fill = new THREE.DirectionalLight('#dbe4ee', 0.45);
   fill.position.set(-span * 0.7, span * 0.35, -span * 0.6);
   scene.add(fill);
 
-  const rim = new THREE.DirectionalLight('#ffca55', 0.4);
+  const rim = new THREE.DirectionalLight('#ffffff', 0.3);
   rim.position.set(-span * 0.2, span * 0.15, span * 0.9);
   scene.add(rim);
 
   // --- sol ------------------------------------------------------
   const ground = new THREE.Mesh(
     new THREE.CircleGeometry(span * 1.35, 64),
-    new THREE.MeshStandardMaterial({ color: '#0d1a22', roughness: 0.95, metalness: 0 })
+    new THREE.MeshStandardMaterial({ color: '#e4e9f0', roughness: 0.98, metalness: 0 })
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.02;
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const grid = new THREE.GridHelper(span * 1.9, Math.round(span * 1.9 / 4), '#1d3440', '#152833');
+  const grid = new THREE.GridHelper(span * 1.9, Math.round(span * 1.9 / 4), '#c6cfda', '#d8dfe8');
   grid.material.transparent = true;
-  grid.material.opacity = 0.5;
+  grid.material.opacity = 0.55;
   scene.add(grid);
 
   // --- tri opaque / transparent ---------------------------------
@@ -103,7 +103,7 @@ export function createViewer(canvas, model) {
 
   const solidMat = () => new THREE.MeshStandardMaterial({ roughness: 0.42, metalness: 0.03 });
   const clearMat = () => new THREE.MeshPhysicalMaterial({
-    roughness: 0.08, metalness: 0, transparent: true, opacity: 0.42,
+    roughness: 0.06, metalness: 0, transparent: true, opacity: 0.3,
     transmission: 0.35, thickness: 2, clearcoat: 0.8,
   });
 
@@ -189,7 +189,7 @@ export function createViewer(canvas, model) {
       ? h.groups.includes(p.group)
       : p.part === h.part && (!h.color || p.color === h.color);
     if (hit) col.copy(ACCENT);
-    else col.multiplyScalar(DIM).lerp(new THREE.Color('#0a1218'), 0.35);
+    else col.lerp(new THREE.Color(BG), 0.78);   // les autres s'effacent dans le fond
     return col;
   }
 

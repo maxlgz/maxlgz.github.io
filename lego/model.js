@@ -1,43 +1,43 @@
 // ================================================================
 // BRIQUE STUDIO — MODÈLE 002 · SOUS-MARIN REQUIN
-// Générateur paramétrique : de la géométrie continue au bordereau
-// de pièces LEGO®.
+// Générateur paramétrique, d'après la maquette de Tintinimaginatio :
+// dos noir, ventre crème séparés par une ligne ondulée, verrière
+// transparente sur le dos, hélice dorée à l'extrême arrière.
 //
 // Chaîne de traitement :
 //   1. fonctions de profil  -> solide implicite (coque, nageoires…)
 //   2. voxelisation         -> cellules 1 × 1 × 1 plaque
-//   3. évidement            -> ne garder que la peau + le châssis
-//   4. colorisation         -> livrée, gueule, dents, œil, ouïes
+//   3. évidement            -> peau + poutre longitudinale
+//   4. livrée               -> noir / crème, gueule, œil, ouïes
 //   5. pavage               -> rectangles = plaques réelles
 //   6. fusion verticale     -> 3 plaques identiques = 1 brique
 //
-// Aucune dépendance : ce module tourne aussi bien dans le navigateur
-// que sous Node (tests, export hors ligne).
+// Aucune dépendance : tourne dans le navigateur comme sous Node.
 // ================================================================
 
 export const STUD_MM = 8;      // 1 tenon = 8 mm
 export const PLATE_MM = 3.2;   // 1 plaque = 3,2 mm (1 brique = 3 plaques)
 
-// --- Enveloppe générale (unités : tenons en X/Z, plaques en Y) ----
-export const HULL_LEN = 82;    // museau -> pédoncule caudal
-export const TOTAL_LEN = 96;   // empennage compris = 76,8 cm
-export const HALF_W = 8;       // demi-largeur maximale du corps
-export const HALF_H = 26;      // demi-hauteur maximale (plaques)
-export const AXIS_Y = 34;      // couche de l'axe longitudinal
-export const NY = 86;          // nombre de couches
+// --- Enveloppe générale (tenons en X/Z, plaques en Y) ------------
+export const HULL_LEN = 78;    // museau -> pédoncule caudal
+export const TOTAL_LEN = 96;   // hélice comprise = 76,8 cm
+export const HALF_W = 6.5;     // demi-largeur maximale
+export const HALF_H = 18;      // demi-hauteur maximale (plaques)
+export const AXIS_Y = 30;      // couche de l'axe longitudinal
+export const NY = 78;
 export const Z_MIN = -18;
-export const Z_MAX = 18;       // exclu
-export const CROSS_N = 2.35;   // exposant de la super-ellipse de section
+export const Z_MAX = 18;
+export const CROSS_N = 2.2;    // exposant de la super-ellipse de section
 
 // --- Couleurs LEGO utilisées -------------------------------------
 export const COLORS = {
-  yellow: { key: 'yellow', name: 'Jaune vif',            ldraw: 14, bl: 3,  hex: '#f5c400' },
-  white:  { key: 'white',  name: 'Blanc',                ldraw: 15, bl: 1,  hex: '#f2f3ee' },
-  black:  { key: 'black',  name: 'Noir',                 ldraw: 0,  bl: 11, hex: '#12181f' },
-  dgrey:  { key: 'dgrey',  name: 'Gris pierre foncé',    ldraw: 72, bl: 85, hex: '#5b6167' },
-  lgrey:  { key: 'lgrey',  name: 'Gris pierre clair',    ldraw: 71, bl: 86, hex: '#9aa1a6' },
-  trans:  { key: 'trans',  name: 'Transparent',          ldraw: 47, bl: 12, hex: '#cfe6ef', alpha: 0.4 },
-  red:    { key: 'red',    name: 'Rouge vif',            ldraw: 4,  bl: 5,  hex: '#b8362a' },
+  black: { key: 'black', name: 'Noir',                 ldraw: 0,   bl: 11,  hex: '#1b1e21' },
+  tan:   { key: 'tan',   name: 'Beige',                ldraw: 19,  bl: 2,   hex: '#dcc9a4' },
+  white: { key: 'white', name: 'Blanc',                ldraw: 15,  bl: 1,   hex: '#f2f3ee' },
+  lgrey: { key: 'lgrey', name: 'Gris pierre clair',    ldraw: 71,  bl: 86,  hex: '#9aa1a6' },
+  dgrey: { key: 'dgrey', name: 'Gris pierre foncé',    ldraw: 72,  bl: 85,  hex: '#5b6167' },
+  gold:  { key: 'gold',  name: 'Or perlé',             ldraw: 297, bl: 115, hex: '#c9a13b' },
+  trans: { key: 'trans', name: 'Transparent',          ldraw: 47,  bl: 12,  hex: '#d3e3ea', alpha: 0.4 },
 };
 
 // --- Catalogue de pièces -----------------------------------------
@@ -70,42 +70,39 @@ export const PARTS = {
 
 // --- Étapes de montage -------------------------------------------
 export const STAGES = [
-  { id: 1, key: 'chassis',  label: 'Châssis & quille',      blurb: 'La poutre longitudinale qui porte tout le reste : deux assises de briques à joints croisés, du museau au pédoncule caudal.' },
-  { id: 2, key: 'avant',    label: 'Coque avant (la tête)',  blurb: 'La partie la plus dense du modèle. Les couches montent en terrasses ; le museau se ferme sur la couronne du hublot.' },
-  { id: 3, key: 'arriere',  label: 'Coque arrière',          blurb: 'Le fuselage s’affine jusqu’au pédoncule caudal, large de deux tenons seulement.' },
-  { id: 4, key: 'hublot',   label: 'Hublot & verrière',      blurb: 'Le nez transparent et la verrière du poste de pilotage, posés en dernier sur la coque avant.' },
-  { id: 5, key: 'nageoires', label: 'Nageoires',             blurb: 'Pectorales, pelviennes et dorsales. Les pectorales sont des ailes plates de deux plaques, en flèche et légèrement tombantes.' },
-  { id: 6, key: 'empennage', label: 'Empennage & hélice',    blurb: 'La caudale fourchue à lobe supérieur dominant, et l’hélice portée par un arbre qui traverse la racine de l’empennage.' },
-  { id: 7, key: 'socle',     label: 'Socle & finitions',     blurb: 'Les deux berceaux de présentation, la gueule, les dents, l’œil et les ouïes.' },
+  { id: 1, key: 'chassis',   label: 'Châssis & quille',        blurb: 'La poutre longitudinale qui porte tout le reste : deux assises de briques à joints croisés, du museau au pédoncule caudal.' },
+  { id: 2, key: 'avant',     label: 'Coque avant (la tête)',   blurb: 'La partie la plus dense. Les couches montent en terrasses ; la ligne de livrée commence à onduler dès le museau.' },
+  { id: 3, key: 'arriere',   label: 'Coque arrière',           blurb: 'Le fuselage s’affine jusqu’au pédoncule caudal, large de deux tenons seulement.' },
+  { id: 4, key: 'verriere',  label: 'Verrière & poste',        blurb: 'La bulle transparente du poste de pilotage et ses montants gris, posés sur le dos une fois la coque fermée.' },
+  { id: 5, key: 'nageoires', label: 'Nageoires',               blurb: 'Pectorales, pelviennes et les deux dorsales. Les pectorales sont des ailes plates en flèche, tombantes vers le bout.' },
+  { id: 6, key: 'empennage', label: 'Empennage & hélice',      blurb: 'La grande caudale en faucille, puis l’hélice dorée à l’extrême arrière et ses deux barres de gouverne.' },
+  { id: 7, key: 'socle',     label: 'Socle & finitions',       blurb: 'Les deux montants de présentation, la gueule, l’œil et les ouïes.' },
 ];
 
 // --- Sous-ensembles (pour l'éclaté) ------------------------------
-// dir = direction d'explosion, en repère modèle (x avant, y haut, z côté)
 export const GROUPS = {
-  chassis:   { label: 'Châssis',              stage: 1, dir: [0, -1, 0], hue: '#8a7a52' },
-  avant:     { label: 'Coque avant',          stage: 2, dir: [-1, 0.2, 0], hue: '#f5c400' },
-  arriere:   { label: 'Coque arrière',        stage: 3, dir: [1, 0.2, 0], hue: '#e0b400' },
-  hublot:    { label: 'Hublot & verrière',    stage: 4, dir: [-0.6, 0.8, 0], hue: '#cfe6ef' },
-  pectoraleD:{ label: 'Pectorale tribord',    stage: 5, dir: [0, -0.2, 1], hue: '#f0c02a' },
-  pectoraleG:{ label: 'Pectorale bâbord',     stage: 5, dir: [0, -0.2, -1], hue: '#f0c02a' },
-  pelvienneD:{ label: 'Pelvienne tribord',    stage: 5, dir: [0, -0.6, 1], hue: '#f0c02a' },
-  pelvienneG:{ label: 'Pelvienne bâbord',     stage: 5, dir: [0, -0.6, -1], hue: '#f0c02a' },
-  dorsale:   { label: 'Dorsale',              stage: 5, dir: [0, 1, 0], hue: '#f5c400' },
-  dorsale2:  { label: 'Dorsale secondaire',   stage: 5, dir: [0, 1, 0], hue: '#f5c400' },
-  caudale:   { label: 'Caudale',              stage: 6, dir: [1, 0.3, 0], hue: '#f5c400' },
-  helice:    { label: 'Hélice',               stage: 6, dir: [1, 0, 0], hue: '#5b6167' },
-  socle:     { label: 'Socle',                stage: 7, dir: [0, -1, 0], hue: '#12181f' },
-  details:   { label: 'Détails',              stage: 7, dir: [0, 0.4, 1], hue: '#b8362a' },
+  chassis:    { label: 'Châssis',             stage: 1, dir: [0, -1, 0] },
+  avant:      { label: 'Coque avant',         stage: 2, dir: [-1, 0.2, 0] },
+  arriere:    { label: 'Coque arrière',       stage: 3, dir: [1, 0.2, 0] },
+  verriere:   { label: 'Verrière',            stage: 4, dir: [0, 1, 0] },
+  pectoraleD: { label: 'Pectorale tribord',   stage: 5, dir: [0, -0.2, 1] },
+  pectoraleG: { label: 'Pectorale bâbord',    stage: 5, dir: [0, -0.2, -1] },
+  pelvienneD: { label: 'Pelvienne tribord',   stage: 5, dir: [0, -0.6, 1] },
+  pelvienneG: { label: 'Pelvienne bâbord',    stage: 5, dir: [0, -0.6, -1] },
+  dorsale:    { label: 'Dorsale',             stage: 5, dir: [0, 1, 0] },
+  dorsale2:   { label: 'Dorsale secondaire',  stage: 5, dir: [0, 1, 0] },
+  caudale:    { label: 'Caudale',             stage: 6, dir: [1, 0.3, 0] },
+  helice:     { label: 'Hélice',              stage: 6, dir: [1, 0, 0] },
+  socle:      { label: 'Socle',               stage: 7, dir: [0, -1, 0] },
 };
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 // ================================================================
-// 1. PROFILS
+// 1. PROFILS — une torpille élancée, museau arrondi
 // ================================================================
 
-// Facteur longitudinal : renflé au tiers avant, effilé vers la queue.
-function taper(u, { nose, tail, peak = 0.30, front = 2.4, back = 1.7, fill = 0.62 }) {
+function taper(u, { nose, tail, peak = 0.30, front = 2.6, back = 1.6, fill = 0.55 }) {
   if (u <= peak) {
     const t = (peak - u) / peak;
     const s = Math.sqrt(Math.max(0, 1 - Math.pow(t, front)));
@@ -118,23 +115,22 @@ function taper(u, { nose, tail, peak = 0.30, front = 2.4, back = 1.7, fill = 0.6
 
 export function halfWidth(x) {          // tenons
   const u = clamp(x / HULL_LEN, 0, 1);
-  return HALF_W * taper(u, { nose: 0.42, tail: 0.10, peak: 0.30 });
+  return HALF_W * taper(u, { nose: 0.30, tail: 0.09, peak: 0.30 });
 }
 export function halfTop(x) {            // plaques, au-dessus de l'axe
   const u = clamp(x / HULL_LEN, 0, 1);
-  return HALF_H * taper(u, { nose: 0.46, tail: 0.12, peak: 0.33, back: 1.9 });
+  return HALF_H * taper(u, { nose: 0.34, tail: 0.10, peak: 0.32, back: 1.7, fill: 0.58 });
 }
 export function halfBottom(x) {
-  return 0.86 * halfTop(x);             // ventre plus plat que le dos
+  return 0.92 * halfTop(x);             // section quasi circulaire
 }
-export function axisY(x) {              // la ligne de corps remonte vers la queue
+export function axisY(x) {
   const u = clamp(x / HULL_LEN, 0, 1);
-  return AXIS_Y + 6 * u * u;
+  return AXIS_Y + 4 * u * u;
 }
 export function hullTop(x)    { return axisY(x) + halfTop(x); }
 export function hullBottom(x) { return axisY(x) - halfBottom(x); }
 
-// Section : super-ellipse légèrement carrée -> lecture « mécanique »
 function insideHull(x, y, z) {
   if (x < 0 || x > HULL_LEN) return false;
   const W = halfWidth(x);
@@ -144,22 +140,42 @@ function insideHull(x, y, z) {
   return Math.pow(Math.abs(z / W), CROSS_N) + Math.pow(Math.abs(dy / H), CROSS_N) <= 1;
 }
 
-// --- Nageoire dorsale --------------------------------------------
-const DORSAL = { x0: 36, xPeak: 43, x1: 55, height: 18 };
+// --- Verrière du poste de pilotage -------------------------------
+// Une bulle allongée posée sur le dos, entre le museau et la dorsale.
+const CANOPY = { x0: 26, x1: 42, halfZ: 3.4, rise: 7 };
+function canopyTop(x) {
+  if (x < CANOPY.x0 || x > CANOPY.x1) return -Infinity;
+  const t = (x - CANOPY.x0) / (CANOPY.x1 - CANOPY.x0);
+  return hullTop(x) + CANOPY.rise * Math.sqrt(Math.max(0, 1 - Math.pow(2 * t - 1, 2)));
+}
+function canopy(x, y, z) {
+  const top = canopyTop(x);
+  if (top === -Infinity) return false;
+  const t = (x - CANOPY.x0) / (CANOPY.x1 - CANOPY.x0);
+  const halfZ = CANOPY.halfZ * Math.sqrt(Math.max(0, 1 - Math.pow(2 * t - 1, 2) * 0.8));
+  if (Math.abs(z) > halfZ) return false;
+  return y > hullTop(x) - 1.5 && y <= top;
+}
+
+// --- Nageoire dorsale, juste derrière la verrière -----------------
+const DORSAL = { x0: 44, xPeak: 49, x1: 63, height: 17 };
 function dorsalHeight(x) {
   if (x < DORSAL.x0 || x > DORSAL.x1) return 0;
-  if (x <= DORSAL.xPeak) return DORSAL.height * Math.pow((x - DORSAL.x0) / (DORSAL.xPeak - DORSAL.x0), 0.65);
-  return DORSAL.height * Math.pow(1 - (x - DORSAL.xPeak) / (DORSAL.x1 - DORSAL.xPeak), 1.35);
+  if (x <= DORSAL.xPeak) return DORSAL.height * Math.pow((x - DORSAL.x0) / (DORSAL.xPeak - DORSAL.x0), 0.55);
+  return DORSAL.height * Math.pow(1 - (x - DORSAL.xPeak) / (DORSAL.x1 - DORSAL.xPeak), 1.5);
 }
-const DORSAL2 = { x0: 62, xPeak: 66, x1: 71, height: 7 };
+const DORSAL2 = { x0: 65, xPeak: 68, x1: 72, height: 6 };
 function dorsal2Height(x) {
   if (x < DORSAL2.x0 || x > DORSAL2.x1) return 0;
-  if (x <= DORSAL2.xPeak) return DORSAL2.height * Math.pow((x - DORSAL2.x0) / (DORSAL2.xPeak - DORSAL2.x0), 0.65);
-  return DORSAL2.height * Math.pow(1 - (x - DORSAL2.xPeak) / (DORSAL2.x1 - DORSAL2.xPeak), 1.2);
+  if (x <= DORSAL2.xPeak) return DORSAL2.height * Math.pow((x - DORSAL2.x0) / (DORSAL2.xPeak - DORSAL2.x0), 0.6);
+  return DORSAL2.height * Math.pow(1 - (x - DORSAL2.xPeak) / (DORSAL2.x1 - DORSAL2.xPeak), 1.3);
 }
 
 // --- Nageoires latérales -----------------------------------------
-// Aile plate en flèche : la corde se réduit et l'aile tombe vers le bout.
+export function finMidY(x, z, cfg) {
+  const r = Math.abs(z);
+  return axisY(x) - cfg.drop * halfBottom(x) - cfg.slope * (r - cfg.r0);
+}
 function lateralFin(x, y, z, cfg) {
   const r = Math.abs(z);
   if (r < cfg.r0 || r > cfg.r1) return false;
@@ -167,42 +183,35 @@ function lateralFin(x, y, z, cfg) {
   const xLE = cfg.xLE0 + (cfg.xLE1 - cfg.xLE0) * t;
   const xTE = cfg.xTE0 + (cfg.xTE1 - cfg.xTE0) * t;
   if (x < xLE || x > xTE) return false;
-  const yMid = axisY(x) - cfg.drop * halfBottom(x) - cfg.slope * (r - cfg.r0);
-  return Math.abs(y - yMid) <= cfg.thick / 2;
+  return Math.abs(y - finMidY(x, z, cfg)) <= cfg.thick / 2;
 }
-export function finMidY(x, z, cfg) {
-  const r = Math.abs(z);
-  return axisY(x) - cfg.drop * halfBottom(x) - cfg.slope * (r - cfg.r0);
-}
-const PECTORAL = { r0: 6.5, r1: 17, xLE0: 25, xLE1: 38, xTE0: 45, xTE1: 41, drop: 0.26, slope: 0.42, thick: 2.2 };
-const PELVIC   = { r0: 3.2, r1: 10, xLE0: 56, xLE1: 62, xTE0: 66, xTE1: 64, drop: 0.34, slope: 0.38, thick: 2.6 };
+const PECTORAL = { r0: 5.0, r1: 15, xLE0: 33, xLE1: 45, xTE0: 49, xTE1: 50, drop: 0.62, slope: 0.78, thick: 2.2 };
+const PELVIC   = { r0: 3.0, r1: 9,  xLE0: 60, xLE1: 66, xTE0: 70, xTE1: 68, drop: 0.62, slope: 0.60, thick: 2.2 };
 
-// --- Empennage caudal --------------------------------------------
-const SHAFT = { x0: 83, x1: 95 };   // ligne d'arbre de l'hélice
-const CAUD = { x0: 74, x1: TOTAL_LEN, upper: 40, lower: 25, forkAt: 86, fork: 22, halfThick: 1 };
+// --- Empennage : grande faucille verticale ------------------------
+const SHAFT = { x0: 78, x1: TOTAL_LEN };   // ligne d'arbre de l'hélice
+const CAUD = { x0: 70, x1: 94, upper: 40, lower: 26, forkAt: 82, fork: 20, halfThick: 1 };
 function caudal(x, y, z) {
   if (x < CAUD.x0 || x > CAUD.x1) return false;
   if (z < -CAUD.halfThick || z >= CAUD.halfThick) return false;
+  const xh = Math.min(x, HULL_LEN);
+  const a = axisY(xh);
   const t = clamp((x - CAUD.x0) / (CAUD.x1 - CAUD.x0), 0, 1);
-  const a = axisY(Math.min(x, HULL_LEN));
-  const top = a + Math.max(halfTop(Math.min(x, HULL_LEN)), CAUD.upper * Math.pow(t, 1.15));
-  const bot = a - Math.max(halfBottom(Math.min(x, HULL_LEN)), CAUD.lower * Math.pow(clamp((x - 78) / (CAUD.x1 - 78), 0, 1), 1.25));
+  const top = a + Math.max(halfTop(xh), CAUD.upper * Math.pow(t, 1.25));
+  const bot = a - Math.max(halfBottom(xh), CAUD.lower * Math.pow(clamp((x - 74) / (CAUD.x1 - 74), 0, 1), 1.3));
   if (y > top || y < bot) return false;
-  // fourche : on évide le centre à l'arrière
   const notch = CAUD.fork * clamp((x - CAUD.forkAt) / (CAUD.x1 - CAUD.forkAt), 0, 1);
   if (Math.abs(y - a) < notch) return false;
-  // canal d'arbre : deux plaques percées dans la racine de l'empennage,
-  // pour que la ligne d'arbre soit tenue par le dessus et par le dessous
+  // canal d'arbre : deux plaques percées dans la racine de l'empennage
   if (x >= SHAFT.x0 && z >= -1 && z < 1 && y > a - 1 && y < a + 1) return false;
   return true;
 }
 
 // --- Solide complet ----------------------------------------------
-// Renvoie la clé de sous-ensemble, ou null si la cellule est vide.
 function solidAt(x, y, z) {
-  if (insideHull(x, y, z)) return x < 40 ? 'avant' : 'arriere';
+  if (insideHull(x, y, z)) return x < 38 ? 'avant' : 'arriere';
+  if (canopy(x, y, z)) return 'verriere';
   if (caudal(x, y, z)) return 'caudale';
-  // dorsales : lame de 2 tenons d'épaisseur au-dessus de la coque
   if (z >= -1 && z < 1) {
     const hd = dorsalHeight(x);
     if (hd > 0 && y >= hullTop(x) - 1 && y <= hullTop(x) + hd) return 'dorsale';
@@ -221,7 +230,7 @@ function solidAt(x, y, z) {
 const key = (x, y, z) => `${x}|${y}|${z}`;
 
 function voxelize() {
-  const solid = new Map();          // key -> group
+  const solid = new Map();
   for (let x = 0; x < TOTAL_LEN; x++) {
     const cx = x + 0.5;
     for (let y = 0; y < NY; y++) {
@@ -235,19 +244,15 @@ function voxelize() {
   return solid;
 }
 
-// Ne garder que la peau ; l'intérieur reste creux. Les nageoires,
-// minces par nature, sont conservées entières.
-//
-// La peau brute ne tient pas debout : sur le dos et sous le ventre, les
-// anneaux de deux couches voisines sont côte à côte et non superposés,
-// donc rien ne s'emboîte. On dilate donc la peau d'une cellule en
-// hauteur — sans effet sur les flancs verticaux, où la cellule voisine
-// appartient déjà à la peau. Les anneaux se recouvrent alors d'un
-// tenon et le pavage les fusionne en bandes qui se tiennent.
+// La peau brute ne tient pas debout : sur le dos et sous le ventre,
+// les anneaux de deux couches voisines sont côte à côte et non
+// superposés. On la dilate d'une cellule en hauteur — sans effet sur
+// les flancs verticaux — pour que les anneaux se recouvrent.
+const HOLLOW = new Set(['avant', 'arriere', 'verriere']);
 function shell(solid) {
   const skin = new Map();
   for (const [k, g] of solid) {
-    if (g !== 'avant' && g !== 'arriere') { skin.set(k, g); continue; }
+    if (!HOLLOW.has(g)) { skin.set(k, g); continue; }
     const [x, y, z] = k.split('|').map(Number);
     const exposed =
       !solid.has(key(x + 1, y, z)) || !solid.has(key(x - 1, y, z)) ||
@@ -257,7 +262,7 @@ function shell(solid) {
   }
   const out = new Map(skin);
   for (const [k, g] of skin) {
-    if (g !== 'avant' && g !== 'arriere') continue;
+    if (!HOLLOW.has(g)) continue;
     const [x, y, z] = k.split('|').map(Number);
     for (const dy of [-1, 1]) {
       const kk = key(x, y + dy, z);
@@ -267,10 +272,8 @@ function shell(solid) {
   return out;
 }
 
-// Plancher longitudinal, sur six plaques : deux assises de briques à
-// joints croisés. Une seule assise resterait un plancher flottant —
-// des briques côte à côte, que rien ne solidarise. Avec deux, la coque
-// se referme sur une vraie poutre.
+// Poutre longitudinale, sur six plaques : deux assises de briques à
+// joints croisés. Une seule assise resterait un plancher flottant.
 function addChassis(cells) {
   for (let x = 0; x < HULL_LEN; x++) {
     const cx = x + 0.5;
@@ -279,7 +282,7 @@ function addChassis(cells) {
       for (let z = Z_MIN; z < Z_MAX; z++) {
         if (!insideHull(cx, y + 0.5, z + 0.5)) continue;
         const k = key(x, y, z);
-        if (cells.has(k)) continue;   // la peau prime : le châssis reste interne
+        if (cells.has(k)) continue;   // la peau prime
         cells.set(k, 'chassis');
       }
     }
@@ -287,70 +290,73 @@ function addChassis(cells) {
 }
 
 // ================================================================
-// 4. COLORISATION
+// 4. LIVRÉE — dos noir, ventre crème, frontière ondulée
 // ================================================================
 
-// Ligne de gueule : elle part du museau et remonte derrière l'œil.
+// La ligne de séparation. Elle descend bas sur la tête (presque tout
+// noir) et remonte vers la queue, et ondule en pointes le long du
+// flanc : trois sinusoïdes de périodes premières entre elles, pour
+// que le motif ne se répète pas.
+export function liveryY(x) {
+  const u = clamp(x / HULL_LEN, 0, 1);
+  const base = axisY(x) - halfBottom(x) * (0.80 - 0.95 * u);
+  const amp = 0.34 * halfTop(x);
+  // deux harmoniques seulement : cinq grandes pointes le long du flanc,
+  // pas un bord dentelé. Trois en produisaient un liseré bruité.
+  const w = Math.sin(u * 26.0 + 0.6) * 0.74
+          + Math.sin(u * 11.0 + 2.1) * 0.26;
+  return base + amp * w;
+}
+
+// Gueule : un trait crème qui part du museau et remonte derrière l'œil.
 function mouthY(x) {
-  const t = clamp(x / 26, 0, 1);
-  return axisY(x) - halfBottom(x) * (0.72 - 0.30 * t * t);
+  const t = clamp(x / 20, 0, 1);
+  return axisY(x) - halfBottom(x) * (0.78 - 0.34 * t * t);
 }
 
 function colorAt(x, y, z, group) {
   const cx = x + 0.5, cy = y + 0.5, cz = z + 0.5;
 
   if (group === 'socle') return 'black';
-  if (group === 'helice') return 'dgrey';
   if (group === 'chassis') return 'dgrey';
-
-  // Nez transparent : le grand hublot circulaire du museau. Le museau
-  // est franchement tronqué, la calotte avant est donc presque
-  // entièrement vitrée — c'est par là que Tintin regarde.
-  if (cx < 3.5) {
-    const dy = (cy - axisY(cx) - 1) / 12, dz = cz / 5.5;
-    if (dy * dy + dz * dz < 1) return 'trans';
-  }
-  // Verrière du poste de pilotage
-  if (cx >= 14 && cx <= 25 && Math.abs(cz) < 3.6 && cy > hullTop(cx) - 5.5) return 'trans';
-
-  // Œil : disque noir cerclé de blanc sur chaque flanc
-  const eyeX = 13.5, eyeY = axisY(eyeX) + 5.5;
-  const dEye = Math.hypot(cx - eyeX, (cy - eyeY) * 0.42);
-  if (Math.abs(cz) > halfWidth(cx) - 1.6) {
-    if (dEye < 1.5) return 'black';
-    if (dEye < 2.6) return 'white';
+  if (group === 'helice') return 'gold';
+  if (group === 'verriere') {
+    // montants gris tous les quatre tenons, verre entre les deux
+    const rib = Math.abs(((cx - CANOPY.x0) % 7) - 0.5) < 0.6;
+    return rib || cy < hullTop(cx) - 0.5 ? 'lgrey' : 'trans';
   }
 
-  // Ouïes : cinq fentes obliques derrière la tête
-  if (Math.abs(cz) > halfWidth(cx) - 1.4 && cy > axisY(cx) - 4 && cy < axisY(cx) + 9) {
-    for (let i = 0; i < 5; i++) {
-      const gx = 27 + i * 3 + (cy - axisY(cx)) * 0.14;
-      if (Math.abs(cx - gx) < 0.6) return 'dgrey';
+  const onFlank = Math.abs(cz) > halfWidth(cx) - 1.5;
+
+  // Œil : petit cercle blanc cerclé de noir, sur la joue
+  const eyeX = 10.5, eyeY = axisY(eyeX) + 4.5;
+  if (onFlank && Math.hypot(cx - eyeX, (cy - eyeY) * 0.45) < 1.4) return 'white';
+
+  // Ouïes : quatre fentes fines derrière la tête
+  if (onFlank && cy > axisY(cx) - 3 && cy < axisY(cx) + 6) {
+    for (let i = 0; i < 4; i++) {
+      const gx = 20 + i * 2.6;
+      if (Math.abs(cx - gx) < 0.5) return 'lgrey';
     }
   }
 
-  // Gueule : bande noire + rangée de dents blanches
-  if (cx > 1.5 && cx < 27) {
+  // Gueule : trait crème souligné de dents blanches
+  if (cx > 1 && cx < 21) {
     const my = mouthY(cx);
-    if (cy > my && cy < my + 2.2) return 'black';
-    if (cy > my - 2.2 && cy <= my) return (Math.floor(cx) % 2 === 0) ? 'white' : 'black';
+    if (cy > my && cy < my + 1.6) return 'tan';
+    if (cy > my - 1.8 && cy <= my) return Math.floor(cx) % 2 === 0 ? 'white' : 'black';
   }
 
-  // Nageoires latérales : jaune dessus, blanc dessous
-  if (group === 'pectoraleD' || group === 'pectoraleG') return cy >= finMidY(cx, cz, PECTORAL) ? 'yellow' : 'white';
-  if (group === 'pelvienneD' || group === 'pelvienneG') return cy >= finMidY(cx, cz, PELVIC) ? 'yellow' : 'white';
+  // Nageoires : entièrement noires, comme sur la maquette
+  if (group !== 'avant' && group !== 'arriere') return 'black';
 
-  // Ventre blanc
-  if (cy < axisY(cx) - 0.42 * halfBottom(cx)) return 'white';
-  return 'yellow';
+  return cy >= liveryY(cx) ? 'black' : 'tan';
 }
 
 // ================================================================
 // 5. PAVAGE — rectangles = pièces réelles
 // ================================================================
 
-// (dz, dx) triés par surface décroissante ; les deux orientations
-// d'une même pièce sont proposées.
 const RECTS = [
   [2, 8], [8, 2], [2, 6], [6, 2],
   [2, 4], [4, 2], [1, 8], [8, 1],
@@ -358,9 +364,6 @@ const RECTS = [
   [2, 2], [1, 4], [4, 1],
   [1, 3], [3, 1], [1, 2], [2, 1], [1, 1],
 ];
-
-// Même jeu, plafonné à quatre tenons : sert à démarrer une file par une
-// pièce courte, une assise sur deux, pour décaler les joints.
 const RECTS_SHORT = RECTS.filter(([dz, dx]) => dz <= 4 && dx <= 4);
 
 function partKeyFor(dz, dx, kind) {
@@ -368,25 +371,20 @@ function partKeyFor(dz, dx, kind) {
   return `${kind}-${a}x${b}`;
 }
 
-// Pave une couche : renvoie des rectangles homogènes en couleur et
-// en sous-ensemble.
-//
-// `phase` alterne d'une assise à l'autre (une assise = trois plaques =
-// une brique). Sur les assises de phase 1, la première pièce de chaque
-// file est plafonnée à quatre tenons : les joints tombent alors à
-// contretemps de l'assise voisine, et les deux se verrouillent. Sans ce
-// décalage, toutes les couches seraient pavées à l'identique et le
-// modèle se réduirait à des piles de briques indépendantes.
+// `phase` alterne d'une assise à l'autre (une assise = trois plaques).
+// Sur les assises de phase 1, la première pièce de chaque file est
+// plafonnée à quatre tenons : les joints tombent à contretemps et les
+// assises se verrouillent. Sans ce décalage, toutes les couches
+// seraient pavées à l'identique et le modèle se réduirait à des piles
+// de briques indépendantes.
 function packLayer(layer, phase) {
   const used = new Set();
   const rects = [];
-  const at = (x, z) => layer.get(`${x}|${z}`);
-
   for (let z = Z_MIN; z < Z_MAX; z++) {
     for (let x = 0; x < TOTAL_LEN; x++) {
       const k = `${x}|${z}`;
       if (used.has(k) || !layer.has(k)) continue;
-      const cell = at(x, z);
+      const cell = layer.get(k);
       const left = layer.get(`${x - 1}|${z}`);
       const runStart = !left || left.color !== cell.color || left.group !== cell.group;
       const order = phase === 1 && runStart ? RECTS_SHORT : RECTS;
@@ -412,7 +410,7 @@ function packLayer(layer, phase) {
 
 // 6. Trois plaques identiques empilées -> une brique.
 function mergeVertical(byLayer) {
-  const index = new Map();  // signature -> [y…]
+  const index = new Map();
   for (const [y, rects] of byLayer) {
     for (const r of rects) {
       const sig = `${r.x}|${r.z}|${r.dx}|${r.dz}|${r.color}|${r.group}`;
@@ -444,10 +442,9 @@ function mergeVertical(byLayer) {
 // SOUS-ENSEMBLES POSÉS À LA MAIN
 // ================================================================
 
-// L'hélice traverse la racine de l'empennage par un canal de deux
-// plaques. La ligne d'arbre est un doublage de plaques à joints
-// décalés : ancrée dans le massif de la caudale à l'avant, elle porte
-// l'hélice en console au milieu de la fourche.
+// L'hélice est à l'extrême arrière, derrière la caudale, comme sur la
+// maquette. L'arbre traverse la racine de l'empennage par un canal de
+// deux plaques ; c'est un doublage à joints décalés, donc une poutre.
 function propeller() {
   const out = [];
   const a = Math.round(axisY(HULL_LEN));
@@ -455,43 +452,41 @@ function propeller() {
     out.push({ x, y, z, dx, dz, h, color, group: 'helice', part });
 
   for (const z of [-1, 0]) {
-    P(83, a - 1, z, 8, 1, 1, 'dgrey', 'plate-1x8');   // couche basse
-    P(91, a - 1, z, 4, 1, 1, 'dgrey', 'plate-1x4');
-    P(83, a, z, 4, 1, 1, 'dgrey', 'plate-1x4');       // couche haute, joints décalés
-    P(87, a, z, 8, 1, 1, 'dgrey', 'plate-1x8');
+    P(78, a - 1, z, 8, 1, 1, 'dgrey', 'plate-1x8');    // couche basse
+    P(86, a - 1, z, 8, 1, 1, 'dgrey', 'plate-1x8');
+    P(78, a, z, 4, 1, 1, 'dgrey', 'plate-1x4');        // couche haute, joints décalés
+    P(82, a, z, 8, 1, 1, 'dgrey', 'plate-1x8');
+    P(90, a, z, 4, 1, 1, 'dgrey', 'plate-1x4');
   }
-  // pale horizontale, posée à cheval sur les deux rails de l'arbre
-  P(94, a + 1, -3, 1, 6, 1, 'dgrey', 'plate-1x6');
-  // pales verticales, empilées au-dessus et au-dessous
-  P(94, a + 2, -1, 1, 2, 1, 'lgrey', 'plate-1x2');
-  P(94, a + 3, -1, 1, 2, 1, 'dgrey', 'plate-1x2');
-  P(94, a - 2, -1, 1, 2, 1, 'lgrey', 'plate-1x2');
-  P(94, a - 3, -1, 1, 2, 1, 'dgrey', 'plate-1x2');
+  // barres de gouverne, en croix devant l'hélice
+  P(91, a + 1, -5, 1, 4, 1, 'dgrey', 'plate-1x4');
+  P(91, a + 1, 1, 1, 4, 1, 'dgrey', 'plate-1x4');
+  // hélice : moyeu et quatre pales en or perlé
+  P(93, a + 1, -3, 1, 6, 1, 'gold', 'plate-1x6');
+  P(93, a + 2, -1, 1, 2, 1, 'gold', 'plate-1x2');
+  P(93, a + 3, -1, 1, 2, 1, 'gold', 'plate-1x2');
+  P(93, a - 2, -1, 1, 2, 1, 'gold', 'plate-1x2');
+  P(93, a - 3, -1, 1, 2, 1, 'gold', 'plate-1x2');
+  P(94, a + 1, -1, 2, 2, 1, 'gold', 'plate-2x2');
   return out;
 }
 
-// Deux berceaux noirs, hauteur ajustée au ventre de la coque. Les
-// assises alternent leur sens de pose : les joints se croisent, le
-// berceau tient tout seul.
+// Deux montants noirs, hauteur ajustée au ventre de la coque.
+// Deux montants fins, comme les tiges de la maquette : une colonne de
+// 2 × 4 tenons par appui, les assises alternant leur sens de pose pour
+// que les joints se croisent.
 function stand() {
   const out = [];
-  for (const cx of [26, 64]) {
-    const topY = Math.floor(hullBottom(cx + 4)) - 1;
+  for (const cx of [22, 58]) {
+    const topY = Math.floor(hullBottom(cx + 2)) - 1;
     let course = 0;
     for (let y = 0; y < topY; y += 3, course++) {
       const h = Math.min(3, topY - y);
       const kind = h === 3 ? 'brick' : 'plate';
       const put = (x, z, dx, dz) =>
         out.push({ x, y, z, dx, dz, h, color: 'black', group: 'socle', part: partKeyFor(dz, dx, kind) });
-      if (course % 2 === 0) {
-        // en long, paires décalées d'un tenon pour enjamber l'axe
-        put(cx, -6, 8, 1);
-        for (let z = -5; z < 5; z += 2) put(cx, z, 8, 2);
-        put(cx, 5, 8, 1);
-      } else {
-        // en travers, de part et d'autre de l'axe
-        for (let x = cx; x < cx + 8; x += 2) { put(x, -6, 2, 6); put(x, 0, 2, 6); }
-      }
+      if (course % 2 === 0) { put(cx, -2, 4, 2); put(cx, 0, 4, 2); }
+      else { put(cx, -2, 2, 4); put(cx + 2, -2, 2, 4); }
     }
   }
   return out;
@@ -506,7 +501,6 @@ export function buildModel() {
   const cells = shell(solid);
   addChassis(cells);
 
-  // colorisation
   const byLayer = new Map();
   for (const [k, group] of cells) {
     const [x, y, z] = k.split('|').map(Number);
@@ -521,11 +515,9 @@ export function buildModel() {
   let pieces = mergeVertical(packed);
   pieces = pieces.concat(propeller(), stand());
 
-  // étape de montage + identifiant stable
   pieces.forEach((p, i) => {
     p.id = i;
     p.stage = GROUPS[p.group] ? GROUPS[p.group].stage : 7;
-    if (p.color === 'trans') p.stage = 4, p.group = 'hublot';
   });
   pieces.sort((a, b) => a.stage - b.stage || a.y - b.y || a.x - b.x);
   pieces.forEach((p, i) => { p.id = i; });
@@ -535,8 +527,6 @@ export function buildModel() {
 }
 
 // Un tenon n'est dessiné que s'il n'est pas coiffé par une pièce.
-// Cela divise le nombre d'instances par trois et supprime les tenons
-// qui traverseraient la couche du dessus.
 function markVisibleStuds(pieces) {
   const filled = new Set();
   for (const p of pieces) {
@@ -557,9 +547,7 @@ function markVisibleStuds(pieces) {
   }
 }
 
-// Contrôle de structure : chevauchements de corps et liaisons par
-// tenons. Le résultat est affiché tel quel sur la page — il vaut mieux
-// annoncer ce qui ne tient pas que de le passer sous silence.
+// Contrôle de structure : chevauchements et liaisons par tenons.
 export function analyze(pieces) {
   const occ = new Map();
   let overlaps = 0;
@@ -588,12 +576,7 @@ export function analyze(pieces) {
   const size = new Map();
   for (const p of pieces) { const r = find(p.id); size.set(r, (size.get(r) || 0) + 1); }
   const sizes = [...size.values()].sort((a, b) => b - a);
-  return {
-    overlaps,
-    components: sizes.length,
-    largest: sizes[0] || 0,
-    detached: pieces.length - (sizes[0] || 0),
-  };
+  return { overlaps, components: sizes.length, largest: sizes[0] || 0, detached: pieces.length - (sizes[0] || 0) };
 }
 
 export function bboxFor(pieces) {
@@ -610,7 +593,6 @@ export function bboxFor(pieces) {
   };
 }
 
-// Bordereau : une ligne par couple (pièce, couleur).
 export function statsFor(pieces) {
   const rows = new Map();
   for (const p of pieces) {
@@ -634,14 +616,11 @@ export function statsFor(pieces) {
   };
 }
 
-// Estimation paramétrique (et non un tarif officiel) : un plancher
-// par pièce, plus un coût proportionnel à la surface en tenons.
-// Les pièces spéciales portent une majoration de moule.
+// Estimation paramétrique (et non un tarif officiel) : un plancher par
+// pièce, plus un coût proportionnel à la surface en tenons.
 export function unitPrice(partKey) {
   const d = PARTS[partKey];
   if (!d) return 0;
-  const area = d.dz * d.dx;
-  const base = 0.045 + 0.021 * area;
-  const factor = d.kind === 'brick' ? 1.25 : 1;
-  return Math.round(base * factor * 100) / 100;
+  const base = 0.045 + 0.021 * d.dz * d.dx;
+  return Math.round(base * (d.kind === 'brick' ? 1.25 : 1) * 100) / 100;
 }

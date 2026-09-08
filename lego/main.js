@@ -1,9 +1,9 @@
 // ================================================================
 // Câblage de la page : génération du modèle, remplissage des
-// chiffres, catalogue, visualiseur, exports.
+// chiffres, onglets, catalogue, visualiseur, exports.
 // ================================================================
 
-import { buildModel, PARTS, COLORS, STAGES, GROUPS, hullTop } from './model.js';
+import { buildModel, PARTS, COLORS, STAGES, GROUPS } from './model.js';
 import { toCSV, toLDraw, toBrickLinkXML, toJSON, toGuide, download } from './exports.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -21,23 +21,16 @@ const { pieces, stats, bbox, check } = model;
 // ---------------------------------------------------------------
 const countIn = (fn) => pieces.filter(fn).length;
 const HULL = new Set(['avant', 'arriere']);
-const FINS = new Set(['pectoraleD', 'pectoraleG', 'pelvienneD', 'pelvienneG', 'dorsale', 'dorsale2', 'caudale']);
-
-const dorsalPeak = pieces.filter((p) => p.group === 'dorsale')
-  .reduce((m, p) => Math.max(m, p.y + p.h), 0);
-const dorsalCm = ((dorsalPeak - hullTop(43)) * 3.2) / 10;
 
 const values = {
   count: nf.format(stats.count),
   types: nf.format(stats.types),
   stages: STAGES.length,
   layers: nf.format(new Set(pieces.map((p) => p.y)).size),
-  coque: nf.format(countIn((p) => HULL.has(p.group))),
-  chassis: nf.format(countIn((p) => p.group === 'chassis')),
-  nageoires: nf.format(countIn((p) => FINS.has(p.group))),
-  hublot: nf.format(countIn((p) => p.group === 'hublot')),
-  caudale: nf.format(countIn((p) => p.group === 'caudale')),
-  dorsale: df(dorsalCm),
+  noir: nf.format(countIn((p) => p.color === 'black' && HULL.has(p.group))),
+  creme: nf.format(countIn((p) => p.color === 'tan' && HULL.has(p.group))),
+  verriere: nf.format(countIn((p) => p.group === 'verriere')),
+  helice: nf.format(countIn((p) => p.group === 'helice')),
   dimx: df(bbox.mm.x / 10),
   dimy: df(bbox.mm.y / 10),
   dimz: df(bbox.mm.z / 10),
@@ -46,7 +39,6 @@ const values = {
   colors: nf.format(new Set(stats.rows.map((r) => r.color)).size),
   studs: `${bbox.studs.x} × ${bbox.studs.z} tenons`,
   overlaps: nf.format(check.overlaps),
-  components: nf.format(check.components),
   detached: nf.format(check.detached),
   linked: `${nf.format(check.largest)} (${df((check.largest / stats.count) * 100)} %)`,
 };
@@ -56,7 +48,21 @@ $$('[data-fill]').forEach((el) => {
 });
 
 // ---------------------------------------------------------------
-// 2. Catalogue
+// 2. Onglets
+// ---------------------------------------------------------------
+function showTab(name) {
+  $$('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  $$('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== name; });
+  if (name === 'modele') viewer?.resize();
+}
+$$('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+$$('[data-goto]').forEach((a) => a.addEventListener('click', (e) => {
+  e.preventDefault();
+  showTab(a.dataset.goto);
+}));
+
+// ---------------------------------------------------------------
+// 3. Catalogue
 // ---------------------------------------------------------------
 const tbody = $('#catalog-body');
 stats.rows.forEach((r) => {
@@ -64,52 +70,48 @@ stats.rows.forEach((r) => {
   tr.dataset.part = r.part;
   tr.dataset.color = r.color;
   tr.innerHTML = `
-    <td class="part"><span class="swatch" style="background:${COLORS[r.color].hex}"></span>${r.label}</td>
-    <td>${COLORS[r.color].name}</td>
+    <td><span class="part-name"><span class="part-swatch" style="background:${COLORS[r.color].hex}"></span>${r.label}</span></td>
+    <td><span class="color-name">${COLORS[r.color].name}</span></td>
     <td class="mono hide-sm"><a href="https://www.bricklink.com/v2/catalog/catalogitem.page?P=${r.design}" target="_blank" rel="noopener">${r.design} ↗</a></td>
     <td class="mono hide-sm">${r.ldraw}</td>
-    <td class="num">${nf.format(r.qty)}</td>
-    <td class="num mono hide-sm">${cf.format(r.price)}</td>
-    <td class="num">${cf.format(r.total)}</td>`;
+    <td class="quantity">${nf.format(r.qty)}</td>
+    <td class="mono right hide-sm">${cf.format(r.price)}</td>
+    <td class="quantity">${cf.format(r.total)}</td>`;
   tbody.appendChild(tr);
 });
 
 // ---------------------------------------------------------------
-// 3. Visualiseur
+// 4. Visualiseur — chargé après coup : si WebGL manque, la page
+//    reste utilisable (chiffres, bordereau, exports).
 // ---------------------------------------------------------------
-// Chargé après coup : si WebGL manque ou si le module échoue, la page
-// reste entièrement utilisable (chiffres, bordereau, exports).
 let viewer = null;
 try {
   const { createViewer } = await import('./viewer.js');
   viewer = createViewer($('#scene'), model);
-  $('#loading').hidden = true;
 } catch (err) {
   console.error(err);
-  $('#loading').textContent = 'Le rendu 3D n’a pas pu démarrer sur cet appareil. Le bordereau et les exports restent disponibles.';
+  $('#canvas-error').hidden = false;
 }
 
-// --- sélection dans le catalogue -------------------------------
 let selected = null;
-function selectRow(tr) {
+function highlight(h) { viewer?.setHighlight(h); }
+
+tbody.addEventListener('click', (e) => {
+  const tr = e.target.closest('tr');
+  if (!tr || e.target.closest('a')) return;
   const same = selected === tr;
   $$('#catalog-body tr').forEach((r) => r.classList.remove('on'));
   selected = same ? null : tr;
   if (selected) selected.classList.add('on');
-  viewer?.setHighlight(selected ? { part: selected.dataset.part, color: selected.dataset.color } : null);
-  if (selected) $('#modele').scrollIntoView({ block: 'center' });
-}
-tbody.addEventListener('click', (e) => {
-  const tr = e.target.closest('tr');
-  if (tr && !e.target.closest('a')) selectRow(tr);
+  highlight(selected ? { part: selected.dataset.part, color: selected.dataset.color } : null);
+  if (selected) showTab('modele');
 });
 
 // --- boutons « situer » ----------------------------------------
 const LOCATE = {
   coque: [...HULL],
-  chassis: ['chassis'],
-  nageoires: [...FINS],
-  hublot: ['hublot'],
+  verriere: ['verriere'],
+  helice: ['helice'],
 };
 let located = null;
 $$('[data-locate]').forEach((btn) => {
@@ -118,8 +120,8 @@ $$('[data-locate]').forEach((btn) => {
     located = located === k ? null : k;
     $$('#catalog-body tr').forEach((r) => r.classList.remove('on'));
     selected = null;
-    viewer?.setHighlight(located ? { groups: LOCATE[k] } : null);
-    $('#modele').scrollIntoView({ block: 'center' });
+    highlight(located ? { groups: LOCATE[k] } : null);
+    $('.workspace').scrollIntoView({ block: 'center' });
   });
 });
 
@@ -136,43 +138,49 @@ const select = $('#stage-select');
 select.innerHTML = '<option value="0">Toutes les pièces — modèle complet</option>' +
   STAGES.map((s) => `<option value="${s.id}">Étapes 1 à ${s.id} — ${s.label}</option>`).join('');
 const BLURB_ALL = 'Le modèle complet, toutes étapes confondues.';
-select.addEventListener('change', () => {
-  const n = Number(select.value);
+
+function setStage(n) {
+  select.value = String(n);
   viewer?.setStage(n);
   const st = STAGES.find((s) => s.id === n);
   $('#stage-blurb').textContent = st ? st.blurb : BLURB_ALL;
   $('#stage-tag').textContent = st ? `Étapes 1 à ${st.id} · ${st.label}` : 'Toutes les pièces';
+  $$('#assembly-steps .assembly-step').forEach((b) => b.setAttribute('aria-current', String(Number(b.dataset.stage) === n)));
+}
+select.addEventListener('change', () => setStage(Number(select.value)));
+
+// --- liste des étapes, onglet « guide » -------------------------
+const byStage = new Map(stats.byStage);
+$('#assembly-steps').innerHTML = STAGES.map((s) => `
+  <button class="assembly-step" type="button" data-stage="${s.id}" aria-current="false">
+    <span class="no">${s.id}</span>
+    <span class="txt"><b>${s.label}</b><span>${s.blurb}</span></span>
+    <span class="qty">${nf.format(byStage.get(s.id) || 0)}</span>
+  </button>`).join('');
+$$('#assembly-steps .assembly-step').forEach((b) => {
+  b.addEventListener('click', () => {
+    setStage(Number(b.dataset.stage));
+    showTab('modele');
+  });
 });
 
-// --- répartition par étape --------------------------------------
-$('#stage-table').innerHTML = stats.byStage.map(([id, n]) => {
-  const st = STAGES.find((s) => s.id === id);
-  return `<tr><td class="mono" style="padding:6px 0;border:0;color:var(--muted)">${id}</td>
-    <td style="padding:6px 8px;border:0">${st ? st.label : '—'}</td>
-    <td class="num mono" style="padding:6px 0;border:0;color:var(--yellow)">${nf.format(n)}</td></tr>`;
-}).join('');
-
 // --- éclaté ------------------------------------------------------
-$('#explode').addEventListener('input', (e) => viewer?.setExplode(Number(e.target.value) / 100));
+$('#explode').addEventListener('input', (e) => {
+  const v = Number(e.target.value);
+  $('#explode-val').textContent = `${v} %`;
+  viewer?.setExplode(v / 100);
+});
 
 // --- pièce cliquée dans la scène ---------------------------------
-const readout = $('#readout');
 viewer?.onPick((p) => {
-  if (!p) { readout.hidden = true; return; }
+  if (!p) { $('#stage-tag').textContent = select.value === '0' ? 'Toutes les pièces' : $('#stage-tag').textContent; return; }
   const def = PARTS[p.part];
-  const st = STAGES.find((s) => s.id === p.stage);
-  readout.hidden = false;
-  readout.innerHTML = `
-    <b>${def.label}</b><br />
-    <span class="k">Couleur</span> ${COLORS[p.color].name}<br />
-    <span class="k">Réf.</span> ${def.design} · ${def.ldraw}<br />
-    <span class="k">Position</span> x ${p.x} · y ${p.y} · z ${p.z}<br />
-    <span class="k">Ensemble</span> ${GROUPS[p.group] ? GROUPS[p.group].label : p.group}<br />
-    <span class="k">Étape</span> ${p.stage} — ${st ? st.label : '—'}`;
+  const g = GROUPS[p.group];
+  $('#stage-tag').textContent = `${def.label} · ${COLORS[p.color].name} · ${g ? g.label : p.group}`;
 });
 
 // ---------------------------------------------------------------
-// 4. Exports
+// 5. Exports
 // ---------------------------------------------------------------
 const EXPORTS = {
   csv:  () => ['sous-marin-requin-pieces.csv', toCSV(stats), 'text/csv;charset=utf-8'],
@@ -185,5 +193,4 @@ $$('[data-dl]').forEach((btn) => {
   btn.addEventListener('click', () => download(...EXPORTS[btn.dataset.dl]()));
 });
 
-// petit repère en console, comme sur le reste du site
 console.info(`Brique Studio 002 — ${stats.count} pièces, ${stats.types} couples pièce/couleur.`);
