@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sous-marin requin — Brique Studio</title>
+    <meta name="description" content="Le sous-marin requin du professeur Tournesol reconstruit en briques : modèle 3D interactif, bordereau de pièces, guide de montage et export LDraw." />
+    <meta name="theme-color" content="#060d12" />
+    <link rel="icon" href="favicon.svg" />
+
+    <meta property="og:title" content="Sous-marin requin — Brique Studio" />
+    <meta property="og:description" content="Modèle 002 : 76,8 cm de long, coque stratifiée, hublot transparent et empennage fourchu." />
+    <meta property="og:type" content="website" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+
+    <!-- three.js est embarqué dans le dépôt : la page ne dépend d'aucun CDN -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./vendor/three.module.min.js",
+          "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <!-- ============================ barre ============================ -->
+    <header class="topbar">
+      <div class="topbar__in">
+        <a class="topbar__mark" href="#top">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2 13c3-4 7-6 11-6 3 0 5 1 6 2l3-2-1 4 1 4-3-2c-1 1-3 2-6 2-4 0-8-2-11-6z" fill="#f5c400"/>
+            <circle cx="8" cy="11.4" r="1.1" fill="#0a1218"/>
+          </svg>
+          <span class="topbar__name">Brique Studio</span>
+        </a>
+        <span class="topbar__id">Modèle 002 / Mer des Caraïbes</span>
+        <span class="topbar__sep"></span>
+        <a class="topbar__link" href="#catalogue">Bordereau de pièces</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <!-- ============================ héros ============================ -->
+      <section class="wrap hero">
+        <p class="eyebrow hero__eyebrow">Une invention, brique par brique</p>
+        <h1>Sous-marin <em>requin</em></h1>
+        <p class="hero__sub">Édition <i>Le Trésor de Rackham le Rouge</i></p>
+        <p class="hero__src">D’après l’engin du professeur Tournesol · Interprétation en briques, non officielle</p>
+
+        <nav class="hero__nav">
+          <a class="hero__cell" href="#modele">
+            <span>Modèle 3D</span>
+            <b>Le sous-marin</b>
+          </a>
+          <a class="hero__cell" href="#catalogue">
+            <span>Toutes les pièces</span>
+            <b class="num" data-fill="count">—</b>
+          </a>
+          <a class="hero__cell" href="#montage">
+            <span>Guide de montage</span>
+            <b>7 étapes</b>
+          </a>
+        </nav>
+      </section>
+
+      <!-- ============================ visualiseur ============================ -->
+      <section class="wrap stage" id="modele">
+        <div class="stage__head">
+          <div>
+            <p class="eyebrow">Modèle 3D</p>
+            <p class="eyebrow eyebrow--accent" style="margin-top:6px">1 tenon = 8 mm · 1 plaque = 3,2 mm</p>
+          </div>
+          <div class="views" role="group" aria-label="Cadrages">
+            <button type="button" data-view="ensemble" aria-pressed="true">Vue d’ensemble</button>
+            <button type="button" data-view="tete" aria-pressed="false">Tête &amp; hublot</button>
+            <button type="button" data-view="babord" aria-pressed="false">Profil</button>
+            <button type="button" data-view="empennage" aria-pressed="false">Empennage</button>
+            <button type="button" data-view="dessus" aria-pressed="false">Dessus</button>
+          </div>
+        </div>
+
+        <div class="canvas-frame">
+          <canvas id="scene"></canvas>
+          <div class="loading" id="loading">Assemblage du modèle…</div>
+          <span class="canvas-tag canvas-tag--tl" id="stage-tag">Toutes les pièces</span>
+          <span class="canvas-tag canvas-tag--bl">Glisser pour orbiter · Molette pour zoomer · Cliquer une pièce</span>
+          <span class="canvas-tag canvas-tag--br" data-fill="studs">—</span>
+          <div class="readout" id="readout" hidden></div>
+        </div>
+      </section>
+
+      <!-- ============================ le montage ============================ -->
+      <section class="wrap section" id="montage">
+        <p class="eyebrow section__label">Le montage</p>
+
+        <div class="build">
+          <div>
+            <h2>Sous-marin <em>requin</em></h2>
+            <p class="build__sub">Modèle d’exposition</p>
+
+            <div class="figures">
+              <div class="figure"><b data-fill="count">—</b><span>pièces</span></div>
+              <div class="figure"><b data-fill="types">—</b><span>couples pièce / couleur</span></div>
+              <div class="figure"><b data-fill="stages">7</b><span>étapes de montage</span></div>
+            </div>
+
+            <p>
+              La coque est une pile de <span class="n" data-fill="layers">—</span> couches de plaques : chacune suit
+              la section du corps à sa hauteur, et l’escalier qu’elles dessinent tient lieu de courbe. Seule la peau
+              est posée — l’intérieur reste creux, refermé sur une poutre longitudinale qui court du museau au
+              pédoncule caudal.
+            </p>
+            <p>
+              Le museau porte un hublot transparent de <span class="n" data-fill="hublot">—</span> pièces, la dorsale
+              monte à <span class="n" data-fill="dorsale">—</span> cm au-dessus du dos, et l’empennage fourchu emporte
+              les <span class="n" data-fill="caudale">—</span> dernières pièces du modèle.
+            </p>
+
+            <div class="dims" style="margin-top:30px">
+              <span data-fill="dimx">—</span><i>×</i><span data-fill="dimz">—</span><i>×</i><span data-fill="dimy">—</span>
+              <u>cm</u>
+            </div>
+            <p class="eyebrow" style="margin-top:10px">Encombrement assemblé, socle compris</p>
+          </div>
+
+          <div class="panel">
+            <div class="panel__row">
+              <label for="stage-select">Étape de montage</label>
+              <select id="stage-select"></select>
+              <p class="panel__blurb" id="stage-blurb">Le modèle complet, toutes étapes confondues.</p>
+            </div>
+            <div class="panel__row">
+              <label for="explode">Éclater les sous-ensembles</label>
+              <div class="switch">
+                <span class="switch__txt">Assemblé</span>
+                <span class="switch__txt">Éclaté</span>
+              </div>
+              <input type="range" id="explode" min="0" max="100" value="0" />
+            </div>
+            <div class="panel__row">
+              <label>Répartition par étape</label>
+              <table style="font-size:12.5px">
+                <tbody id="stage-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ---------------- guide en trois temps ---------------- -->
+        <div class="feature">
+          <p class="eyebrow eyebrow--accent">Coque stratifiée</p>
+          <h2 style="margin-top:14px">Des terrasses, <em>pas des courbes.</em></h2>
+
+          <div class="cards">
+            <article class="card">
+              <span class="card__no">01 / Coque</span>
+              <h3>Une peau d’un tenon</h3>
+              <p>
+                Le corps est voxelisé puis évidé : on ne garde que les cellules qui touchent le vide, plus une
+                cellule de recouvrement en hauteur. Il reste <span class="n" data-fill="coque">—</span> pièces de
+                coque sur une poutre de <span class="n" data-fill="chassis">—</span> pièces — six fois moins qu’un
+                volume plein.
+              </p>
+              <button class="locate" type="button" data-locate="coque">Situer la coque ↗</button>
+            </article>
+
+            <article class="card">
+              <span class="card__no">02 / Appareillage</span>
+              <h3>Des joints à contretemps</h3>
+              <p>
+                Pavées à l’identique, les couches ne feraient que des piles indépendantes. Une assise sur deux
+                démarre donc chaque file par une pièce courte : les joints tombent en quinconce et les assises se
+                verrouillent. C’est ce décalage qui fait passer le modèle de
+                <span class="n">325</span> blocs séparés à <span class="n" data-fill="components">—</span>.
+              </p>
+              <button class="locate" type="button" data-locate="chassis">Situer la poutre ↗</button>
+            </article>
+
+            <article class="card">
+              <span class="card__no">03 / Nageoires</span>
+              <h3>Six ailes plates</h3>
+              <p>
+                Pectorales, pelviennes, deux dorsales et la caudale : <span class="n" data-fill="nageoires">—</span>
+                pièces. Les pectorales sont des ailes en flèche de deux plaques d’épaisseur, tombantes de
+                0,42 plaque par tenon vers le bout.
+              </p>
+              <button class="locate" type="button" data-locate="nageoires">Situer les nageoires ↗</button>
+            </article>
+
+            <article class="card">
+              <span class="card__no">04 / Hublot</span>
+              <h3>Le nez de verre</h3>
+              <p>
+                Le grand hublot circulaire du museau et la verrière du poste de pilotage sont posés en
+                transparent : <span class="n" data-fill="hublot">—</span> pièces qui ferment la coque avant et
+                laissent voir le vide intérieur.
+              </p>
+              <button class="locate" type="button" data-locate="hublot">Situer le hublot ↗</button>
+            </article>
+          </div>
+
+          <p class="note">
+            <strong>Contrôle de structure, sur le modèle affiché.</strong>
+            <span data-fill="overlaps">—</span> chevauchement de corps sur <span data-fill="count">—</span> pièces, et
+            <span data-fill="linked">—</span> d’entre elles forment un seul bloc solidaire par les tenons.
+            Les <span data-fill="detached">—</span> restantes — la verrière, les pelviennes, quelques marches de
+            terrasse — reposent sans liaison : une pièce ne peut pas enjamber une frontière de couleur.
+            Les nageoires en porte-à-faux et l’ancrage de l’empennage sont des propositions, non éprouvées
+            physiquement. Prévoir un renfort interne si le modèle doit être manipulé.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============================ catalogue ============================ -->
+      <section class="wrap section" id="catalogue">
+        <p class="eyebrow section__label">Les pièces du modèle</p>
+
+        <div class="catalog__head">
+          <h2>Bordereau</h2>
+          <span class="types"><span data-fill="types">—</span> couples pièce / couleur</span>
+        </div>
+
+        <p class="catalog__hint">Sélectionner une ligne pour situer la pièce dans le modèle.</p>
+        <p class="catalog__math">
+          <span class="n" data-fill="count">—</span> pièces réparties en
+          <span class="n" data-fill="families">—</span> familles de moules et
+          <span class="n" data-fill="colors">—</span> couleurs. Les prix unitaires sont une
+          <em>estimation paramétrique</em> — un plancher par pièce plus un coût proportionnel à la surface en tenons,
+          majoré pour les moules spéciaux — et non un tarif relevé chez un revendeur.
+        </p>
+
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Pièce</th>
+                <th>Couleur</th>
+                <th class="hide-sm">Réf. design</th>
+                <th class="hide-sm">Réf. LDraw</th>
+                <th class="num">Qté</th>
+                <th class="num hide-sm">Unité</th>
+                <th class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody id="catalog-body"></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4"><span data-fill="count">—</span> pièces · estimation paramétrique</td>
+                <td class="num" data-fill="count">—</td>
+                <td class="num hide-sm"></td>
+                <td class="num" data-fill="cost">—</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="downloads">
+          <button class="dl" type="button" data-dl="csv"><b>Bordereau de pièces</b><span>Fichier .csv</span></button>
+          <button class="dl" type="button" data-dl="ldr"><b>Modèle LDraw</b><span>Fichier .ldr</span></button>
+          <button class="dl" type="button" data-dl="xml"><b>Liste BrickLink</b><span>Liste de manque .xml</span></button>
+          <button class="dl" type="button" data-dl="json"><b>Coordonnées des pièces</b><span>Fichier .json</span></button>
+          <button class="dl" type="button" data-dl="guide"><b>Guide de montage</b><span>Fichier .md</span></button>
+        </div>
+      </section>
+
+      <!-- ============================ pied ============================ -->
+      <footer class="wrap foot">
+        <h3>Conçu pour être monté.</h3>
+        <p>
+          Le modèle est généré par un programme : les profils du corps, les nageoires et l’empennage sont des
+          fonctions, la voxelisation les transforme en cellules, et un pavage glouton remplace ces cellules par des
+          plaques et des briques réelles. Trois plaques identiques empilées deviennent une brique. Chaque nombre de
+          cette page — pièces, couleurs, encombrement, estimation — est recalculé à l’ouverture, à partir du modèle
+          affiché à l’écran.
+        </p>
+        <p>
+          Le fichier <b>.ldr</b> s’ouvre dans Studio, LeoCAD ou LDView ; la liste <b>.xml</b> s’importe directement
+          comme liste de manque sur BrickLink.
+        </p>
+        <div class="foot__meta">
+          <span>Sous-marin requin / Modèle 002</span>
+          <span>Création de fan indépendante</span>
+          <span>Non affilié à LEGO® ni à Moulinsart / Tintinimaginatio</span>
+        </div>
+      </footer>
+    </main>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>
