@@ -24,7 +24,7 @@ Rien n'est modélisé à la main. `model.js` enchaîne six étapes :
 3. **Évidement** — seules les cellules qui touchent le vide sont conservées, la
    peau est dilatée de deux cellules en hauteur et d'une en longueur pour que
    les anneaux se recouvrent ; museau et pédoncule restent pleins, la bulle de
-   la verrière aussi. Une poutre à mi-hauteur traverse la coque de bord à bord
+   la verrière est traitée séparément. Une poutre à mi-hauteur traverse la coque de bord à bord
    et se prolonge en arbre d'hélice à travers la racine de la caudale.
    La verrière est désormais partiellement évidée entre ses trois arceaux,
    dont les assises restent contreventées pour conserver une seule composante.
@@ -113,6 +113,18 @@ hauteur de pose, la liste à rassembler et les coordonnées.
 ## Réserves
 
 ### Révision des nageoires — 10 septembre 2026
+
+Révision suivante, queue et habitacle : le carénage beige est prolongé
+jusqu'au moyeu, sous la lame noire de l'empennage. L'hélice comporte trois
+pales dans le plan transversal et une plaque 2×4 réservée assure sa liaison
+au carénage. La verrière rejoint la surface arrondie de la coque sans
+remplissage vertical noir ; son extrémité arrière se resserre. Son vitrage
+est moins opaque et deux personnages stylisés en briques, Tintin et Milou,
+sont intégrés au bordereau et aux couches du guide.
+
+Ces personnages ne sont pas des figurines moulées. Les pales et le vitrage
+restent constitués des plaques et briques du catalogue : leur courbure
+n'est pas identique aux pièces lisses de la maquette de référence.
 
 Le bord de fuite de la grande dorsale est maintenant concave, estimé sur
 `tools/ref/profil.png`. Les pectorales utilisent deux contours continus

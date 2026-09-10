@@ -81,6 +81,8 @@ export const COLORS = {
   dgrey: { key: 'dgrey', name: 'Gris pierre foncé',    ldraw: 72,  bl: 85,  hex: '#5b6167' },
   gold:  { key: 'gold',  name: 'Or perlé',             ldraw: 297, bl: 115, hex: '#c9a13b' },
   trans: { key: 'trans', name: 'Transparent',          ldraw: 47,  bl: 12,  hex: '#d3e3ea', alpha: 0.4 },
+  blue:  { key: 'blue', name: 'Bleu', ldraw: 1, bl: 7, hex: '#287fba' },
+  orange: { key: 'orange', name: 'Orange', ldraw: 25, bl: 4, hex: '#ed9a21' },
 };
 
 // --- Catalogue de pièces -----------------------------------------
@@ -134,6 +136,7 @@ export const GROUPS = {
   avant:      { label: 'Coque avant',          stage: 1, dir: [-1, 0.2, 0] },
   arriere:    { label: 'Coque arrière',        stage: 1, dir: [1, 0.2, 0] },
   verriere:   { label: 'Verrière',             stage: 2, dir: [0, 1, 0] },
+  equipage:   { label: 'Tintin et Milou',      stage: 2, dir: [0, 1, 0] },
   pectoraleD: { label: 'Pectorale tribord',    stage: 3, dir: [0, -0.2, 1] },
   pectoraleG: { label: 'Pectorale bâbord',     stage: 3, dir: [0, -0.2, -1] },
   pelvienneD: { label: 'Pelvienne tribord',    stage: 3, dir: [0, -0.6, 1] },
@@ -219,6 +222,7 @@ function insideHull(x, y, z) {
 const CANOPY = { x0: Math.min(...Object.keys(PR.canopy).map(Number)) - 1, x1: Math.max(...Object.keys(PR.canopy).map(Number)) + 1, ramp: 7, ribs: [] };
 { const n = 3, len = CANOPY.x1 - CANOPY.x0; for (let i = 1; i <= n; i++) CANOPY.ribs.push(CANOPY.x0 + len * i / (n + 1)); }
 const canopySide = table(Object.fromEntries(Object.entries(PR.canopy).map(([k, v]) => [k, v[0]])));
+const cabinColors = new Map();
 function canopy(x, y, z) {
   if (x < CANOPY.x0 || x > CANOPY.x1) return false;
   // vue de dessus (plus proche de l'objectif, donc plus longue) recalée
@@ -226,14 +230,16 @@ function canopy(x, y, z) {
   const keys = Object.keys(PR.canopyHalfZ).map(Number);
   const u = Math.min(...keys) + (x - CANOPY.x0) / (CANOPY.x1 - CANOPY.x0) * (Math.max(...keys) - Math.min(...keys));
   const t = clamp((x - CANOPY.x0) / CANOPY.ramp, 0, 1);
-  const hz = T.canopyHalfZ(u) * Math.sqrt(1 - (1 - t) * (1 - t));
+  const rear = clamp((CANOPY.x1 - x) / 5, 0, 1);
+  const hz = T.canopyHalfZ(u) * Math.sqrt(1 - (1 - t) * (1 - t)) * Math.sqrt(1 - (1 - rear) ** 2);
   if (!hz || hz < 0.5 || Math.abs(z) > hz) return false;
   const ease = (1 - Math.cos(Math.PI * t)) / 2;
   const roof = hullTop(x) + (canopySide(Math.max(x, CANOPY.x0 + CANOPY.ramp)) - hullTop(x)) * ease;
   const top = hullTop(x) + (roof - hullTop(x)) * Math.sqrt(Math.max(0, 1 - Math.pow(z / hz, 2)));
   if (y > top || y <= hullSurfaceTop(x, z) - 1.5) return null;
-  // sous la bulle, le dos est aplani en un pont : la bulle y repose à plat
-  return y > hullTop(x) - 1 ? 'verriere' : 'pont';
+  // Le vitrage rejoint directement la coque arrondie. Le remplissage
+  // « pont » jusqu'au sommet du dos créait une haute paroi noire verticale.
+  return 'verriere';
 }
 
 // --- Dorsales : contour de profil, lame de deux tenons ------------------
@@ -405,6 +411,25 @@ function addChassis(cells) {
   }
   if (MESH && !MESH.shaft) return;
   const a = Math.floor(axisY(HULL_LEN));
+  if (!MESH) {
+    // Le carénage prolonge le ventre SOUS la lame horizontale noire.
+    // Profil de référence : axe du moyeu vers y=64, lame vers y=69.
+    // Une section pleine, effilée, relie la coque au moyeu sans tige noire nue.
+    for (let x = 80; x < 95; x++) {
+      const t = clamp((x - 80) / 14, 0, 1);
+      const ry = 5 - t, rz = 2.8 - 1.6 * t;
+      for (let y = a - 11; y < a; y++) for (let z = -3; z < 3; z++) {
+        if (((y + 0.5 - (a - 5)) / ry) ** 2 + ((z + 0.5) / rz) ** 2 <= 1) {
+          cells.set(key(x, y, z), 'arriere');
+        }
+      }
+    }
+    // Traverses internes de l'empennage : elles s'arrêtent avant l'hélice.
+    for (let x = 83; x < 90; x++) for (let y = a - 1; y <= a; y++) {
+      for (let z = -2; z < 2; z++) cells.set(key(x, y, z), 'chassis');
+    }
+    return;
+  }
   for (let x = SHAFT.x0; x < SHAFT.x1; x++) {
     for (const [y, wide] of [[a - 1, 90], [a, 88]]) {
       const four = x < wide && (!MESH || halfWidth(x + 0.5) >= 2);   // à la largeur du pédoncule importé
@@ -430,11 +455,13 @@ function colorAt(x, y, z, group) {
 
   if (group === 'socle') return 'black';
   if (group === 'helice') return 'gold';
+  if (group === 'equipage') return cabinColors.get(key(x, y, z)) || 'white';
+  if (!MESH && group === 'arriere' && x >= 80 && cy < Math.floor(axisY(HULL_LEN))) return 'tan';
   if (group === 'verriere') {
     // nervures chromées en surface seulement ; l'intérieur reste en verre
     const rib = CANOPY.ribs.some((r) => Math.abs(cx - r) < 0.6);
     const surface = !solidAt(cx, cy + 1, cz) || !solidAt(cx, cy, cz + 1) || !solidAt(cx, cy, cz - 1);
-    return (rib && surface) || cy < hullTop(cx) + 0.5 ? 'lgrey' : 'trans';   // anneau de base chromé
+    return (rib && surface) || cy < hullSurfaceTop(cx, cz) + 2 ? 'lgrey' : 'trans';
   }
 
   // sur la peau du flanc, à la largeur locale de la section (le ventre
@@ -591,23 +618,64 @@ function mergeVertical(byLayer) {
 // SOUS-ENSEMBLES POSÉS À LA MAIN
 // ================================================================
 
-// L'hélice est à l'extrême arrière, au bout de l'arbre : quatre pales en
-// croix et un moyeu, en or perlé, agrafés sur la poutre.
-function propeller() {
-  const out = [];
-  const a = Math.floor(axisY(HULL_LEN));
-  const P = (x, y, z, dx, dz, h, color, part) =>
-    out.push({ x, y, z, dx, dz, h, color, group: 'helice', part });
-  const hx = SHAFT.hub;
-  P(hx, a + 1, -3, 1, 6, 1, 'gold', 'plate-1x6');
-  P(hx, a - 2, -3, 1, 6, 1, 'gold', 'plate-1x6');
-  P(hx, a + 2, -1, 1, 2, 1, 'gold', 'plate-1x2');
-  P(hx, a + 3, -1, 1, 2, 1, 'gold', 'plate-1x2');
-  P(hx, a - 3, -1, 1, 2, 1, 'gold', 'plate-1x2');
-  P(hx, a - 4, -1, 1, 2, 1, 'gold', 'plate-1x2');
-  P(hx + 1, a + 1, -1, 1, 2, 1, 'gold', 'plate-1x2');
-  P(hx + 1, a - 2, -1, 1, 2, 1, 'gold', 'plate-1x2');
-  return out;
+// L'hélice est à l'extrême arrière : trois pales transversales et un
+// moyeu, en or perlé, raccordés au carénage inférieur beige.
+function addPropellerCells(cells) {
+  const a = Math.floor(axisY(HULL_LEN)) - (MESH ? 0 : 5);
+  // Trois pales balayées autour de l'axe X, dans le plan transversal Y/Z.
+  // Les distances sont exprimées en tenons (une plaque vaut 0,4 tenon).
+  // Leur volume rejoint celui du moyeu avant pavage : pas de pièces
+  // ajoutées après coup à travers l'arbre ou les autres pales.
+  for (let x = SHAFT.hub; x < TOTAL_LEN; x++) {
+    for (let y = a - 10; y <= a + 9; y++) for (let z = -4; z < 4; z++) {
+      const dy = (y + 0.5 - a) * 0.4, dz = z + 0.5;
+      const r = Math.hypot(dy, dz);
+      let filled = r <= (x === TOTAL_LEN - 1 ? 0.85 : 1.25);
+      if (x < TOTAL_LEN - 1 && r <= 3.4) {
+        const theta = Math.atan2(dz, dy);
+        for (let blade = 0; blade < 3; blade++) {
+          const angle = blade * Math.PI * 2 / 3 + 0.32 * r;
+          const delta = Math.atan2(Math.sin(theta - angle), Math.cos(theta - angle));
+          if (Math.cos(delta) > 0 && Math.abs(Math.sin(delta) * r) < 1.2 - 0.1 * r) filled = true;
+        }
+      }
+      if (filled) cells.set(key(x, y, z), 'helice');
+    }
+  }
+  if (!MESH) {
+    // Assise beige sous le moyeu : une même rangée traverse la jonction
+    // coque/hélice et reçoit les pièces dorées par leurs tenons.
+    for (let x = 90; x < 95; x++) for (let z = -1; z < 1; z++) {
+      cells.set(key(x, a - 4, z), 'arriere');
+    }
+  }
+}
+
+// Petits personnages construits dans le même catalogue de briques que
+// le sous-marin ; intégrés aux couches du guide avant de fermer la bulle.
+function addCrew(cells) {
+  const box = (x0, x1, y0, y1, z0, z1, color) => {
+    for (let x=x0; x<x1; x++) for (let y=y0; y<y1; y++) for (let z=z0; z<z1; z++) {
+      const k=key(x,y,z); cells.set(k,'equipage'); cabinColors.set(k,color);
+    }
+  };
+  // Tintin, tourné vers le museau (−X) : pull bleu, visage et houppette.
+  box(32,36,87,92,-2,2,'blue');
+  box(32,36,92,97,-2,2,'tan');
+  box(33,36,97,98,-2,2,'orange');
+  box(32,34,98,100,-1,1,'orange');
+  box(31,32,93,95,-1,1,'tan');
+  box(32,33,95,96,-2,-1,'black');
+  box(32,33,95,96,1,2,'black');
+  // Milou derrière Tintin : corps, tête blanche, museau et oreilles.
+  box(39,43,87,92,-2,2,'white');
+  box(39,43,92,96,-2,2,'white');
+  box(38,40,93,95,-1,1,'white');
+  box(38,39,95,96,-1,1,'black');
+  box(41,43,96,98,-2,-1,'white');
+  box(41,43,96,98,1,2,'white');
+  box(39,40,94,95,-2,-1,'black');
+  box(39,40,94,95,1,2,'black');
 }
 
 // Le socle de la maquette : une plaque noire de 54 × 22 tenons, et deux
@@ -737,8 +805,18 @@ export function buildModel(voxels = null) {
     solid = voxelize();
   }
   const cells = shell(solid);
+  cabinColors.clear();
+  if (!MESH) addCrew(cells);
   if (voxels) for (const [k, g] of cells) if (g === 'coque') cells.set(k, Number(k.split('|')[0]) < 38 ? 'avant' : 'arriere');
   addChassis(cells);
+  if (addPropeller) addPropellerCells(cells);
+  // Réserver une vraie plaque 2×4 traversant le joint du moyeu : le
+  // pavage glouton peut sinon aligner toutes ses coutures en x=93.
+  const hubBridge = !MESH && addPropeller ? {
+    x: 91, y: Math.floor(axisY(HULL_LEN)) - 9, z: -1,
+    dx: 4, dz: 2, h: 1, color: 'tan', group: 'arriere', part: 'plate-2x4',
+  } : null;
+  if (hubBridge) for (let x = 91; x < 95; x++) for (let z = -1; z < 1; z++) cells.delete(key(x, hubBridge.y, z));
 
   const byLayer = new Map();
   for (const [k, group] of cells) {
@@ -753,7 +831,7 @@ export function buildModel(voxels = null) {
 
   let pieces = mergeVertical(packed);
   // le maillage apporte sa propre hélice ; le socle, lui, est toujours posé ici
-  pieces = pieces.concat(addPropeller ? propeller() : [], stand(cells));
+  pieces = pieces.concat(hubBridge ? [hubBridge] : [], stand(cells));
 
   pieces.sort((a, b) => a.y - b.y || a.x - b.x || a.z - b.z);
   pieces.forEach((p, i) => { p.id = i; });
