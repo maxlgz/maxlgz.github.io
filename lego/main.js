@@ -193,7 +193,7 @@ const HULL = new Set(['avant', 'arriere']);
 const values = {
   count: nf.format(stats.count),
   types: nf.format(stats.types),
-  stages: STAGES.length,
+  stages: steps.length,
   layers: nf.format(new Set(pieces.map((p) => p.y)).size),
   noir: nf.format(countIn((p) => p.color === 'black' && HULL.has(p.group))),
   blanc: nf.format(countIn((p) => p.color === 'tan' && HULL.has(p.group))),
