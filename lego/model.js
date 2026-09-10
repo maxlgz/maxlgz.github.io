@@ -240,7 +240,9 @@ function canopy(x, y, z) {
   const ease = (1 - Math.cos(Math.PI * t)) / 2;
   const roof = hullTop(x) + (canopySide(Math.max(x, CANOPY.x0 + CANOPY.ramp)) - hullTop(x)) * ease;
   const top = hullTop(x) + (roof - hullTop(x)) * Math.sqrt(Math.max(0, 1 - Math.pow(z / hz, 2)));
-  if (y > top || y <= hullSurfaceTop(x, z) - 1.5) return null;
+  // L'assise longitudinale ne descend pas sous y=84 : les variations
+  // sub-plaque du profil créaient sinon des languettes grises isolées.
+  if (y > top || y < 84 || y <= hullSurfaceTop(x, z) - 1.5) return null;
   // Le vitrage rejoint directement la coque arrondie. Le remplissage
   // « pont » jusqu'au sommet du dos créait une haute paroi noire verticale.
   return 'verriere';
