@@ -500,13 +500,17 @@ function colorAt(x, y, z, group) {
     for (const gx of [first, first - 2, first - 4, first - 6]) if (Math.floor(cx) === gx) return 'black';
   }
 
-  // Bouche : le triangle blanc sous les dents, bordé de noir sur sa
-  // pente, relevé sur la photo de profil
-  if (onFlank) {
+  // La bouche enveloppe aussi le dessous du museau : le trait transversal
+  // rejoint les deux pointes du sourire, sans interrompre le blanc au ventre.
+  if (fam(group) === 'coque') {
+    if (x === 13 && cy < 54) return 'black';
     const col = MOUTH[Math.floor(cx)];
     if (col) {
-      if (cy > col.white[0] && cy < col.white[1] + 1) return 'white';
-      if (cy > col.black[0] && cy < col.black[1] + 1) return 'black';
+      if (x >= 14 && cy < col.white[1] + 1) return 'white';
+      if (onFlank) {
+        if (cy > col.white[0] && cy < col.white[1] + 1) return 'white';
+        if (cy > col.black[0] && cy < col.black[1] + 1) return 'black';
+      }
     }
   }
 
