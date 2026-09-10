@@ -231,7 +231,11 @@ function canopy(x, y, z) {
   const u = Math.min(...keys) + (x - CANOPY.x0) / (CANOPY.x1 - CANOPY.x0) * (Math.max(...keys) - Math.min(...keys));
   const t = clamp((x - CANOPY.x0) / CANOPY.ramp, 0, 1);
   const rear = clamp((CANOPY.x1 - x) / 5, 0, 1);
-  const hz = T.canopyHalfZ(u) * Math.sqrt(1 - (1 - t) * (1 - t)) * Math.sqrt(1 - (1 - rear) ** 2);
+  // Le relevé de dessus incluait la largeur projetée de la bulle :
+  // utilisé tel quel sur une section elliptique, il descendait jusqu'au
+  // milieu du flanc. Limiter l'emprise au sommet arrondi du dos maintient
+  // le raccord à environ trois plaques sous la crête, sans podium noir.
+  const hz = T.canopyHalfZ(u) * 0.62 * Math.sqrt(1 - (1 - t) * (1 - t)) * Math.sqrt(1 - (1 - rear) ** 2);
   if (!hz || hz < 0.5 || Math.abs(z) > hz) return false;
   const ease = (1 - Math.cos(Math.PI * t)) / 2;
   const roof = hullTop(x) + (canopySide(Math.max(x, CANOPY.x0 + CANOPY.ramp)) - hullTop(x)) * ease;
