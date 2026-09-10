@@ -93,9 +93,14 @@ ligne de commande :
 
 ## Guide de montage
 
+Les pectorales avant sont affinées : attache rentrée sous la coque,
+épaisseur réduite et contour resserré. À l'arrière, le modèle photo possède
+une seule petite nageoire ventrale médiane, à bord de fuite échancré.
+Les anciens groupes de pelviennes restent reconnus pour les imports existants.
+
 L'onglet « Guide de montage » découpe le modèle en étapes, du bas vers le
 haut toutes pièces confondues — rien ne s'insère après coup dans une coque
-refermée. Les nageoires pendantes (pectorales, pelviennes, lobe inférieur de
+refermée. Les nageoires pendantes (pectorales, ventrale, lobe inférieur de
 la caudale) se montent d'abord à plat ; le guide indique l'étape exacte où
 les presser sous la coque, juste après la couche qui les reçoit. Le socle
 vient en dernier. Un second visualiseur grise le
