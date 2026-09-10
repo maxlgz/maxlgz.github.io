@@ -13,8 +13,9 @@
     <script type="importmap">
       {
         "imports": {
-          "./model.js": "./model.js?v=20260910-mouth-wrap",
-          "./viewer.js": "./viewer.js?v=20260910-cockpit",
+          "./model.js": "./model.js?v=20260910-guide",
+          "./viewer.js": "./viewer.js?v=20260910-guide",
+          "./exports.js": "./exports.js?v=20260910-guide",
           "three": "./vendor/three.module.min.js",
           "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js",
           "three/addons/environments/RoomEnvironment.js": "./vendor/RoomEnvironment.js"
@@ -242,7 +243,7 @@
           </div>
 
           <div class="cart-summary">
-            <span class="cart-check">✓ Bordereau prêt à commander</span>
+            <span class="cart-check">Bordereau à vérifier avant commande</span>
             <div class="cart-actions">
               <button class="bag-link" type="button" data-dl="xml">↓ Liste de manque BrickLink (.xml)</button>
               <button class="download" type="button" data-dl="ldr">↓ Modèle LDraw (.ldr)</button>
@@ -254,6 +255,16 @@
             <button type="button" data-dl="guide">↓ Guide de montage (.md)</button>
             <button type="button" data-dl="csv">↓ Bordereau (.csv)</button>
           </div>
+          <section class="assembly-note" aria-label="Commander sur LEGO Pick a Brick">
+            <h3>Préparer le panier LEGO Pick a Brick</h3>
+            <p id="pab-status"></p>
+            <p id="pab-missing" role="status"></p>
+            <button class="bag-link" type="button" data-dl="lego">↓ Export LEGO Pick a Brick (.csv, partiel)</button>
+            <a class="download" href="https://www.lego.com/en-us/pick-and-build/pick-a-brick?icmp=PAB_All_Pieces" target="_blank" rel="noopener">Ouvrir LEGO Pick a Brick ↗</a>
+            <p>1. Télécharger le CSV. 2. Sur LEGO, choisir « Upload List » et importer ce fichier.
+              3. Vérifier les pièces reconnues, les couleurs, les quantités et les manquantes avant « Add to Bag ».
+              Choisir le pays de livraison sur LEGO. L’import ne remplace pas la vérification du panier.</p>
+          </section>
         </div>
       </section>
 
@@ -284,9 +295,10 @@
                 1 brique = 3 plaques. Chaque étape indique la hauteur du dessous des pièces à poser.
               </p>
               <p>
-                Le modèle se monte <b>du bas vers le haut, toutes pièces confondues</b> : chaque couche contient
-                ce qui s’y trouve — coque, poutre, base de la verrière, dorsales, caudale. Rien ne s’insère après
-                coup dans une coque refermée. Seules les <b>nageoires pendantes</b> (pectorales, pelviennes, lobe
+                Le modèle se monte <b>par attaches disponibles, six pièces maximum par étape</b> : chaque étape contient
+                des pièces reliées aux pièces déjà posées, ou les premières pièces à disposer sur la table.
+                Les poses par dessous sont indiquées explicitement et demandent de soutenir le montage.
+                Les <b>nageoires pendantes</b> (pectorales, ventrale, lobe
                 inférieur de la caudale), qui n’ont rien sous elles, se montent d’abord à plat, pointe sur la
                 table ; le guide indique l’étape exacte où les presser par en dessous, juste après la couche de
                 coque qui les reçoit. Le <b>socle</b> se monte en dernier ; on y descend le sous-marin.
@@ -308,8 +320,8 @@
               </div>
               <div class="assembly-view-tools">
                 <span class="assembly-legend">
-                  <i class="sw" style="background:#1fb6c9"></i> À poser
-                  <i class="sw" style="background:#c7ced7;margin-left:14px"></i> Déjà monté
+                  <i class="sw" style="background:#bfa875"></i> À poser : couleur réelle
+                  <i class="sw" style="background:#ded2b9;margin-left:14px"></i> Déjà monté : couleur atténuée
                 </span>
                 <button class="assembly-toggle" type="button" id="cycle-view">⟳ Changer de vue</button>
               </div>
@@ -370,6 +382,6 @@
       </footer>
     </main>
 
-    <script type="module" src="main.js"></script>
+    <script type="module" src="main.js?v=20260910-guide"></script>
   </body>
 </html>

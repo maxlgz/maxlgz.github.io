@@ -161,5 +161,24 @@ physiquement. Les prix sont une
 estimation paramétrique (plancher par pièce + coût proportionnel à la surface),
 pas un tarif relevé chez un revendeur.
 
+### Révision du 10 septembre : guide et Pick a Brick
+
+Le guide suit les attaches disponibles (6 ajouts maximum par pose), avec
+support identifié et poses par dessous explicites. Les premières pièces de
+chaque unité sont disposées sur la table. Ce contrôle n'est ni une simulation
+de résistance ni une preuve d'accès manuel à toutes les attaches.
+Les couleurs sont conservées, le montage précédent atténué, les ajouts
+bordés de rouge ; la caméra montre le dessous quand nécessaire.
+
+Le bouton CSV Pick a Brick utilise `elementId,quantity`, comme le modèle
+officiel LEGO consulté le 10/09/2026. `lego-elements.js` contient les
+correspondances du catalogue Rebrickable, pas les stocks LEGO. Les références
+non identifiées sont exclues ET listées à l'écran ; aucune substitution de
+couleur, aucun ajout automatique au panier. L'utilisateur importe le fichier
+sur LEGO et vérifie le résultat. Ne pas présenter le bordereau comme complet.
+
+Contrôles additionnels : `node lego/tools/check-guide.mjs`,
+`node lego/tools/check-small-fins.mjs`, `node lego/tools/check-pab.mjs`.
+
 Création de fan indépendante. Non affiliée à LEGO®, ni à Moulinsart /
 Tintinimaginatio.

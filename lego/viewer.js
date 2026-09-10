@@ -19,8 +19,6 @@ const STUD_H = 0.22;
 
 const ACCENT = new THREE.Color('#c92b30');   // le rouge du site
 const BG = '#f0f3f7';
-const ADD = new THREE.Color('#1fb6c9');      // mode montage : à poser
-const BUILT = new THREE.Color('#c7ced7');    // mode montage : déjà monté
 
 export function createViewer(canvas, model) {
   const { pieces } = model;
@@ -129,6 +127,10 @@ export function createViewer(canvas, model) {
   }
 
   const sets = { opaque: makeSet(opaque, solidMat), clear: makeSet(clear, clearMat) };
+  const additionEdges = new THREE.Group();
+  const edgeGeometry = new THREE.EdgesGeometry(boxGeo);
+  const edgeMaterial = new THREE.LineBasicMaterial({color:'#c92b30'});
+  scene.add(additionEdges);
   sets.clear.bodies.renderOrder = 2;
   sets.clear.studs.renderOrder = 2;
 
@@ -195,7 +197,8 @@ export function createViewer(canvas, model) {
 
   function tint(p) {
     if (state.build) {
-      col.copy(state.build.add.has(p.id) ? ADD : BUILT);
+      col.set(COLORS[p.color].hex);
+      if (!state.build.add.has(p.id)) col.lerp(new THREE.Color(BG), 0.45);
       return col;
     }
     col.set(COLORS[p.color].hex);
@@ -247,6 +250,7 @@ export function createViewer(canvas, model) {
     dessus:  [0.10, 1.0, 0.45],
     profil:  [0.05, 0.25, 1.0],
     arriere: [1.0, 0.45, 0.6],
+    dessous: [0.7, -0.8, 0.9],
   };
   const before = (x1) => (p) => p.x < x1;
   const after = (x0) => (p) => p.x + p.dx > x0;
@@ -400,10 +404,26 @@ export function createViewer(canvas, model) {
     setGroupFilter(g) { state.groupFilter = g; updateMatrices(); },
     setHighlight(h) { state.highlight = h; updateColors(); },
     setView,
-    // Mode montage : `built` déjà posé (gris), `add` à poser (cyan),
+    // Mode montage : vraies couleurs, déjà posé atténué, ajouts non atténués.
     // `only` n'affiche que les additions. La caméra cadre les additions.
     setBuild(b, dirName = 'montage') {
       state.build = b;
+      controls.maxPolarAngle = b ? Math.PI * 0.95 : Math.PI * 0.52;
+      ground.visible = grid.visible = dirName !== 'dessous';
+      for (const m of [sets.clear.bodies.material,sets.clear.studs.material]) {
+        m.opacity=b?0.55:0.09; m.transmission=b?0.2:0.85;
+      }
+      additionEdges.clear();
+      if(b && b.add.size<=100) for(const id of b.add) {
+        const p=pieces[id], edge=new THREE.LineSegments(edgeGeometry,edgeMaterial);
+        edge.scale.set(p.dx,p.h*PLATE_U,p.dz);
+        edge.position.set(p.x+p.dx/2-cx,(p.y-y0+p.h/2)*PLATE_U,p.z+p.dz/2-cz);
+        additionEdges.add(edge);
+      }
+      // Le plan de travail vient sous les pièces visibles du sous-ensemble.
+      const floor = b ? (Math.min(...pieces.filter(p => b.add.has(p.id) || b.built.has(p.id)).map(p => p.y)) - y0) * PLATE_U : 0;
+      ground.position.y = floor - 0.02;
+      grid.position.y = floor;
       updateMatrices(); updateColors();
       if (!b) return;
       const ids = b.add;

@@ -1,0 +1,11 @@
+import {strict as assert} from 'assert';
+import {buildModel} from '../model.js';
+import {pickABrickList} from '../exports.js';
+const model=buildModel(), list=pickABrickList(model.stats);
+assert(list.csv.startsWith('elementId,quantity\r\n'));
+assert(list.rows.length<=400);
+assert(list.rows.every(r=>/^\d+$/.test(r.elementId)&&Number.isInteger(r.quantity)&&r.quantity>0));
+assert.equal(new Set(list.rows.map(r=>r.elementId)).size,list.rows.length);
+assert.equal(list.rows.reduce((n,r)=>n+r.quantity,0)+list.missing.reduce((n,r)=>n+r.qty,0),model.stats.count);
+assert(list.missing.every(r=>!list.csv.includes('undefined')));
+console.log(`OK : CSV LEGO ${list.rows.length} références ; ${list.missing.reduce((n,r)=>n+r.qty,0)} pièces explicitement exclues faute d'identifiant. Disponibilité non testée.`);
