@@ -122,7 +122,7 @@ export const PARTS = {
 // où la couche de coque qui les reçoit vient d'être posée. Le socle se
 // monte en dernier et reçoit le sous-marin.
 export const STAGES = [
-  { id: 1, key: 'sous-ensembles', label: 'Sous-ensembles',  blurb: 'Les nageoires pendantes, montées à plat de la pointe vers l’attache : deux pectorales, deux pelviennes et le lobe inférieur de la caudale. Elles seront pressées sous la coque au fil du montage.' },
+  { id: 1, key: 'sous-ensembles', label: 'Sous-ensembles',  blurb: 'Les nageoires pendantes, montées à plat de la pointe vers l’attache : deux pectorales, une nageoire ventrale centrale et le lobe inférieur de la caudale. Elles seront pressées sous la coque au fil du montage.' },
   { id: 2, key: 'ventre',         label: 'Ventre',          blurb: 'Les premières couches de la coque, depuis la quille, sur une planche plane. La peau suit la section du corps et s’élargit à chaque couche.' },
   { id: 3, key: 'flancs',         label: 'Flancs',          blurb: 'Les couches à hauteur d’axe : la poutre longitudinale s’intègre, les nageoires pendantes se fixent, la racine de la caudale se pose sur son lobe inférieur.' },
   { id: 4, key: 'dos',            label: 'Dos',             blurb: 'La coque se referme. La base de la verrière, la dorsale et la seconde dorsale démarrent sur les dernières couches de peau.' },
@@ -141,6 +141,7 @@ export const GROUPS = {
   pectoraleG: { label: 'Pectorale bâbord',     stage: 3, dir: [0, -0.2, -1] },
   pelvienneD: { label: 'Pelvienne tribord',    stage: 3, dir: [0, -0.6, 1] },
   pelvienneG: { label: 'Pelvienne bâbord',     stage: 3, dir: [0, -0.6, -1] },
+  ventrale:  { label: 'Nageoire ventrale centrale', stage: 3, dir: [0, -1, 0] },
   dorsale:    { label: 'Dorsale',              stage: 3, dir: [0, 1, 0] },
   dorsale2:   { label: 'Dorsale secondaire',   stage: 3, dir: [0, 1, 0] },
   caudale:    { label: 'Caudale',              stage: 4, dir: [1, 0.3, 0] },
@@ -291,7 +292,7 @@ function caudal(x, y, z) {
 // remonte jusqu'à la peau de la coque pour s'y agrafer sur toute sa
 // racine ; deux tenons d'épaisseur.
 const FINS = {
-  pectoral: { side: PR.pectoral, yRoot: 47.5, depth: 25, zRoot: 6.3, zTip: 12.4 },
+  pectoral: { side: PR.pectoral, yRoot: 47.5, depth: 25, zRoot: 5.3, zTip: 12.4 },
   pelvic:   { side: PR.pelvic,   yRoot: 55.5, depth: 7.5, zRoot: 4.3, zTip: 6.8 },
 };
 // Reconstruction continue des deux bords de la pectorale, sur le profil
@@ -303,7 +304,11 @@ const pectoralBack = table({ 21: 34, 24: 34, 28: 33.5, 34: 32.5,
   40: 31.5, 47: 30, 58: 30 });
 function hangingFin(x, y, z, fin) {
   const pectoral = fin === FINS.pectoral;
-  if (pectoral && (y < 21.5 || x < pectoralFront(y) || x > pectoralBack(y))) return false;
+  if (pectoral) {
+    const front = pectoralFront(y), back = pectoralBack(y);
+    const inset = (back - front) * 0.08;
+    if (y < 21.5 || x < front + inset || x > back - inset) return false;
+  }
   const v = pectoral ? [fin.yRoot, 21.5] : fin.side[Math.floor(x)];
   if (!v) return false;
   const [yHi, yLo] = v[0] > v[1] ? v : [v[1], v[0]];
@@ -315,7 +320,7 @@ function hangingFin(x, y, z, fin) {
   const zc = zRoot + (Math.max(fin.zTip, zRoot + 3) - zRoot) * t;
   // Racine épaisse, extrémité affinée ; la largeur diminue graduellement
   // pour conserver le recouvrement entre les assises de plaques.
-  const thickness = fin === FINS.pectoral ? 0.85 + 0.75 * Math.pow(1 - t, 1.4) : 1;
+  const thickness = pectoral ? 0.7 + 0.3 * Math.pow(1 - t, 1.4) : 1;
   if (Math.abs(az - zc) > thickness) return false;
   // sous la coque : jusqu'à la peau, à cet écartement
   const W = halfWidth(x);
@@ -334,7 +339,14 @@ function solidAt(x, y, z) {
   if (caudal(x, y, z)) return 'caudale';
   if (z >= -1 && z < 1) { const d = dorsalAt(x, y); if (d) return d; }
   if (hangingFin(x, y, z, FINS.pectoral)) return z > 0 ? 'pectoraleD' : 'pectoraleG';
-  if (hangingFin(x, y, z, FINS.pelvic))   return z > 0 ? 'pelvienneD' : 'pelvienneG';
+  // Une seule nageoire médiane, sous la petite dorsale, et non une paire
+  // de pelviennes latérales. Profil inférieur relevé sur la vue officielle.
+  const ventral = PR.pelvic[Math.floor(x)];
+  if (ventral && Math.abs(z) < 1 && y >= Math.min(...ventral) - 0.5
+      && y <= hullBottom(x) + 0.5) {
+    const trailing = table({ 48: 75, 50: 74.5, 52: 73.8, 54: 77, 57: 75 });
+    if (x <= trailing(y)) return 'ventrale';
+  }
   return null;
 }
 
@@ -741,7 +753,7 @@ function useMesh(runs) {
 }
 
 // Groupes que le modèle photo sait fournir quand un maillage ne les a pas
-const PARAM_GROUPS = ['verriere', 'dorsale', 'dorsale2', 'caudale', 'pectoraleG', 'pectoraleD', 'pelvienneG', 'pelvienneD'];
+const PARAM_GROUPS = ['verriere', 'dorsale', 'dorsale2', 'caudale', 'pectoraleG', 'pectoraleD', 'ventrale'];
 
 export function buildModel(voxels = null) {
   let solid;
@@ -793,7 +805,7 @@ export function buildModel(voxels = null) {
         // la première cellule de coque au-dessus d'elles.
         const tops = new Map();
         for (const [x, y, z, g] of added) {
-          if (!/^(pectorale|pelvienne)/.test(g)) continue;
+          if (!/^(pectorale|pelvienne|ventrale)/.test(g)) continue;
           const ck = `${x}|${z}`;
           if (!tops.has(ck) || tops.get(ck)[0] < y) tops.set(ck, [y, g]);
         }
@@ -855,6 +867,7 @@ export function buildModel(voxels = null) {
 const HANGING = {
   pectoraleG: 'Pectorale bâbord', pectoraleD: 'Pectorale tribord',
   pelvienneG: 'Pelvienne bâbord', pelvienneD: 'Pelvienne tribord',
+  ventrale: 'Nageoire ventrale centrale',
   caudaleBas: 'Lobe inférieur de la caudale',
 };
 export const HANGING_LABELS = HANGING;
