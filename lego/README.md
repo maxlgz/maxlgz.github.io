@@ -161,6 +161,17 @@ physiquement. Les prix sont une
 estimation paramétrique (plancher par pièce + coût proportionnel à la surface),
 pas un tarif relevé chez un revendeur.
 
+### Correction Pick a Brick France — 10 septembre 2026
+
+Le CSV complet a été importé et contrôlé dans l'interface officielle française :
+74 références reconnues, zéro refus, 3 523 pièces (quantités relues après import).
+Aucun ajout au panier ni achat. Les stocks peuvent changer après ce contrôle.
+Le modèle utilise les références acceptées de `lego-elements.js`. Les pièces
+non disponibles sont remplacées dans le modèle ET la notice, avec conservation
+exacte du volume et des couleurs (`node lego/tools/check-france.mjs`).
+Les joints de l'hélice sont croisés pour conserver une seule composante.
+Contrepartie : 475 pièces supplémentaires, surtout dans la verrière.
+
 ### Révision du 10 septembre : guide et Pick a Brick
 
 Le guide suit les attaches disponibles (6 ajouts maximum par pose), avec
