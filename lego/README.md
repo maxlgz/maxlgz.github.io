@@ -156,7 +156,7 @@ reconstruction exacte en trois dimensions à partir de deux photographies.
 Les recouvrements et la connectivité des tenons sont vérifiés pièce par pièce
 et le résultat est affiché sur la page (un seul bloc solidaire, aucun
 chevauchement), mais les croissants de la caudale en porte-à-faux, l'ancrage
-des pectorales et les tiges du socle sont des propositions non éprouvées
+des pectorales et les berceaux du socle sont des propositions non éprouvées
 physiquement. Les prix sont une
 estimation paramétrique (plancher par pièce + coût proportionnel à la surface),
 pas un tarif relevé chez un revendeur.
