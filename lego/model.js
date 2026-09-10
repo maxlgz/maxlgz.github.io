@@ -238,10 +238,14 @@ function canopy(x, y, z) {
 
 // --- Dorsales : contour de profil, lame de deux tenons ------------------
 function dorsalAt(x, y) {
-  if (inRange(PR.dorsal, x) && y > hullTop(x) - 1 && y <= T.dorsal(x)) return 'dorsale';
+  // Bord de fuite concave estimé sur ref/profil.png : contrairement au
+  // seul contour supérieur extrait, la nageoire n'est pas un triangle plein.
+  if (inRange(PR.dorsal, x) && y > hullTop(x) - 1 && y <= T.dorsal(x) && x <= dorsalTrailing(y)) return 'dorsale';
   if (inRange(PR.dorsal2, x) && y > hullTop(x) - 1 && y <= T.dorsal2(x)) return 'dorsale2';
   return null;
 }
+const dorsalTrailing = table({ 86: 53, 90: 54, 92: 55.5, 94: 54,
+  97: 52.8, 100: 52.9, 103: 53.6, 106: 54.7, 110: 56, 115: 57 });
 
 // --- Caudale en croix : deux croissants identiques, l'un vertical (vu de
 // profil), l'autre horizontal (vu de dessus). L'arbre de l'hélice est le
@@ -278,8 +282,17 @@ const FINS = {
   pectoral: { side: PR.pectoral, yRoot: 47.5, depth: 25, zRoot: 6.3, zTip: 12.4 },
   pelvic:   { side: PR.pelvic,   yRoot: 55.5, depth: 7.5, zRoot: 4.3, zTip: 6.8 },
 };
+// Reconstruction continue des deux bords de la pectorale, sur le profil
+// officiel. Les anciennes colonnes contaminées par la tige du socle
+// dessinaient plusieurs pointes au lieu d'une seule aile courbe.
+const pectoralFront = table({ 21: 33, 24: 30.5, 28: 28, 34: 26,
+  40: 24.5, 47: 23, 58: 23 });
+const pectoralBack = table({ 21: 34, 24: 34, 28: 33.5, 34: 32.5,
+  40: 31.5, 47: 30, 58: 30 });
 function hangingFin(x, y, z, fin) {
-  const v = fin.side[Math.floor(x)];
+  const pectoral = fin === FINS.pectoral;
+  if (pectoral && (y < 21.5 || x < pectoralFront(y) || x > pectoralBack(y))) return false;
+  const v = pectoral ? [fin.yRoot, 21.5] : fin.side[Math.floor(x)];
   if (!v) return false;
   const [yHi, yLo] = v[0] > v[1] ? v : [v[1], v[0]];
   if (y < yLo - 0.5) return false;
@@ -288,13 +301,16 @@ function hangingFin(x, y, z, fin) {
   // sur une coque importée plus étroite, la racine se rapproche de l'axe
   const zRoot = Math.min(fin.zRoot, halfWidth(x) - 1);
   const zc = zRoot + (Math.max(fin.zTip, zRoot + 3) - zRoot) * t;
-  if (Math.abs(az - zc) > 1) return false;
+  // Racine épaisse, extrémité affinée ; la largeur diminue graduellement
+  // pour conserver le recouvrement entre les assises de plaques.
+  const thickness = fin === FINS.pectoral ? 0.85 + 0.75 * Math.pow(1 - t, 1.4) : 1;
+  if (Math.abs(az - zc) > thickness) return false;
   // sous la coque : jusqu'à la peau, à cet écartement
   const W = halfWidth(x);
   const zz = Math.min(az, Math.max(0, W - 0.8));
   const k = Math.max(0, 1 - Math.pow(zz / W, CROSS_N));
   const surf = axisY(x) - halfBottom(x) * Math.pow(k, 1 / CROSS_N);
-  const yMax = yHi >= hullBottom(x) - 1.5 ? surf : yHi;   // racine sur le ventre : jusqu'à la peau
+  const yMax = pectoral || yHi >= hullBottom(x) - 1.5 ? surf : yHi;   // racine sur le ventre : jusqu'à la peau
   return y <= yMax + 0.5;
 }
 
@@ -337,17 +353,22 @@ function voxelize() {
 // de deux cellules en hauteur et d'une en longueur, vers l'intérieur :
 // les anneaux se recouvrent et les colonnes se rejoignent. Museau et
 // pédoncule, trop étroits pour être creux, restent pleins.
-const HOLLOW = new Set(['avant', 'arriere', 'coque']);   // la verrière reste pleine
+const HOLLOW = new Set(['avant', 'arriere', 'coque', 'verriere']);
 function shell(solid) {
   const skin = new Map();
   const exposedCells = [];
   for (const [k, g] of solid) {
     if (!HOLLOW.has(g)) { skin.set(k, g); continue; }
     const [x, y, z] = k.split('|').map(Number);
-    if (!MESH && halfWidth(x + 0.5) < 4.5) { skin.set(k, g); exposedCells.push([x, y, z]); continue; }
+    // Les trois arceaux restent contreventés à l'intérieur de la bulle :
+    // leurs petites pièces grises doivent s'agrafer aux assises voisines.
+    if (g === 'verriere' && CANOPY.ribs.some(r => Math.abs(x + 0.5 - r) < 1.6)) {
+      skin.set(k, g); exposedCells.push([x, y, z]); continue;
+    }
+    if (!MESH && g !== 'verriere' && halfWidth(x + 0.5) < 4.5) { skin.set(k, g); exposedCells.push([x, y, z]); continue; }
     // exposée au vide, ou en contact avec une nageoire, la bulle, une
     // dorsale : ce qui s'agrafe à la coque a besoin de sa peau
-    const open = (kk) => { const gg = solid.get(kk); return gg === undefined || !HOLLOW.has(gg); };
+    const open = (kk) => { const gg = solid.get(kk); return gg === undefined || !HOLLOW.has(gg) || (g === 'verriere') !== (gg === 'verriere'); };
     const exposed =
       open(key(x + 1, y, z)) || open(key(x - 1, y, z)) ||
       open(key(x, y + 1, z)) || open(key(x, y - 1, z)) ||
