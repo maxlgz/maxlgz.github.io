@@ -111,8 +111,8 @@ export function createViewer(canvas, model) {
 
   const solidMat = () => new THREE.MeshStandardMaterial({ roughness: 0.38, metalness: 0.02, envMapIntensity: 0.45 });
   const clearMat = () => new THREE.MeshPhysicalMaterial({
-    color: '#eaf6fb', roughness: 0.04, metalness: 0, transparent: true, opacity: 0.22,
-    transmission: 0.55, thickness: 1.5, ior: 1.5, clearcoat: 1, clearcoatRoughness: 0.04,
+    color: '#f7fbff', roughness: 0.03, metalness: 0, transparent: true, opacity: 0.09,
+    transmission: 0.85, thickness: 0.3, ior: 1.46, clearcoat: 1, clearcoatRoughness: 0.04,
     envMapIntensity: 1.2, depthWrite: false, side: THREE.DoubleSide,
   });
 
