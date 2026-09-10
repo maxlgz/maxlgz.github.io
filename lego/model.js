@@ -127,7 +127,7 @@ export const STAGES = [
   { id: 3, key: 'flancs',         label: 'Flancs',          blurb: 'Les couches à hauteur d’axe : la poutre longitudinale s’intègre, les nageoires pendantes se fixent, la racine de la caudale se pose sur son lobe inférieur.' },
   { id: 4, key: 'dos',            label: 'Dos',             blurb: 'La coque se referme. La base de la verrière, la dorsale et la seconde dorsale démarrent sur les dernières couches de peau.' },
   { id: 5, key: 'superstructures', label: 'Verrière, dorsale, caudale', blurb: 'Tout ce qui dépasse du dos : la voûte et ses arceaux, la dorsale en faucille, le lobe supérieur de la caudale, l’arbre et l’hélice.' },
-  { id: 6, key: 'socle',          label: 'Socle',           blurb: 'La plaque noire en deux couches croisées, les deux tiges, puis la pose du sous-marin.' },
+  { id: 6, key: 'socle',          label: 'Socle',           blurb: 'La plaque noire en deux couches croisées, les pieds évasés, les piliers et leurs berceaux, puis la pose du sous-marin.' },
 ];
 
 // --- Sous-ensembles (pour l'éclaté) ------------------------------
@@ -751,10 +751,9 @@ function addCrew(cells) {
   box(39,40,94,95,1,2,'black');
 }
 
-// Le socle de la maquette : une plaque noire de 54 × 22 tenons, et deux
-// tiges qui portent le sous-marin quinze centimètres au-dessus.
-// Les tiges sont des colonnes de briques 2 × 2 ; c'est le point le plus
-// fragile du modèle en briques, et la page le dit.
+// Proposition de socle LEGO : plaque noire 54×22 et deux piliers évasés.
+// Les berceaux répartissent les contacts sous le ventre. Validation
+// géométrique uniquement : un montage physique reste nécessaire.
 function stand(cells) {
   const out = [];
   const P = (x, y, z, dx, dz, h, part) =>
@@ -771,18 +770,32 @@ function stand(cells) {
   for (const [x, dx] of columns) {
     for (const [z, dz] of [[-11, 1], [-10, 8], [-2, 8], [6, 4], [10, 1]]) S(1, x, z, dx, dz);
   }
-  // deux tiges de briques 2 × 2, jusqu'au contact du ventre
-  for (const cx of [24, 61]) {   // positions relevées sur la photo
-    // la tige monte jusqu'à la première cellule de coque de son emprise
-    let topY = NY;
-    for (const x of [cx, cx + 1]) for (const z of [-1, 0]) {
-      for (let y = 0; y < NY; y++) if (cells.has(key(x, y, z))) { topY = Math.min(topY, y); break; }
+  // Proposition de supports : noyau 4×4, pieds évasés 6×14 et
+  // berceau 4×8 épousant le dessous du modèle. Pas de résistance garantie.
+  const supports = new Map();
+  for (const cx of [24, 61]) {
+    const bottoms = new Map(); let keel = NY;
+    for(let x=cx-2;x<cx+4;x++) for(let z=-7;z<7;z++) {
+      let bottom=NY;
+      for(let y=2;y<NY;y++) if(cells.has(key(x,y,z))) {bottom=y;break;}
+      bottoms.set(`${x}|${z}`,bottom);
+      if(x>=cx-1&&x<cx+3&&Math.abs(z+0.5)<2)keel=Math.min(keel,bottom);
     }
-    for (let y = 2; y < topY; y += 3) {
-      const h = Math.min(3, topY - y);
-      P(cx, y, -1, 2, 2, h, h === 3 ? 'brick-2x2' : 'plate-2x2');
+    for(let y=2;y<Math.min(NY,keel+10);y++) {
+      const foot = y<11;
+      const flare = y>=keel-6;
+      const halfZ=foot?7-Math.floor((y-2)/3)*2:flare?Math.min(4,2+Math.floor((y-(keel-6))/2)):2;
+      const x0=foot?cx-2:cx-1, x1=foot?cx+4:cx+3;
+      for(let x=x0;x<x1;x++) for(let z=-halfZ;z<halfZ;z++) {
+        if(y>=bottoms.get(`${x}|${z}`))continue;
+        if(!supports.has(y))supports.set(y,new Map());
+        supports.get(y).set(`${x}|${z}`,{color:'black',group:'socle'});
+      }
     }
   }
+  const packedSupports=new Map();
+  for(const [y,layer] of supports)packedSupports.set(y,packLayer(layer,Math.floor((y-2)/3)%2,y));
+  out.push(...mergeVertical(packedSupports));
   return out;
 }
 
@@ -1050,7 +1063,7 @@ export function buildSteps(pieces) {
   });
   push({
     stage: 6, context: 'final', unit: 'socle', unitLabel: 'Socle', counts: false,
-    y: 0, yTop: 0, title: 'Poser le sous-marin sur ses tiges',
+    y: 0, yTop: 0, title: 'Poser le sous-marin sur ses berceaux',
     pieces: pieces.filter((p) => p.unit !== 'socle').map((p) => p.id),
   });
   return steps;
