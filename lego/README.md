@@ -26,6 +26,8 @@ Rien n'est modélisé à la main. `model.js` enchaîne six étapes :
    les anneaux se recouvrent ; museau et pédoncule restent pleins, la bulle de
    la verrière aussi. Une poutre à mi-hauteur traverse la coque de bord à bord
    et se prolonge en arbre d'hélice à travers la racine de la caudale.
+   La verrière est désormais partiellement évidée entre ses trois arceaux,
+   dont les assises restent contreventées pour conserver une seule composante.
 4. **Livrée** — la ligne noir / beige relevée sur la photo de profil, tenon
    par tenon (le crème de la maquette devient du Tan) ; œil annulaire,
    bouche blanche bordée de noir, quatre ouïes, anneau de base et arceaux
@@ -109,6 +111,20 @@ hauteur de pose, la liste à rassembler et les coordonnées.
 - **`.csv`**, **`.json`**, **`.md`** — bordereau, coordonnées de chaque pièce, résumé par chapitre.
 
 ## Réserves
+
+### Révision des nageoires — 10 septembre 2026
+
+Le bord de fuite de la grande dorsale est maintenant concave, estimé sur
+`tools/ref/profil.png`. Les pectorales utilisent deux contours continus
+en hauteur : les anciens relevés contaminés par le socle produisaient des
+pointes parasites. Leur racine est épaissie et leur extrémité affinée.
+Ces corrections sont explicites dans `model.js` et ne modifient pas les
+relevés bruts régénérés par `extract.py`.
+
+Cette révision conserve les plaques et briques du catalogue existant :
+elle ne remplace pas encore les escaliers par des slopes ou des wedges.
+Le corps conserve ses sections super-elliptiques ; il ne s'agit pas d'une
+reconstruction exacte en trois dimensions à partir de deux photographies.
 
 Les recouvrements et la connectivité des tenons sont vérifiés pièce par pièce
 et le résultat est affiché sur la page (un seul bloc solidaire, aucun
