@@ -383,15 +383,9 @@ function stepText(s) {
           ? 'Commencer la coque sur une planche rigide et plane, quille en bas. Le museau est à x = 0, la queue vers x = 84 ; le plan de symétrie est z = 0.'
           : `Chapitre ${st.id} — ${st.label} : ${st.blurb}`);
   }
-  lines.push(`Ajouter ${n} pièce${n > 1 ? 's' : ''}, dans leurs couleurs réelles. Les pièces déjà montées sont atténuées ; les pièces futures sont masquées.`);
-  for (const instruction of s.placements || []) {
-    const p = model.pieces[instruction.id];
-    const q = instruction.support === null ? null : model.pieces[instruction.support];
-    lines.push(`${PARTS[p.part].label}, ${COLORS[p.color].name.toLowerCase()} : x ${p.x}, z ${p.z}, y ${p.y} plaques. ${instruction.mode === 'table'
-      ? 'Placer sur le plan de travail à la position indiquée ; les rangs suivants solidariseront cette base.'
-      : `${instruction.mode === 'below' ? 'Soutenir le montage et clipser par dessous' : 'Emboîter par dessus'} la pièce déjà posée à x ${q.x}, z ${q.z}, y ${q.y}.`}`);
+  if (s.placements?.some(p => p.mode === 'below')) {
+    lines.push('Soutenir le montage et clipser les pièces indiquées par dessous.');
   }
-  if (s.groupsHere && s.groupsHere.length > 1) lines.push(`Cette couche contient : ${s.groupsHere.join(', ').toLowerCase()}.`);
   if (s.last && s.context === 'sub' && s.unit !== 'socle') lines.push('Sous-ensemble terminé : le mettre de côté, attache vers le haut. Il sera fixé à l’étape indiquée dans le chapitre de la coque.');
   return lines;
 }
