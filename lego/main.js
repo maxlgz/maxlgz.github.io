@@ -485,7 +485,7 @@ viewer?.onPick((p) => {
 // 5. Exports
 // ---------------------------------------------------------------
 const EXPORTS = {
-  lego: () => ['sous-marin-requin-lego-PARTIEL.csv', pickABrickList(stats).csv, 'text/csv;charset=utf-8'],
+  lego: () => ['sous-marin-requin-lego-france.csv', pickABrickList(stats).csv, 'text/csv;charset=utf-8'],
   csv:  () => ['sous-marin-requin-pieces.csv', toCSV(stats), 'text/csv;charset=utf-8'],
   ldr:  () => ['sous-marin-requin.ldr', toLDraw(pieces, { count: stats.count }), 'text/plain;charset=utf-8'],
   xml:  () => ['sous-marin-requin-bricklink.xml', toBrickLinkXML(stats), 'application/xml;charset=utf-8'],
@@ -497,7 +497,7 @@ $$('[data-dl]').forEach((btn) => {
   btn.addEventListener('click', () => download(...EXPORTS[btn.dataset.dl]()));
 });
 const pabList=pickABrickList(stats);
-$('#pab-status').textContent=`${pabList.rows.reduce((n,r)=>n+r.quantity,0)} / ${stats.count} pièces avec identifiant LEGO identifié. Disponibilité et prix à vérifier sur LEGO ; aucune commande automatique.`;
+$('#pab-status').textContent=`${pabList.rows.reduce((n,r)=>n+r.quantity,0)} / ${stats.count} pièces couvertes par les références testées sur LEGO France le 10/09/2026. Stocks et prix peuvent évoluer ; aucune commande automatique.`;
 $('#pab-missing').textContent=pabList.missing.length
   ? `Export partiel — non inclus : ${pabList.missing.map(r=>`${r.qty} × ${r.label} ${COLORS[r.color].name} (${r.design})`).join(' ; ')}. Ne pas commander en pensant que le modèle est complet.`
   : 'Toutes les références sont identifiées, sous réserve de disponibilité chez LEGO.';

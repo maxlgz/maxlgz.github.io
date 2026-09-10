@@ -17,6 +17,7 @@
 // ================================================================
 
 import { PROFILE as RAW } from './profile.js';
+import { LEGO_ELEMENTS } from './lego-elements.js';
 
 // Corrections des relevés photo : là où l'œil, une nageoire, l'hélice ou
 // une tige du socle mordent sur le contour, la ligne est rétablie par
@@ -828,7 +829,7 @@ function useMesh(runs) {
 // Groupes que le modèle photo sait fournir quand un maillage ne les a pas
 const PARAM_GROUPS = ['verriere', 'dorsale', 'dorsale2', 'caudale', 'pectoraleG', 'pectoraleD', 'ventrale'];
 
-export function buildModel(voxels = null, { optimizeHull = true } = {}) {
+export function buildModel(voxels = null, { optimizeHull = true, franceParts = true } = {}) {
   let solid;
   let addPropeller = !voxels;
   SHAFT.x0 = HULL_LEN; SHAFT.hub = 93; SHAFT.x1 = 95;
@@ -924,7 +925,49 @@ export function buildModel(voxels = null, { optimizeHull = true } = {}) {
   if (optimizeHull) pieces = consolidateHull(pieces);
   // le maillage apporte sa propre hélice ; le socle, lui, est toujours posé ici
   pieces = pieces.concat(hubBridge ? [hubBridge] : [], stand(cells));
+  if (!voxels && franceParts) {
+  pieces = pieces.flatMap(p => {
+    if (LEGO_ELEMENTS[`${PARTS[p.part].design}|${p.color}`]) return [p];
+    const choices = Object.entries(PARTS).filter(([id,d]) => d.h===1 && LEGO_ELEMENTS[`${d.design}|${p.color}`])
+      .flatMap(([part,d]) => [{part,dx:d.dx,dz:d.dz},{part,dx:d.dz,dz:d.dx}])
+      .sort((a,b)=>b.dx*b.dz-a.dx*a.dz);
+    const out=[];
+    for(let y=p.y;y<p.y+p.h;y++) {
+      const used=new Set();
+      const options=y%2 ? [...choices].sort((a,b)=>b.dx*b.dz-a.dx*a.dz || b.dz-a.dz) : choices;
+      for(let x=p.x;x<p.x+p.dx;x++)for(let z=p.z;z<p.z+p.dz;z++) {
+        if(used.has(`${x}|${z}`))continue;
+        const c=options.find(c=>x+c.dx<=p.x+p.dx&&z+c.dz<=p.z+p.dz
+          && Array.from({length:c.dx},(_,a)=>a).every(a=>Array.from({length:c.dz},(_,b)=>b).every(b=>!used.has(`${x+a}|${z+b}`))));
+        if(!c) throw new Error(`Aucun remplacement LEGO France : ${p.part} ${p.color}`);
+        for(let a=0;a<c.dx;a++)for(let b=0;b<c.dz;b++)used.add(`${x+a}|${z+b}`);
+        out.push({...p,...c,x,y,z,h:1});
+      }
+    }
+    return out;
+  });
 
+  // Refaire les joints de l'hélice à travers les anciennes frontières de pièces.
+  const goldLayers=new Map();
+  for(const p of pieces.filter(p=>p.color==='gold'))for(let y=p.y;y<p.y+p.h;y++) {
+    if(!goldLayers.has(y))goldLayers.set(y,new Set());
+    for(let x=p.x;x<p.x+p.dx;x++)for(let z=p.z;z<p.z+p.dz;z++)goldLayers.get(y).add(`${x}|${z}`);
+  }
+  pieces=pieces.filter(p=>p.color!=='gold');
+  for(const [y,original]of goldLayers) {
+    const cells=y%2?new Set([...original].map(k=>{const[x,z]=k.split('|').map(Number);return `${-x-1}|${z}`;})):original;
+    const positions=[...cells].map(k=>k.split('|').map(Number)).sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+    for(const[x,z]of positions){
+      if(!cells.has(`${x}|${z}`))continue;
+      const choices=y%2?[[2,2],[2,1],[1,2]]:[[2,2],[1,2],[2,1]];
+      const choice=choices.find(([dx,dz])=>Array.from({length:dx},(_,a)=>a).every(a=>Array.from({length:dz},(_,b)=>b).every(b=>cells.has(`${x+a}|${z+b}`))));
+      if(!choice)throw new Error('Pavage or impossible sans changer la forme');
+      const[dx,dz]=choice;
+      for(let a=0;a<dx;a++)for(let b=0;b<dz;b++)cells.delete(`${x+a}|${z+b}`);
+      pieces.push({x:y%2?-x-dx:x,y,z,dx,dz,h:1,color:'gold',group:'helice',part:dx*dz===4?'plate-2x2':'plate-1x2'});
+    }
+  }
+  }
   pieces.sort((a, b) => a.y - b.y || a.x - b.x || a.z - b.z);
   pieces.forEach((p, i) => { p.id = i; });
   markVisibleStuds(pieces);
@@ -1001,7 +1044,7 @@ export function buildSteps(pieces) {
       const ready = [...remaining].map(id => pieces[id]).filter(p =>
         p.y === bottom || [...neighbors[p.id]].some(id => built.has(id)))
         .sort((a,b) => a.y-b.y || a.x-b.x || a.z-b.z);
-      if (!ready.length) throw new Error(`Sous-ensemble non montable : ${list[0].unit}`);
+      if (!ready.length) throw new Error(`Sous-ensemble non montable : ${list[0].unit} ${JSON.stringify([...remaining].slice(0,10).map(id=>pieces[id]))}`);
       const y = ready[0].y;
       const batch = ready.filter(p => p.y === y).slice(0, 6);
       for (const p of batch) {

@@ -4,6 +4,7 @@ import {pickABrickList} from '../exports.js';
 const model=buildModel(), list=pickABrickList(model.stats);
 assert(list.csv.startsWith('elementId,quantity\r\n'));
 assert(list.rows.length<=400);
+assert.equal(list.missing.length,0,'Le modèle photo doit être entièrement couvert en France');
 assert(list.rows.every(r=>/^\d+$/.test(r.elementId)&&Number.isInteger(r.quantity)&&r.quantity>0));
 assert.equal(new Set(list.rows.map(r=>r.elementId)).size,list.rows.length);
 assert.equal(list.rows.reduce((n,r)=>n+r.quantity,0)+list.missing.reduce((n,r)=>n+r.qty,0),model.stats.count);
