@@ -4,7 +4,7 @@
 // ================================================================
 
 import { buildModel, PARTS, COLORS, STAGES, GROUPS, HANGING_LABELS } from './model.js';
-import { toCSV, toLDraw, toBrickLinkXML, toJSON, toGuide, toGuideHTML, download } from './exports.js';
+import { toCSV, toLDraw, toBrickLinkXML, toJSON, toGuide, toGuideHTML, download, pickABrickList } from './exports.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -326,7 +326,7 @@ select.addEventListener('change', () => setStage(Number(select.value)));
 let guideViewer = null;
 let guideReady = false;
 let stepIndex = 0;
-const DIRS = ['montage', 'dessus', 'profil', 'arriere'];
+const DIRS = ['montage', 'dessus', 'profil', 'arriere', 'dessous'];
 let dirIndex = 0;
 const byStage = new Map(stats.byStage);
 
@@ -370,8 +370,8 @@ function stepText(s) {
   if (s.context === 'final') {
     return [
       'Le socle est terminé. Soulever le sous-marin par la coque, sous les pectorales, à deux mains.',
-      'Le descendre sur les deux tiges : leur sommet vient sous le ventre, à x = 25 et x = 62, dans le plan de symétrie. Presser doucement jusqu’au contact.',
-      'Vérifier l’aplomb et la stabilité. Les tiges 2 × 2 sont le point fragile du modèle : ne pas le déplacer par le socle.',
+      'Le descendre sur les deux berceaux, dans le plan de symétrie. Presser doucement jusqu’au contact.',
+      'Vérifier l’aplomb et la stabilité. La résistance des supports reste à tester physiquement : ne pas déplacer le modèle par le socle.',
     ];
   }
   if (s.first) {
@@ -383,7 +383,14 @@ function stepText(s) {
           ? 'Commencer la coque sur une planche rigide et plane, quille en bas. Le museau est à x = 0, la queue vers x = 84 ; le plan de symétrie est z = 0.'
           : `Chapitre ${st.id} — ${st.label} : ${st.blurb}`);
   }
-  lines.push(`Poser ces ${n} pièce${n > 1 ? 's' : ''} avec le dessous à ${s.y} plaque${s.y > 1 ? 's' : ''} (${h} cm) au-dessus de la base${s.yTop > s.y ? `, sur ${s.yTop - s.y + 1} couches` : ''}. Respecter les emprises et coordonnées ci-dessous ; presser sur la couche du dessous.`);
+  lines.push(`Ajouter ${n} pièce${n > 1 ? 's' : ''}, dans leurs couleurs réelles. Les pièces déjà montées sont atténuées ; les pièces futures sont masquées.`);
+  for (const instruction of s.placements || []) {
+    const p = model.pieces[instruction.id];
+    const q = instruction.support === null ? null : model.pieces[instruction.support];
+    lines.push(`${PARTS[p.part].label}, ${COLORS[p.color].name.toLowerCase()} : x ${p.x}, z ${p.z}, y ${p.y} plaques. ${instruction.mode === 'table'
+      ? 'Placer sur le plan de travail à la position indiquée ; les rangs suivants solidariseront cette base.'
+      : `${instruction.mode === 'below' ? 'Soutenir le montage et clipser par dessous' : 'Emboîter par dessus'} la pièce déjà posée à x ${q.x}, z ${q.z}, y ${q.y}.`}`);
+  }
   if (s.groupsHere && s.groupsHere.length > 1) lines.push(`Cette couche contient : ${s.groupsHere.join(', ').toLowerCase()}.`);
   if (s.last && s.context === 'sub' && s.unit !== 'socle') lines.push('Sous-ensemble terminé : le mettre de côté, attache vers le haut. Il sera fixé à l’étape indiquée dans le chapitre de la coque.');
   return lines;
@@ -418,7 +425,8 @@ function showStep(i) {
   const built = builtBefore(stepIndex);
   const add = new Set(s.pieces);
   // une nageoire pendante se lit de profil, pas d'en haut
-  const dir = s.context === 'attach' && dirIndex === 0 ? 'profil' : DIRS[dirIndex];
+  const under = s.placements?.some(p=>p.mode==='below');
+  const dir = dirIndex === 0 && (under || s.context==='attach') ? 'dessous' : DIRS[dirIndex];
   guideViewer?.setBuild({ built, add, only: $('#only-step').checked }, dir);
 
   $('#step-no').textContent = s.id;
@@ -483,6 +491,7 @@ viewer?.onPick((p) => {
 // 5. Exports
 // ---------------------------------------------------------------
 const EXPORTS = {
+  lego: () => ['sous-marin-requin-lego-PARTIEL.csv', pickABrickList(stats).csv, 'text/csv;charset=utf-8'],
   csv:  () => ['sous-marin-requin-pieces.csv', toCSV(stats), 'text/csv;charset=utf-8'],
   ldr:  () => ['sous-marin-requin.ldr', toLDraw(pieces, { count: stats.count }), 'text/plain;charset=utf-8'],
   xml:  () => ['sous-marin-requin-bricklink.xml', toBrickLinkXML(stats), 'application/xml;charset=utf-8'],
@@ -493,5 +502,10 @@ const EXPORTS = {
 $$('[data-dl]').forEach((btn) => {
   btn.addEventListener('click', () => download(...EXPORTS[btn.dataset.dl]()));
 });
+const pabList=pickABrickList(stats);
+$('#pab-status').textContent=`${pabList.rows.reduce((n,r)=>n+r.quantity,0)} / ${stats.count} pièces avec identifiant LEGO identifié. Disponibilité et prix à vérifier sur LEGO ; aucune commande automatique.`;
+$('#pab-missing').textContent=pabList.missing.length
+  ? `Export partiel — non inclus : ${pabList.missing.map(r=>`${r.qty} × ${r.label} ${COLORS[r.color].name} (${r.design})`).join(' ; ')}. Ne pas commander en pensant que le modèle est complet.`
+  : 'Toutes les références sont identifiées, sous réserve de disponibilité chez LEGO.';
 
 console.info(`Brique Studio 002 — ${stats.count} pièces, ${stats.types} couples pièce/couleur.`);

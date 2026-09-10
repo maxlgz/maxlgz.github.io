@@ -254,11 +254,17 @@ function dorsalAt(x, y) {
   // Bord de fuite concave estimé sur ref/profil.png : contrairement au
   // seul contour supérieur extrait, la nageoire n'est pas un triangle plein.
   if (inRange(PR.dorsal, x) && y > hullTop(x) - 1 && y <= T.dorsal(x) && x <= dorsalTrailing(y)) return 'dorsale';
-  if (inRange(PR.dorsal2, x) && y > hullTop(x) - 1 && y <= T.dorsal2(x)) return 'dorsale2';
+  if (smallVentralAt(x, 137 - y)) return 'dorsale2';
   return null;
 }
 const dorsalTrailing = table({ 86: 53, 90: 54, 92: 55.5, 94: 54,
   97: 52.8, 100: 52.9, 103: 53.6, 106: 54.7, 110: 56, 115: 57 });
+
+const ventralTrailing = table({48:75,50:74.5,52:73.8,54:77,57:75});
+function smallVentralAt(x,y) {
+  const profile=PR.pelvic[Math.floor(x)];
+  return profile && y >= Math.min(...profile)-0.5 && y <= hullBottom(x)+0.5 && x <= ventralTrailing(y);
+}
 
 // --- Caudale en croix : deux croissants identiques, l'un vertical (vu de
 // profil), l'autre horizontal (vu de dessus). L'arbre de l'hélice est le
@@ -341,12 +347,7 @@ function solidAt(x, y, z) {
   if (hangingFin(x, y, z, FINS.pectoral)) return z > 0 ? 'pectoraleD' : 'pectoraleG';
   // Une seule nageoire médiane, sous la petite dorsale, et non une paire
   // de pelviennes latérales. Profil inférieur relevé sur la vue officielle.
-  const ventral = PR.pelvic[Math.floor(x)];
-  if (ventral && Math.abs(z) < 1 && y >= Math.min(...ventral) - 0.5
-      && y <= hullBottom(x) + 0.5) {
-    const trailing = table({ 48: 75, 50: 74.5, 52: 73.8, 54: 77, 57: 75 });
-    if (x <= trailing(y)) return 'ventrale';
-  }
+  if (Math.abs(z)<1 && smallVentralAt(x,y)) return 'ventrale';
   return null;
 }
 
@@ -962,6 +963,24 @@ function bandOf(y) {
 
 export function buildSteps(pieces) {
   for (const p of pieces) p.unit = unitOf(p);
+  const neighbors = pieces.map(() => new Set());
+  for (const p of pieces) for (const [, , q] of p.studs) if (q >= 0) {
+    neighbors[p.id].add(q); neighbors[q].add(p.id);
+  }
+  // Le lobe inférieur comprend parfois des pièces séparées par la coque :
+  // elles restent dans la séquence principale, pas dans un faux sous-ensemble.
+  for (const unit of Object.keys(HANGING)) {
+    const own = pieces.filter(p => p.unit === unit);
+    if (!own.length) continue;
+    const bottom = Math.min(...own.map(p => p.y));
+    const reached = new Set(own.filter(p => p.y === bottom).map(p => p.id));
+    const queue = [...reached];
+    for (const id of queue) for (const q of neighbors[id]) {
+      if (pieces[q].unit === unit && !reached.has(q)) { reached.add(q); queue.push(q); }
+    }
+    for (const p of own) if (!reached.has(p.id)) p.unit = 'main';
+  }
+  const placement = new Map();
   const byId = pieces;
   const steps = [];
   let allocated = 0;
@@ -971,23 +990,35 @@ export function buildSteps(pieces) {
     return [...g.entries()].map(([k, qty]) => { const [part, color] = k.split('|'); return { part, color, qty }; })
       .sort((a, b) => b.qty - a.qty);
   };
-  // Découpe une liste en couches, en regroupant jusqu'à trois couches
-  // consécutives quand l'étape reste sous dix pièces (lames minces).
+  // Six pièces maximum, toutes fixables avant le début de l'étape.
   const layersOf = (list, mergeSmall) => {
-    const ys = [...new Set(list.map((p) => p.y))].sort((a, b) => a - b);
+    if (!list.length) return [];
+    const bottom = Math.min(...list.map(p => p.y));
+    const remaining = new Set(list.map(p => p.id));
+    const built = new Set();
     const groups = [];
-    for (const y of ys) {
-      const n = list.filter((p) => p.y === y).length;
-      const last = groups[groups.length - 1];
-      if (mergeSmall && last && last.ys.length < 3 && last.n + n <= 10 && y === last.ys[last.ys.length - 1] + 1) {
-        last.ys.push(y); last.n += n;
-      } else groups.push({ ys: [y], n });
+    while (remaining.size) {
+      const ready = [...remaining].map(id => pieces[id]).filter(p =>
+        p.y === bottom || [...neighbors[p.id]].some(id => built.has(id)))
+        .sort((a,b) => a.y-b.y || a.x-b.x || a.z-b.z);
+      if (!ready.length) throw new Error(`Sous-ensemble non montable : ${list[0].unit}`);
+      const y = ready[0].y;
+      const batch = ready.filter(p => p.y === y).slice(0, 6);
+      for (const p of batch) {
+        const support = [...neighbors[p.id]].find(id => built.has(id) && pieces[id].y < p.y)
+          ?? [...neighbors[p.id]].find(id => built.has(id));
+        placement.set(p.id, { support: support ?? null,
+          mode: support === undefined ? 'table' : pieces[support].y < p.y ? 'above' : 'below' });
+      }
+      for (const p of batch) { remaining.delete(p.id); built.add(p.id); }
+      groups.push({ys:[y], pieces:batch});
     }
-    return groups.map((g) => ({ ys: g.ys, pieces: list.filter((p) => g.ys.includes(p.y)) }));
+    return groups;
   };
   const push = (o) => {
     allocated += o.counts === false ? 0 : o.pieces.length;
-    steps.push({ id: steps.length + 1, allocated, gather: gatherOf(o.pieces.map((id) => byId[id])), ...o });
+    steps.push({ id: steps.length + 1, allocated, gather: gatherOf(o.pieces.map((id) => byId[id])),
+      placements: o.counts === false ? [] : o.pieces.map(id => ({id, ...placement.get(id)})), ...o });
   };
 
   // --- 1. sous-ensembles pendants, à plat ---------------------------
@@ -1008,7 +1039,7 @@ export function buildSteps(pieces) {
       push({
         stage: 1, context: 'sub', unit, unitLabel: HANGING[unit],
         layer: li + 1, layers: layers.length, y: l.ys[0], yTop: l.ys[l.ys.length - 1],
-        title: `${HANGING[unit]} · ${l.ys.length > 1 ? 'assise' : 'couche'} ${li + 1}`,
+        title: `${HANGING[unit]} · pose ${li + 1}`,
         pieces: l.pieces.map((p) => p.id), first: li === 0, last: li === layers.length - 1,
       });
     });
@@ -1017,19 +1048,13 @@ export function buildSteps(pieces) {
   // --- 2 à 5. séquence principale, du bas vers le haut ---------------
   const main = pieces.filter((p) => p.unit === 'main');
   const layers = layersOf(main, false);
-  // regroupement doux des couches hautes et minces (lobe, dorsale, arceaux)
-  const merged = [];
-  for (const l of layers) {
-    const last = merged[merged.length - 1];
-    if (last && last.ys.length < 3 && last.pieces.length + l.pieces.length <= 10
-        && l.ys[0] === last.ys[last.ys.length - 1] + 1 && bandOf(l.ys[0]) === bandOf(last.ys[0])) {
-      last.ys.push(...l.ys); last.pieces.push(...l.pieces);
-    } else merged.push({ ys: [...l.ys], pieces: [...l.pieces] });
-  }
+  const merged = layers;
   const pending = Object.entries(attachAt).sort((a, b) => a[1] - b[1]);
   const counters = {};
+  const mainPlaced = new Set();
+  let currentStage = 2;
   for (const l of merged) {
-    const stage = bandOf(l.ys[0]);
+    const stage = currentStage = Math.max(currentStage, bandOf(l.ys[0]));
     counters[stage] = (counters[stage] || 0) + 1;
     const st = STAGES.find((x) => x.id === stage);
     for (const p of l.pieces) p.stage = stage;
@@ -1037,13 +1062,16 @@ export function buildSteps(pieces) {
     push({
       stage, context: 'main', unit: 'main', unitLabel: st.label,
       layer: counters[stage], y: l.ys[0], yTop: l.ys[l.ys.length - 1],
-      title: `${st.label} · ${l.ys.length > 1 ? 'assise' : 'couche'} ${counters[stage]}`,
+      title: `${st.label} · pose ${counters[stage]}`,
       pieces: l.pieces.map((p) => p.id), groupsHere,
       first: counters[stage] === 1, last: false,
     });
     // les sous-ensembles dont la couche d'accueil vient d'être posée
-    while (pending.length && pending[0][1] <= l.ys[l.ys.length - 1]) {
-      const [unit] = pending.shift();
+    l.pieces.forEach(p => mainPlaced.add(p.id));
+    let attachIndex;
+    while ((attachIndex = pending.findIndex(([unit]) => pieces.some(p => p.unit === unit
+      && [...neighbors[p.id]].some(id => mainPlaced.has(id))))) >= 0) {
+      const [[unit]] = pending.splice(attachIndex, 1);
       push({
         stage, context: 'attach', unit, unitLabel: HANGING[unit], counts: false,
         y: l.ys[l.ys.length - 1], yTop: l.ys[l.ys.length - 1],
@@ -1061,7 +1089,7 @@ export function buildSteps(pieces) {
     push({
       stage: 6, context: 'sub', unit: 'socle', unitLabel: 'Socle',
       layer: li + 1, layers: sl.length, y: l.ys[0], yTop: l.ys[l.ys.length - 1],
-      title: `Socle · ${l.ys.length > 1 ? 'assise' : 'couche'} ${li + 1}`,
+      title: `Socle · pose ${li + 1}`,
       pieces: l.pieces.map((p) => p.id), first: li === 0, last: li === sl.length - 1,
     });
   });

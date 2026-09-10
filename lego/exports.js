@@ -4,6 +4,17 @@
 // ================================================================
 
 import { PARTS, COLORS, STAGES, GROUPS, HANGING_LABELS, STUD_MM, PLATE_MM, unitPrice } from './model.js';
+import { LEGO_ELEMENTS } from './lego-elements.js';
+
+// Format du modèle CSV officiel LEGO : elementId,quantity (vérifié 10/09/2026).
+export function pickABrickList(stats) {
+  const rows=[],missing=[];
+  for(const r of stats.rows) {
+    const elementId=LEGO_ELEMENTS[`${r.design}|${r.color}`];
+    if(elementId) rows.push({elementId,quantity:r.qty}); else missing.push(r);
+  }
+  return {rows,missing,csv:['elementId,quantity',...rows.map(r=>`${r.elementId},${r.quantity}`)].join('\r\n')};
+}
 
 const LDU_STUD = 20;   // 1 tenon = 20 LDU
 const LDU_PLATE = 8;   // 1 plaque = 8 LDU
@@ -89,7 +100,7 @@ export function toGuide(model) {
   for (const st of STAGES) {
     const sub = pieces.filter((p) => p.stage === st.id);
     if (!sub.length) continue;
-    L.push(`## Étape ${st.id} — ${st.label} (${sub.length} pièces)`);
+    L.push(`## Inventaire du chapitre ${st.id} — ${st.label} (${sub.length} pièces)`);
     L.push('');
     L.push(st.blurb);
     L.push('');
@@ -111,14 +122,23 @@ export function toGuide(model) {
   }
   L.push('---');
   L.push('');
-  L.push('Les coordonnées exactes de chaque pièce se trouvent dans le fichier JSON, et le');
-  L.push('fichier `.ldr` s’ouvre directement dans Studio, LeoCAD ou LDView pour un montage pas à pas.');
+  L.push('## Montage détaillé');
+  L.push('Ordre contrôlé par les attaches disponibles ; résistance et accès physique à valider par un montage d’essai.');
+  for (const s of model.steps) {
+    L.push(`\n### Étape ${s.id} — ${s.title}\n`);
+    if(s.context==='attach') L.push('Fixer le sous-ensemble déjà construit sur les pièces d’accueil en place.');
+    if(s.context==='final') L.push('Poser le sous-marin sur les berceaux et vérifier la stabilité.');
+    for(const item of s.placements || []) {
+      const p=pieces[item.id], q=item.support===null?null:pieces[item.support];
+      L.push(`- ${PARTS[p.part].label}, ${COLORS[p.color].name} : x ${p.x}, z ${p.z}, y ${p.y}. ${item.mode==='table'?'Disposer sur la table.':`${item.mode==='below'?'Soutenir et clipser par dessous':'Emboîter par dessus'} la pièce à x ${q.x}, z ${q.z}, y ${q.y}.`}`);
+    }
+  }
   return L.join('\n');
 }
 
 // Guide de montage HTML autonome : une page par étape, avec le plan de
-// pose de la couche vu de dessus (à poser en cyan, couche du dessous en
-// gris), la liste à rassembler et les coordonnées. Imprimable en PDF
+// pose vu de dessus (couleurs réelles, montage précédent atténué),
+// la liste à rassembler et les coordonnées. Imprimable en PDF
 // depuis le navigateur.
 export function toGuideHTML(model) {
   const { pieces, steps, stats, bbox } = model;
@@ -128,12 +148,18 @@ export function toGuideHTML(model) {
   // plan d'une étape : emprise des pièces, x vers la droite, z vers le bas
   function plan(step) {
     const add = step.pieces.map((id) => pieces[id]);
-    const yPrev = step.y - 1;
-    // couche du dessous : dans le même contexte seulement (un
-    // sous-ensemble à plat ne repose pas sur la coque)
-    const same = (p) => step.context === 'sub' ? p.unit === step.unit
-      : step.context === 'main' ? (p.unit === 'main' || p.unit in HANGING_LABELS) : false;
-    const under = pieces.filter((p) => same(p) && p.y <= yPrev && p.y + p.h > yPrev);
+    const built = new Set();
+    for (const prior of steps.slice(0,step.id-1)) {
+      if (step.context === 'sub' ? prior.context === 'sub' && prior.unit === step.unit
+        : prior.context === 'main' || prior.context === 'attach') prior.pieces.forEach(id=>built.add(id));
+    }
+    // Une seule surface supérieure par cellule suffit à situer la pose :
+    // éviter de répéter toutes les couches cachées dans chaque page imprimée.
+    const topCells = new Map();
+    const ordered = pieces.filter(p=>built.has(p.id)).sort((a,b)=>(a.y+a.h)-(b.y+b.h));
+    for(const p of ordered) for(let x=p.x;x<p.x+p.dx;x++) for(let z=p.z;z<p.z+p.dz;z++) topCells.set(`${x}|${z}`,p.id);
+    const topIds = new Set(topCells.values());
+    const under = ordered.filter(p=>topIds.has(p.id));
     const all = [...under, ...add];
     const x0 = Math.min(...all.map((p) => p.x)) - 1, x1 = Math.max(...all.map((p) => p.x + p.dx)) + 1;
     const z0 = Math.min(...all.map((p) => p.z)) - 1, z1 = Math.max(...all.map((p) => p.z + p.dz)) + 1;
@@ -144,7 +170,7 @@ export function toGuideHTML(model) {
     const studs = (p) => {
       let o = '';
       for (let a = 0; a < p.dx; a++) for (let c = 0; c < p.dz; c++)
-        o += `<circle cx="${(p.x - x0 + a + 0.5) * U}" cy="${(p.z - z0 + c + 0.5) * U}" r="${U * 0.28}" fill="none" stroke="#0b7d8c" stroke-width="0.6"/>`;
+        o += `<circle cx="${(p.x - x0 + a + 0.5) * U}" cy="${(p.z - z0 + c + 0.5) * U}" r="${U * 0.28}" fill="none" stroke="#888" stroke-width="0.6"/>`;
       return o;
     };
     const grid = [];
@@ -153,8 +179,8 @@ export function toGuideHTML(model) {
     const axis = `<line x1="0" y1="${(0 - z0) * U}" x2="${w}" y2="${(0 - z0) * U}" stroke="#c92b30" stroke-width="0.7" stroke-dasharray="4 3"/>`;
     return `<svg viewBox="0 0 ${w} ${h}" width="${Math.min(w, 620)}" role="img" aria-label="Plan de la couche">
       ${grid.join('')}${z0 < 0 && z1 > 0 ? axis : ''}
-      ${under.map((p) => rect(p, '#dfe4ea', '#b9c2cc')).join('')}
-      ${add.map((p) => rect(p, '#8fdbe6', '#0b7d8c') + studs(p)).join('')}
+      <g opacity="0.4">${under.map((p) => rect(p, COLORS[p.color].hex, '#888')).join('')}</g>
+      ${add.map((p) => rect(p, COLORS[p.color].hex, '#c92b30') + studs(p)).join('')}
       <text x="2" y="${h - 3}" font-size="7" fill="#607086">x ${x0 + 1} → ${x1 - 1} · z ${z0 + 1} → ${z1 - 1} · axe z = 0 en pointillé rouge</text>
     </svg>`;
   }
@@ -168,10 +194,11 @@ export function toGuideHTML(model) {
         <p class="lead">${s.context === 'attach'
           ? `La couche d’accueil vient d’être posée (dessous à ${s.y} plaques) : presser <b>${esc(s.unitLabel.toLowerCase())}</b> par en dessous, maintenant — une fois la couche suivante posée, il ne s’insère plus.`
           : s.context === 'final'
-            ? 'Descendre le sous-marin sur les deux tiges, à x = 25 et x = 62 dans le plan de symétrie.'
+            ? 'Descendre le sous-marin sur les deux berceaux dans le plan de symétrie ; tester la stabilité.'
             : `Dessous des pièces à <b>${s.y} plaques</b> (${cm(s.y * PLATE_MM)} cm) au-dessus de la base${s.yTop > s.y ? `, sur ${s.yTop - s.y + 1} couches` : ''}.
           ${s.first && s.context === 'sub' && s.unit !== 'socle' ? 'Premier rang du sous-ensemble : le monter à plat, pointe sur la table.' : ''}
           ${s.groupsHere && s.groupsHere.length > 1 ? `Cette couche contient : ${esc(s.groupsHere.join(', ').toLowerCase())}.` : ''}`}</p>
+        <ol>${(s.placements||[]).map(item=>{const p=pieces[item.id], q=item.support===null?null:pieces[item.support];return `<li>${esc(PARTS[p.part].label)} ${esc(COLORS[p.color].name)} — x ${p.x}, z ${p.z}, y ${p.y} : ${item.mode==='table'?'placer sur le plan de travail':`${item.mode==='below'?'soutenir et clipser par dessous':'emboîter par dessus'} la pièce à x ${q.x}, z ${q.z}, y ${q.y}`}.</li>`}).join('')}</ol>
         <div class="cols">
           <div class="plan">${s.context === 'final' ? '' : plan(s)}</div>
           <div>
@@ -211,7 +238,7 @@ export function toGuideHTML(model) {
 </style></head><body>
 <h1>Sous-marin requin — guide de montage</h1>
 <p class="sub">Brique Studio, modèle 002 · ${stats.count} pièces · ${steps.length} étapes · ${cm(bbox.mm.x)} × ${cm(bbox.mm.z)} × ${cm(bbox.mm.y)} cm</p>
-<p class="note">Guide dérivé du modèle. Les positions sont contrôlées numériquement (0 chevauchement, ${model.check.largest} pièces solidaires par les tenons sur ${stats.count}) ; la tenue physique n’a pas été éprouvée. Repère : x du museau vers la queue, z de bâbord à tribord (0 = plan de symétrie), y en plaques depuis le dessus de la plaque de base. Sur chaque plan, x va vers la droite et z vers le bas ; la couche du dessous est en gris, les pièces à poser en cyan avec leurs tenons.</p>
+<p class="note">Guide dérivé du modèle : attaches vérifiées dans l’ordre de montage, six pièces maximum par pose. Résistance et accès physique restent à éprouver. Repère : x du museau vers la queue, z de bâbord à tribord, y en plaques depuis le bas du socle. Sur chaque plan, les pièces précédentes sont atténuées ; les ajouts gardent leur couleur avec un contour rouge. Pour une pose par dessous, soutenir et retourner le montage : le plan reste une projection de dessus.</p>
 <div class="sommaire">${STAGES.map((st) => `<div><a href="#chapitre-${st.id}">0${st.id} · ${esc(st.label)}</a> — ${steps.filter((s) => s.stage === st.id).length} étapes</div>`).join('')}</div>
 ${chapters}
 <p class="sub" style="margin-top:40px">Création de fan indépendante. Non affiliée à LEGO® ni à Moulinsart / Tintinimaginatio.</p>
