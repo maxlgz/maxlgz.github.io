@@ -632,6 +632,61 @@ function mergeVertical(byLayer) {
   return pieces;
 }
 
+// Fusion de volumes complets : aucune pièce existante n'est découpée.
+// Une fusion conserve exactement les cellules, la couleur et les faces
+// externes où s'accrochent les voisins ; seuls les joints internes disparaissent.
+function consolidateHull(pieces) {
+  // Refaire une assise à la fois, en conservant les pièces qui traversent
+  // sa frontière. N'accepter la substitution que si elle réduit le nombre
+  // de pièces sans augmenter les composantes de l'assemblage.
+  for(const offset of [0,1,2]) for(let y=45+offset;y<90;y+=3) {
+    const selected=pieces.filter(p=>fam(p.group)==='coque'&&p.y>=y&&p.y+p.h<=y+3);
+    const layers=[new Map(),new Map(),new Map()];
+    for(const p of selected) for(let yy=p.y;yy<p.y+p.h;yy++) for(let x=p.x;x<p.x+p.dx;x++) for(let z=p.z;z<p.z+p.dz;z++) layers[yy-y].set(`${x}|${z}`,{color:p.color,group:p.group});
+    const common=new Map([...layers[0]].filter(([k,c])=>layers[1].get(k)?.color===c.color&&layers[2].get(k)?.color===c.color));
+    const replacement=packLayer(common,Math.floor(y/3)%2,y).map(r=>({...r,y,h:3,part:partKeyFor(r.dz,r.dx,'brick')}));
+    for(const r of replacement) for(const l of layers) for(let x=r.x;x<r.x+r.dx;x++) for(let z=r.z;z<r.z+r.dz;z++) l.delete(`${x}|${z}`);
+    for(let i=0;i<3;i++) replacement.push(...packLayer(layers[i],Math.floor(y/3)%2,y+i).map(r=>({...r,y:y+i,h:1,part:partKeyFor(r.dz,r.dx,'plate')})));
+    const small = list => list.filter(p=>p.dx*p.dz<=2).length;
+    if(replacement.length>=selected.length || small(replacement)>small(selected))continue;
+    const set=new Set(selected), candidate=pieces.filter(p=>!set.has(p)).concat(replacement);
+    pieces.forEach((p,i)=>p.id=i);
+    const before=analyze(pieces).components;
+    candidate.forEach((p,i)=>p.id=i);
+    if(analyze(candidate).components<=before)pieces=candidate;
+  }
+  const live = new Set(pieces), occ = new Map();
+  const visit = (p, fn) => {
+    for(let x=p.x;x<p.x+p.dx;x++) for(let y=p.y;y<p.y+p.h;y++) for(let z=p.z;z<p.z+p.dz;z++) fn(key(x,y,z));
+  };
+  for (const p of pieces) visit(p, k=>occ.set(k,p));
+  const candidates = Object.entries(PARTS).flatMap(([part,d]) => [
+    {part,dx:d.dx,dz:d.dz,h:d.h}, ...(d.dx===d.dz ? [] : [{part,dx:d.dz,dz:d.dx,h:d.h}]),
+  ]).sort((a,b)=>b.dx*b.dz*b.h-a.dx*a.dz*a.h);
+  let changed=true;
+  while(changed) {
+    changed=false;
+    for(const p of [...live]) {
+      if(!live.has(p)||fam(p.group)!=='coque') continue;
+      for(const d of candidates) {
+        if(d.dx*d.dz*d.h<=p.dx*p.dz*p.h) continue;
+        const q={...p,...d}, members=new Set(); let valid=true;
+        visit(q,k=>{
+          if(!valid)return;
+          const r=occ.get(k);
+          if(!r||fam(r.group)!=='coque'||r.color!==p.color||r.x<q.x||r.y<q.y||r.z<q.z
+              ||r.x+r.dx>q.x+q.dx||r.y+r.h>q.y+q.h||r.z+r.dz>q.z+q.dz) valid=false;
+          else members.add(r);
+        });
+        if(!valid||members.size<2) continue;
+        for(const r of members) live.delete(r);
+        live.add(q); visit(q,k=>occ.set(k,q)); changed=true; break;
+      }
+    }
+  }
+  return [...live];
+}
+
 // ================================================================
 // SOUS-ENSEMBLES POSÉS À LA MAIN
 // ================================================================
@@ -755,7 +810,7 @@ function useMesh(runs) {
 // Groupes que le modèle photo sait fournir quand un maillage ne les a pas
 const PARAM_GROUPS = ['verriere', 'dorsale', 'dorsale2', 'caudale', 'pectoraleG', 'pectoraleD', 'ventrale'];
 
-export function buildModel(voxels = null) {
+export function buildModel(voxels = null, { optimizeHull = true } = {}) {
   let solid;
   let addPropeller = !voxels;
   SHAFT.x0 = HULL_LEN; SHAFT.hub = 93; SHAFT.x1 = 95;
@@ -848,6 +903,7 @@ export function buildModel(voxels = null) {
   for (const [y, layer] of byLayer) packed.set(y, packLayer(layer, Math.floor(y / 3) % 2, y));
 
   let pieces = mergeVertical(packed);
+  if (optimizeHull) pieces = consolidateHull(pieces);
   // le maillage apporte sa propre hélice ; le socle, lui, est toujours posé ici
   pieces = pieces.concat(hubBridge ? [hubBridge] : [], stand(cells));
 

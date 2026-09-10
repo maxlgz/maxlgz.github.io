@@ -46,6 +46,16 @@ effectivement rendu à l'écran.
 
 ## Fichiers
 
+### Pavage économique du corps
+
+Après le pavage initial, les assises de coque sont optimisées localement.
+Une substitution n'est acceptée que si elle réduit le nombre de pièces,
+n'augmente ni les petites emprises (1×1 et 1×2) ni les composantes connexes.
+Les volumes rectangulaires complets sont ensuite fusionnés dans les pièces
+du catalogue. Le volume occupé et les couleurs restent strictement identiques.
+`node lego/tools/check-packing.mjs` compare les deux versions cellule par
+cellule. La solidité physique et les tarifs réels des pièces restent à valider.
+
 | Fichier | Rôle |
 | --- | --- |
 | `model.js` | générateur : profils, voxelisation, pavage, catalogue de pièces, étapes |
