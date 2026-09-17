@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Raccourcisseur d’URL — maxlgz.github.io/url</title>
+  <meta name="description" content="Raccourcisseur d’URL personnel, sans serveur : les liens vivent dans le dépôt GitHub Pages." />
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="../icon.svg" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./">🔗 URL</a>
+    <nav>
+      <a href="#raccourcir" aria-current="true">Raccourcir</a>
+      <a href="#liens">Mes liens</a>
+      <a href="#reglages">Réglages</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Raccourcir une adresse</h1>
+    <p class="lead">Un lien court en <b id="base-display">maxlgz.github.io/url/…</b>, hébergé sur GitHub Pages, sans serveur.</p>
+
+    <section class="card" id="raccourcir">
+      <form id="form">
+        <label for="url">Adresse longue</label>
+        <input type="url" id="url" placeholder="https://…" required autocomplete="off" spellcheck="false" />
+        <div class="row" style="margin-top:12px">
+          <div>
+            <label for="slug">Alias personnalisé <span class="help">(facultatif — lettres, chiffres, - et _)</span></label>
+            <div class="prefix"><span id="base-prefix">/url/</span><input type="text" id="slug" placeholder="aléatoire" maxlength="32" autocomplete="off" spellcheck="false" pattern="[A-Za-z0-9_-]{1,32}" /></div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="primary" type="submit" id="go">Raccourcir</button>
+          <span class="status" id="status"></span>
+        </div>
+      </form>
+      <div class="result" id="result">
+        <div class="short"><a id="result-link" href="#" target="_blank" rel="noopener"></a></div>
+        <div class="target" id="result-target"></div>
+        <div class="actions">
+          <button class="small" type="button" id="copy">Copier</button>
+          <button class="small" type="button" id="preview">Aperçu (+)</button>
+          <span class="help" id="result-note"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="liens">
+      <h2>Mes liens <span class="badge" id="count">0</span></h2>
+      <div id="list"></div>
+      <div class="actions">
+        <button class="small" type="button" id="refresh">Actualiser</button>
+        <input type="text" id="filter" placeholder="Filtrer…" style="max-width:220px" />
+      </div>
+    </section>
+
+    <section class="card" id="reglages">
+      <h2>Réglages</h2>
+      <p class="help">
+        Les liens sont enregistrés dans <code>url/links.json</code> du dépôt, sur la branche publiée par GitHub Pages.
+        Pour en créer ou en supprimer, il faut un <b>jeton GitHub</b> à portée limitée : Settings → Developer settings →
+        <i>Fine-grained tokens</i> → dépôt <code>maxlgz.github.io</code> seul, permission <b>Contents : Read and write</b>.
+        Le jeton reste dans ce navigateur (stockage local) et n’est envoyé qu’à <code>api.github.com</code>.
+        Les liens courts, eux, fonctionnent pour tout le monde. Compter jusqu’à une minute après création
+        pour que GitHub Pages publie le fichier ; en attendant, la redirection lit le dépôt directement.
+      </p>
+      <div class="row">
+        <div><label for="cfg-owner">Propriétaire</label><input type="text" id="cfg-owner" /></div>
+        <div><label for="cfg-repo">Dépôt</label><input type="text" id="cfg-repo" /></div>
+        <div><label for="cfg-branch">Branche publiée</label><input type="text" id="cfg-branch" /></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div><label for="cfg-token">Jeton GitHub</label><input type="password" id="cfg-token" placeholder="github_pat_…" autocomplete="off" /></div>
+      </div>
+      <div class="actions">
+        <button class="primary" type="button" id="cfg-save">Enregistrer</button>
+        <button type="button" id="cfg-test">Tester l’accès</button>
+        <button type="button" id="cfg-forget">Oublier le jeton</button>
+        <span class="status" id="cfg-status"></span>
+      </div>
+      <details style="margin-top:14px">
+        <summary>Bookmarklet « Raccourcir cette page »</summary>
+        <p class="help" style="margin:8px 0">Glisser ce lien dans la barre des favoris ; sur n’importe quelle page, un clic ouvre le raccourcisseur pré-rempli.</p>
+        <a class="bookmarklet" id="bookmarklet" href="#">🔗 Raccourcir</a>
+      </details>
+    </section>
+
+    <footer>Inspiré de <a href="https://github.com/cydrobolt/polr" target="_blank" rel="noopener">Polr</a>, refait sans serveur pour GitHub Pages. Pas de statistiques de clics : rien ne s’exécute côté serveur.</footer>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
