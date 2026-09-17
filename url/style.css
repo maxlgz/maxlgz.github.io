@@ -1,0 +1,54 @@
+:root {
+  --bg: #f5f6fa; --card: #fff; --ink: #1c2238; --muted: #6b7280; --line: #e3e6ee;
+  --accent: #3f51b5; --accent-ink: #fff; --danger: #c62828; --ok: #2e7d32;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+a { color: var(--accent); }
+.topbar { background: var(--accent); color: var(--accent-ink); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.topbar .brand { font-weight: 700; letter-spacing: .04em; text-decoration: none; color: inherit; font-size: 17px; }
+.topbar nav a { color: inherit; opacity: .85; text-decoration: none; margin-left: 18px; font-size: 14px; }
+.topbar nav a:hover, .topbar nav a[aria-current="true"] { opacity: 1; text-decoration: underline; }
+main { max-width: 860px; margin: 0 auto; padding: 28px 16px 60px; }
+h1 { font-size: 30px; margin: 10px 0 4px; font-weight: 700; }
+.lead { color: var(--muted); margin: 0 0 22px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin-bottom: 18px; }
+.card h2 { font-size: 17px; margin: 0 0 12px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row > * { flex: 1 1 200px; }
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+input[type="url"], input[type="text"], input[type="password"] {
+  width: 100%; font: inherit; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
+}
+input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.prefix { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fafbfd; }
+.prefix span { padding: 0 0 0 12px; color: var(--muted); white-space: nowrap; font-size: 14px; }
+.prefix input { border: 0; background: transparent; }
+button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 10px 16px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button.primary:disabled { opacity: .5; cursor: default; }
+button.small { padding: 5px 10px; font-size: 13px; }
+button.danger { color: var(--danger); }
+.actions { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.status { font-size: 14px; color: var(--muted); min-height: 1.4em; margin-top: 10px; }
+.status.err { color: var(--danger); }
+.status.ok { color: var(--ok); }
+.result { display: none; margin-top: 14px; padding: 14px; border-radius: 8px; background: #eef1fb; }
+.result.show { display: block; }
+.result .short { font-size: 20px; font-weight: 700; word-break: break-all; }
+.result .target { color: var(--muted); font-size: 13px; word-break: break-all; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+td.code a { font-weight: 600; }
+td.target { max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+td.when { white-space: nowrap; color: var(--muted); }
+td.ops { white-space: nowrap; text-align: right; }
+.empty { color: var(--muted); padding: 12px 0; }
+details summary { cursor: pointer; font-weight: 600; }
+.help { font-size: 13px; color: var(--muted); }
+.help code { background: #eef0f5; padding: 1px 5px; border-radius: 4px; }
+.bookmarklet { display: inline-block; padding: 6px 12px; border: 1px dashed var(--accent); border-radius: 8px; text-decoration: none; font-weight: 600; }
+.badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #eef1fb; color: var(--accent); }
+footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 30px; }
+@media (max-width: 640px) { td.target { max-width: 160px; } .topbar nav a { margin-left: 12px; } }
