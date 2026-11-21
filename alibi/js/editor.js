@@ -103,8 +103,10 @@ function defaultState() {
 }
 
 function fromRaw(raw) {
-  const rows = clampInt(raw.rows ?? raw.size, ROWS_MIN, ROWS_MAX, 6);
-  const cols = clampInt(raw.cols ?? raw.size, COLS_MIN, COLS_MAX, 6);
+  // Carré (`size`) : 5 à 9 comme avant ; rectangle : lignes 4 à 12, colonnes 4 à 9.
+  const sq = raw.size != null && raw.rows == null && raw.cols == null;
+  const rows = sq ? clampInt(raw.size, 5, 9, 6) : clampInt(raw.rows, ROWS_MIN, ROWS_MAX, 6);
+  const cols = sq ? rows : clampInt(raw.cols, COLS_MIN, COLS_MAX, 6);
   const rooms = (Array.isArray(raw.rooms) ? raw.rooms : []).map((r) => ({ key: String(r.key || 'a')[0], name: String(r.name || ''), floor: r.floor || 'wood' }));
   if (!rooms.length) rooms.push({ key: 'a', name: 'Pièce', floor: 'wood' });
   const grid = Array.from({ length: rows }, (_, r) => Array.from({ length: cols }, (_, c) => {

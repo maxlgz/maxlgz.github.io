@@ -472,7 +472,7 @@ function compileSet(ctx, cluesByIdx) {
   return { unary, bin, alonePos, aloneNeg, finals, impossible };
 }
 
-function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
+function solveCore(ctx, comp, max, rng = null, budget = Infinity, prio = false) {
   const { H, W, NN, n, cellRoom, cellType, blocked } = ctx;
   const out = [];
   if (n === 0 || n > Math.min(H, W) || comp.impossible || max <= 0) return out;
@@ -559,9 +559,10 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
   for (let d = 0; d <= n; d++) { rcAdj.push(new Int32Array(NP)); rcFree.push(new Int32Array(NP)); }
   const pRows = new Int32Array(Math.max(n, NL)), pCols = new Int32Array(Math.max(n, NL));
   const matchOf = new Int8Array(NL);
-  const lineBranch = H !== W && exactLines && globalThis.__LB !== false;
-  const lineCnt = [], lineOpts = [];
-  if (lineBranch) for (let d = 0; d <= n; d++) { lineCnt.push(new Int16Array(NP)); lineOpts.push(new Int16Array(2 * n * Math.max(H, W))); }
+  const roomCap = H !== W && R <= 31;
+  const roomLines = [], forced = new Int8Array(R), fAl = new Int8Array(R), fV = new Int8Array(R);
+  const pMask = new Int32Array(n), pIdx = new Int32Array(n);
+  if (roomCap) for (let d = 0; d <= n; d++) roomLines.push(new Int32Array(R * NP));
   // Couplage parfait (Kuhn) : chaque élément gauche g reçoit un bit distinct de adjM[g].
   function matching(adjM, m, stopOnFail) {
     matchOf.fill(-1);
@@ -683,30 +684,36 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
       const rm = roomOf[pos[q]];
       if (roomCount[rm] === 1 && roomMark[rm] !== stamp) { roomMark[rm] = stamp; missing++; }
     }
-    let best = -1, bestCount = 1e9, bestBuf = bufA[depth], scratch = bufB[depth];
+    let bestCnt = 0, best = -1, bestCount = 1e9, bestBuf = bufA[depth], scratch = bufB[depth];
     let rowsCov = 0, colsCov = 0, k = 0;
-    const rc = rcAdj[depth], rcF = rcFree[depth], lc = lineCnt[depth];
-    rc.fill(0); rcF.fill(0); if (lineBranch) lc.fill(0);
+    const rc = rcAdj[depth], rcF = rcFree[depth];
+    rc.fill(0); rcF.fill(0);
+    const rl = roomCap ? roomLines[depth] : null;
+    if (roomCap) rl.fill(0);
     const vRoomNow = victim >= 0 && pos[victim] >= 0 ? roomOf[pos[victim]] : -1;
     for (let p = 0; p < n; p++) {
       if (pos[p] >= 0) continue;
       const d = domains[p];
-      let cnt = 0, pr = 0, pc = 0;
+      let cnt = 0, pr = 0, pc = 0, pm = 0;
       for (let x = 0; x < d.length; x++) {
         const i = d[x];
         if (feasible(p, i)) {
           scratch[cnt++] = i;
           const r = (i / W) | 0, c = i % W;
           pr |= 1 << r; pc |= 1 << c;
-          if (primRows) { rc[r] |= 1 << c; if (roomOf[i] !== vRoomNow) rcF[r] |= 1 << c; if (lineBranch) lc[r]++; }
-          else { rc[c] |= 1 << r; if (roomOf[i] !== vRoomNow) rcF[c] |= 1 << r; if (lineBranch) lc[c]++; }
+          if (roomCap) { const rm = roomOf[i]; pm |= 1 << rm; if (primRows) rl[rm * NP + r] |= 1 << c; else rl[rm * NP + c] |= 1 << r; }
+          if (primRows) { rc[r] |= 1 << c; if (roomOf[i] !== vRoomNow) rcF[r] |= 1 << c; }
+          else { rc[c] |= 1 << r; if (roomOf[i] !== vRoomNow) rcF[c] |= 1 << r; }
           if (missing) { const rm = roomOf[i]; if (roomMark[rm] === stamp) { roomMark[rm] = -stamp; missing--; } }
         }
       }
       if (cnt === 0) return;
       rowsCov |= pr; colsCov |= pc;
+      if (roomCap) { pMask[k] = pm; pIdx[k] = p; }
       pRows[k] = pr; pCols[k] = pc; k++;
-      if (cnt < bestCount) { bestCount = cnt; best = p; const t = bestBuf; bestBuf = scratch; scratch = t; }
+      // ordre « prioritaire » : la victime et les personnes seules d'abord (effets globaux sur les pièces)
+      const eff = prio && (alonePos[p] || p === victim) ? cnt / 1000 : cnt;
+      if (eff < bestCount) { bestCount = eff; best = p; const t = bestBuf; bestBuf = scratch; scratch = t; bestCnt = cnt; }
     }
     if (missing > 0) return;
     if (exactLines) {
@@ -729,33 +736,31 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
         }
       }
     }
-    if (lineBranch) {
-      // Plan rectangulaire : chaque ligne libre de la dimension couverte recevra exactement une
-      // personne ; brancher sur la ligne la plus contrainte est souvent bien plus efficace.
-      const used = primRows ? rowUsed : colUsed;
-      let line = -1, lineMin = bestCount;
-      if (fOpts) lineMin = Math.min(lineMin, fOpts.length / 2);
-      for (let r = 0; r < NP; r++) if (!((used >> r) & 1) && lc[r] < lineMin) { lineMin = lc[r]; line = r; }
-      if (line >= 0) {
-        const opts = lineOpts[depth];
-        let m = 0;
-        for (let p = 0; p < n; p++) {
-          if (pos[p] >= 0) continue;
-          const d = domains[p];
-          for (let x = 0; x < d.length; x++) {
-            const i = d[x];
-            if ((primRows ? (i / W) | 0 : i % W) === line && feasible(p, i)) { opts[m++] = p; opts[m++] = i; }
-          }
+    if (roomCap && k > 0) {
+      // Capacité des pièces : nombre maximal de personnes encore plaçables dans chaque pièce
+      // (couplage lignes ↔ colonnes sur ses cases utilisables), borné par les règles
+      // (pièce de la victime : 2 en tout ; personne seule : 1). Les personnes dont toutes les
+      // cases possibles sont dans une même pièce doivent y tenir, et tout le monde doit tenir quelque part.
+      forced.fill(0); fAl.fill(0); fV.fill(0);
+      for (let x = 0; x < k; x++) {
+        const pm = pMask[x];
+        if ((pm & (pm - 1)) === 0) {
+          const rm = 31 - Math.clz32(pm), q = pIdx[x];
+          forced[rm]++; if (alonePos[q]) fAl[rm] = 1; if (q === victim) fV[rm] = 1;
         }
-        if (rng) for (let x = m / 2 - 1; x > 0; x--) { const y = Math.floor(rng() * (x + 1)); let t = opts[2 * x]; opts[2 * x] = opts[2 * y]; opts[2 * y] = t; t = opts[2 * x + 1]; opts[2 * x + 1] = opts[2 * y + 1]; opts[2 * y + 1] = t; }
-        for (let x = 0; x < m; x += 2) {
-          place(opts[x], opts[x + 1]);
-          dfs(depth + 1);
-          unplace(opts[x]);
-          if (out.length >= max || nodes > budget) return;
-        }
-        return;
       }
+      const used = primRows ? rowUsed : colUsed;
+      let tot = 0;
+      for (let rm = 0; rm < R; rm++) {
+        let m = 0, any = 0;
+        for (let r = 0; r < NP; r++) if (!((used >> r) & 1)) { const b = rl[rm * NP + r]; any |= b; pRows[m++] = b; }
+        let U = any ? maxMatch(pRows, m) : 0;
+        if (rm === vRoomNow || fV[rm]) U = Math.min(U, 2 - roomCount[rm]);
+        if (fAl[rm]) U = Math.min(U, 1 - roomCount[rm]);
+        if (forced[rm] > U) return;
+        tot += U;
+      }
+      if (tot < k) return;
     }
     if (fOpts && fOpts.length / 2 < bestCount) {
       // branche k : l'option k est vraie, les options précédentes sont interdites (pas de doublon)
@@ -772,8 +777,8 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
       for (let x = 0; x < fOpts.length; x += 2) forbid[fOpts[x] * NN + fOpts[x + 1]]--;
       return;
     }
-    if (rng) for (let x = bestCount - 1; x > 0; x--) { const y = Math.floor(rng() * (x + 1)); const t = bestBuf[x]; bestBuf[x] = bestBuf[y]; bestBuf[y] = t; }
-    for (let x = 0; x < bestCount; x++) {
+    if (rng) for (let x = bestCnt - 1; x > 0; x--) { const y = Math.floor(rng() * (x + 1)); const t = bestBuf[x]; bestBuf[x] = bestBuf[y]; bestBuf[y] = t; }
+    for (let x = 0; x < bestCnt; x++) {
       place(best, bestBuf[x]);
       dfs(depth + 1);
       unplace(best);
@@ -783,7 +788,26 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
   const __t0 = globalThis.__ss ? performance.now() : 0;
   dfs(0);
   if (globalThis.__ss) globalThis.__ss.push({ ms: performance.now() - __t0, nodes, max, budget, found: out.length, rng: !!rng, clues: JSON.stringify(globalThis.__lastClues) });
+  out.done = out.length >= max || nodes <= budget;
+  out.nodes = nodes;
   return out;
+}
+
+// Recherche exacte (au plus `max` solutions). Carré : une seule recherche (comportement historique).
+// Rectangle : la liberté des lignes non couvertes rend certaines recherches très inégales selon
+// l'ordre de branchement ; on alterne deux ordres avec des budgets croissants (toute solution
+// trouvée est valide ; la première recherche menée à terme donne la réponse exacte).
+function solveExact(ctx, comp, max) {
+  if (ctx.H === ctx.W) return solveCore(ctx, comp, max);
+  const seen = new Map();
+  for (let b = 3000; ; b *= 4) {
+    for (const prio of [false, true]) {
+      const res = solveCore(ctx, comp, max, null, b, prio);
+      if (res.done) return res;
+      for (const sol of res) { const key = sol.join(','); if (!seen.has(key)) seen.set(key, sol); }
+      if (seen.size >= max) return Array.from(seen.values()).slice(0, max);
+    }
+  }
 }
 
 function posToPlacements(ctx, pos) {
@@ -795,7 +819,7 @@ function posToPlacements(ctx, pos) {
 export function solve(level, { max = 2 } = {}) {
   const L = prepare(level), ctx = L[PREP];
   const comp = compileSet(ctx, ctx.people.map(p => p.clues));
-  return solveCore(ctx, comp, max).map(pos => posToPlacements(ctx, pos));
+  return solveExact(ctx, comp, max).map(pos => posToPlacements(ctx, pos));
 }
 
 /* ------------------------------------------------------------------ */
@@ -987,6 +1011,8 @@ function enumerateCandidates(ctx, pos, p) {
   const { W, NN, n, cellRoom, cellType, blocked } = ctx;
   const victim = ctx.victim;
   const ip = pos[p], r = (ip / W) | 0, c = ip % W;
+  // écart exact proposé : jusqu'à 3 (plan carré), davantage sur un plan rectangulaire
+  const XM = ctx.H === ctx.W ? 3 : TUNE.xm;
   const unblocked = [];
   for (let i = 0; i < NN; i++) if (!blocked[i]) unblocked.push(i);
   const out = [];
@@ -1053,8 +1079,8 @@ function enumerateCandidates(ctx, pos, p) {
       add({ t: 'dir', dir: d, of: { who }, not: true }, 'dir', `dirN|${axisSym(d)}|${pair}`);
     }
     const dr = rq - r, dc = c - cq;
-    if (dr !== 0 && Math.abs(dr) <= 3) add({ t: 'dir', dir: dr > 0 ? 'N' : 'S', of: { who }, exact: Math.abs(dr) }, 'dirExact', `dirX|NS|${pair}`);
-    if (dc !== 0 && Math.abs(dc) <= 3) add({ t: 'dir', dir: dc > 0 ? 'E' : 'W', of: { who }, exact: Math.abs(dc) }, 'dirExact', `dirX|EW|${pair}`);
+    if (dr !== 0 && Math.abs(dr) <= XM) add({ t: 'dir', dir: dr > 0 ? 'N' : 'S', of: { who }, exact: Math.abs(dr) }, 'dirExact', `dirX|NS|${pair}`);
+    if (dc !== 0 && Math.abs(dc) <= XM) add({ t: 'dir', dir: dc > 0 ? 'E' : 'W', of: { who }, exact: Math.abs(dc) }, 'dirExact', `dirX|EW|${pair}`);
   }
   // dir : objets
   for (const t of types) {
@@ -1064,7 +1090,7 @@ function enumerateCandidates(ctx, pos, p) {
     }
     for (const b of ctx.typeBoxes[t]) {
       const ks = { N: b.r0 - r, S: r - b.r1, W: b.c0 - c, E: c - b.c1 };
-      for (const d of DIRS) if (ks[d] > 0 && ks[d] <= 3) add({ t: 'dir', dir: d, of: { obj: t }, exact: ks[d] }, 'dirExact');
+      for (const d of DIRS) if (ks[d] > 0 && ks[d] <= XM) add({ t: 'dir', dir: d, of: { obj: t }, exact: ks[d] }, 'dirExact');
     }
   }
   // dir : quelqu'un sur un objet
@@ -1079,8 +1105,8 @@ function enumerateCandidates(ctx, pos, p) {
     for (const q of sitters) {
       const rq = (pos[q] / W) | 0, cq = pos[q] % W;
       const dr = rq - r, dc = c - cq;
-      if (dr !== 0 && Math.abs(dr) <= 3) add({ t: 'dir', dir: dr > 0 ? 'N' : 'S', of: { on: t }, exact: Math.abs(dr) }, 'dirOn');
-      if (dc !== 0 && Math.abs(dc) <= 3) add({ t: 'dir', dir: dc > 0 ? 'E' : 'W', of: { on: t }, exact: Math.abs(dc) }, 'dirOn');
+      if (dr !== 0 && Math.abs(dr) <= XM) add({ t: 'dir', dir: dr > 0 ? 'N' : 'S', of: { on: t }, exact: Math.abs(dr) }, 'dirOn');
+      if (dc !== 0 && Math.abs(dc) <= XM) add({ t: 'dir', dir: dc > 0 ? 'E' : 'W', of: { on: t }, exact: Math.abs(dc) }, 'dirOn');
     }
   }
   // Normalise les poids par catégorie (sinon les catégories nombreuses — directions — écrasent les autres).
@@ -1091,6 +1117,7 @@ function enumerateCandidates(ctx, pos, p) {
 }
 
 let RECT_ATTEMPTS = 40, RECT_CAP3_FROM = 99, RECT_DYNAMIC = true;
+const TUNE = { xm: +(globalThis.process?.env?.XM || 3), robust: +(globalThis.process?.env?.ROB || 18), fe: +(globalThis.process?.env?.FE || 2) };
 export function __tune(o) { ({ RECT_ATTEMPTS = RECT_ATTEMPTS, RECT_CAP3_FROM = RECT_CAP3_FROM, RECT_DYNAMIC = RECT_DYNAMIC } = o); }
 export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}) {
   const raw = clone(level && level[PREP] ? stripPrep(level) : (level || {}));
@@ -1133,13 +1160,13 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
   const samePos = a => { for (let p = 0; p < n; p++) if (a[p] !== pos[p]) return false; return true; };
   const isUnique = chosen => {
     const comp = compileSet(ctx, chosen.map(list => list.map(c => c.clue)));
-    return solveCore(ctx, comp, 2);
+    return solveExact(ctx, comp, 2);
   };
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     const rng = mulberry32(hashSeed(`${seed}#${attempt}`));
     strict = attempt < 8;
-    robust = attempt >= 18;
+    robust = attempt >= (rect ? TUNE.robust : 18);
     // au plus 2 indices par suspect ; 3 sur un plan rectangulaire, seulement quand on est bloqué à 2
     let cap = rect && attempt >= RECT_CAP3_FROM ? maxCap : 2;
     const chosen = Array.from({ length: n }, () => []);
@@ -1194,7 +1221,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
     let ok = false;
     for (let iter = 0, iterMax = (rect ? 3 : 2) * n + 4; iter < iterMax; iter++) {
       const comp = compileSet(ctx, chosen.map(list => list.map(c => c.clue)));
-      const exact = solveCore(ctx, comp, 2);
+      const exact = solveExact(ctx, comp, 2);
       if (exact.length === 1) { ok = true; break; }
       if (exact.length === 0) break;
       // échantillon aléatoire (borné) de solutions alternatives
@@ -1212,12 +1239,13 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
           for (const a of alts) if (evalCompiled(ctx, p, c.cc, a) === false) elim++;
           if (!elim) continue;
           const frac = elim / alts.length;
-          opts.push({ p, c, w: robust ? weightOf(c) * frac ** 8 : weightOf(c) * variety(c) * frac * frac * (chosen[p].length ? 1 : 1.5) });
+          opts.push({ p, c, w: robust ? weightOf(c) * frac ** 8 : weightOf(c) * variety(c) * (rect ? frac ** TUNE.fe : frac * frac) * (chosen[p].length ? 1 : 1.5) });
         }
       }
       const o = pick(opts);
       if (!o) {
         if (cap < maxCap && rect && RECT_DYNAMIC) { cap = maxCap; continue; }
+        if (globalThis.__why) globalThis.__why.push('noopt:' + alts.slice(0, 3).map(a => Array.from(a).map((x, q) => (x !== pos[q] ? `${ctx.people[q].id}${(x / ctx.W) | 0},${x % ctx.W}` : '')).filter(Boolean).join(' ')).join(' | ') + ' || ' + JSON.stringify(chosen.map(l => l.map(c => c.clue))));
         break;
       }
       take(o.p, o.c);
@@ -1227,7 +1255,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
       for (const p of suspects) {
         if (chosen[p].length) continue;
         const o = pick(cands[p].filter(c => acceptable(p, c)).map(c => ({ p, c, w: weightOf(c) * variety(c) * (0.15 + c.sel) })));
-        if (!o) { ok = false; break; }
+        if (!o) { ok = false; if (globalThis.__why) globalThis.__why.push('step2'); break; }
         take(p, o.c);
       }
     }
