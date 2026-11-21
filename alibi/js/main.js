@@ -204,7 +204,7 @@ function applyTheme(t) {
 }
 const switchHTML = (key, title, hint, on) => `<button type="button" class="sw" role="switch" aria-checked="${on}" data-set="${key}">
   <span class="sw-text"><b>${title}</b>${hint ? `<small>${hint}</small>` : ''}</span>
-  <span class="sw-track" aria-hidden="true"><i></i></span><span class="sw-state">${on ? 'Activé' : 'Désactivé'}</span></button>`;
+  <span class="sw-ctl"><span class="sw-track" aria-hidden="true"><i></i></span><span class="sw-state">${on ? 'Activé' : 'Désactivé'}</span></span></button>`;
 
 let homeSettingsOpen = null;
 function openHomeSettings() {
@@ -216,7 +216,7 @@ function openHomeSettings() {
     body.innerHTML = `<div class="modal-kicker">Accueil</div>
       <h2>Réglages</h2>
       <div class="set-group"><h3 id="set-view">Affichage des énigmes</h3>
-        <div class="view-switch" role="group" aria-labelledby="set-view" aria-label="Affichage des énigmes">
+        <div class="view-switch" role="group" aria-label="Affichage des énigmes">
           <button type="button" data-view="large" aria-pressed="${view === 'large'}">${VIEW_ICONS.large}<span>Grandes cartes</span></button>
           <button type="button" data-view="compact" aria-pressed="${view === 'compact'}">${VIEW_ICONS.compact}<span>Compact</span></button>
         </div></div>
