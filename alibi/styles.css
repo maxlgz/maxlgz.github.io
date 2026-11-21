@@ -637,6 +637,14 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.12; l
 .card.victim[aria-pressed='true'] {
   box-shadow: inset 0 0 0 4px var(--victim), inset 0 -10px 0 var(--band-c), 0 0 0 4px var(--sun), 0 0 0 7px var(--ink);
 }
+/* fiche d'un personnage déjà posé : décor grisé, texte intact (pas d'opacité globale) */
+.card.placed { --band-c: #CBC8BF; background: #E9E7E1; border-color: #5E607F; }
+.card.placed .card-face { filter: grayscale(1); opacity: 0.6; }
+.card.placed .card-letter { filter: grayscale(1); opacity: 0.5; }
+.card.placed .placed-tag { background: var(--mint); font-weight: 700; }
+.card.placed .placed-tag::before { content: '✓ '; }
+.card.placed.wrong { background: #F3DDD8; border-color: var(--ink); }
+.card.placed.wrong .card-face, .card.placed.wrong .card-letter { opacity: 0.85; }
 /* fiche en erreur après validation : anneau corail + pastille « À revoir » */
 .card.wrong, .card.wrong[aria-pressed='true'] {
   box-shadow: inset 0 -6px 0 var(--band-c), 0 0 0 4px var(--coral), 0 0 0 7px var(--ink);

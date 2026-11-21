@@ -449,6 +449,7 @@ export function mountGame(root, opts = {}) {
       pickEls[p.id].setAttribute('aria-pressed', String(isSel));
       const pl = st.placements[p.id];
       pickEls[p.id].classList.toggle('placed', !!pl);
+      card.classList.toggle('placed', !!pl);
       card.querySelector('.placed-tag').textContent = pl ? `posé${fem(p, '', 'e')} · L${pl[0] + 1} C${pl[1] + 1}` : '';
       const bad = wrong.get(p.id);
       card.classList.toggle('wrong', !!bad);
@@ -607,14 +608,16 @@ export function mountGame(root, opts = {}) {
 
   async function clearAll() {
     const ok = await confirmDialog({
-      kicker: 'Gomme', title: 'Tout effacer ?',
-      text: 'Les poses, les notes et les croix seront retirées du plan. Le chrono continue.',
+      kicker: 'Gomme', title: 'Tout effacer et remettre le chronomètre à zéro ?',
+      text: 'Les poses, les notes et les croix seront retirées du plan. Le chronomètre, les indices et les erreurs repartent de zéro : c’est une nouvelle tentative.',
       ok: 'Tout effacer', danger: true,
     });
     if (!ok || destroyed) return;
-    commit(() => { st.placements = {}; st.notes = {}; st.crosses = {}; });
+    commit(() => { st.placements = {}; st.notes = {}; st.crosses = {}; st.seconds = 0; st.hints = 0; st.errors = 0; });
+    tickCount = 0;
     mode = null;
     render();
+    renderTimer();
     setStatus('Plan remis à zéro.');
   }
 
