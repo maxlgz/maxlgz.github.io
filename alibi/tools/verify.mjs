@@ -2,7 +2,10 @@
 // Vérifie chaque niveau de alibi/js/levels.js : structure, unicité de la solution, meurtrier.
 // Usage : node alibi/tools/verify.mjs   (code de sortie ≠ 0 si un niveau n'a pas exactement une solution)
 import { LEVELS } from '../js/levels.js';
-import { validateLevel, solve, murdererOf, evaluate, prepare } from '../js/engine.js';
+import { validateLevel, solve, murdererOf, evaluate, prepare, dims } from '../js/engine.js';
+
+// « 6×6 » pour un carré ; « 6×9 » = lignes×colonnes pour un rectangle.
+const planLabel = raw => { const { rows, cols } = dims(raw); return `${rows}×${cols}`; };
 
 let failed = 0;
 const ids = new Set();
@@ -43,7 +46,7 @@ for (const raw of LEVELS) {
   }
   if (problems.length) failed++;
   const ok = sols.length === 1 && !problems.length;
-  console.log(`${ok ? '✓' : '✗'} ${label} ${raw.size}×${raw.size}  ${String(nClues).padStart(2)} indices  ${status.padEnd(8)}  meurtrier : ${murderer.padEnd(14)} ${ms.toFixed(1)} ms`
+  console.log(`${ok ? '✓' : '✗'} ${label} ${planLabel(raw).padEnd(4)}  ${String(nClues).padStart(2)} indices  ${status.padEnd(8)}  meurtrier : ${murderer.padEnd(14)} ${ms.toFixed(1)} ms`
     + (problems.length ? `  ⚠ ${problems.join(' ; ')}` : '')
     + (warnings.length ? `\n    avertissements : ${warnings.join(' | ')}` : ''));
 }

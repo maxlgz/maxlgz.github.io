@@ -63,7 +63,9 @@ body {
   font-weight: 600;
   font-size: 16px;
   line-height: 1.45;
-  overflow-x: hidden;
+  /* « clip » et non « hidden » : sur iOS, overflow-x: hidden sur le corps de page fait du corps un
+     conteneur de défilement et les éléments fixés en bas (barre d'outils) suivent le défilement. */
+  overflow-x: clip;
 }
 
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -139,10 +141,13 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.12; l
 .board {
   --frame: clamp(5px, 1.55vw, 10px);
   --ri: calc(var(--frame) * 1.4);
+  /* --n = nombre de colonnes (fixe la taille des cases) ; --rows × --cols = forme du plan */
   --cell: calc(100cqw / var(--n));
   position: relative;
-  width: 100%;
-  aspect-ratio: 1 / 1;
+  /* boîte de contenu : les cases restent carrées quelle que soit l'épaisseur du cadre */
+  box-sizing: content-box;
+  width: calc(100% - 2 * var(--frame));
+  aspect-ratio: var(--cols, var(--n)) / var(--rows, var(--n));
   container-type: inline-size;
   background: var(--paper-2);
   border: var(--frame) solid var(--ink);
@@ -156,7 +161,7 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.12; l
   position: absolute; inset: 0;
   display: grid;
   grid-template-columns: repeat(var(--n), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--n), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows, var(--n)), minmax(0, 1fr));
 }
 .cell {
   position: relative;
@@ -375,6 +380,17 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.12; l
 }
 .custom-item .thumb { width: 64px; height: 64px; overflow: hidden; border: 2.5px solid var(--ink); border-radius: 12px; }
 .custom-item .thumb svg { display: block; width: 100%; height: 100%; }
+/* vignette d'un plan rectangulaire : même emplacement carré, plan centré à ses proportions */
+.level-card .thumb.thumb--rect, .custom-item .thumb.thumb--rect {
+  display: grid; place-items: center; border-color: transparent; background: transparent;
+}
+.thumb--rect .thumb-plan {
+  display: block; max-width: 100%; max-height: 100%; overflow: hidden;
+  border: var(--stroke) solid var(--ink); border-radius: 14px; background: var(--paper-2);
+}
+.custom-item .thumb--rect .thumb-plan { border-width: 2.5px; border-radius: 10px; }
+.thumb--rect .thumb-plan svg { display: block; width: 100%; height: 100%; }
+[data-home-view='compact'] .thumb--rect .thumb-plan { border-width: 2.5px; border-radius: 8px; }
 .custom-item h3 { margin: 0; font-size: 1.05rem; font-weight: 600; overflow-wrap: anywhere; }
 .custom-item .sub { font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); }
 .custom-item .actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
@@ -754,6 +770,8 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.12; l
 /* ---------- barre d'outils ---------- */
 .toolbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  /* Calque à part : la barre reste collée au bas de l'écran pendant le défilement à inertie d'iOS. */
+  transform: translate3d(0, 0, 0); -webkit-backface-visibility: hidden; backface-visibility: hidden;
   display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;
   padding: 9px 8px calc(9px + env(safe-area-inset-bottom));
   background: var(--paper); color: var(--ink);
@@ -888,11 +906,13 @@ dialog.modal[open] { animation: pop 0.2s ease-out; }
 
 /* ---------- tutoriel ---------- */
 .tuto-step[hidden] { display: none; }
+.tuto-note { font-size: 0.9rem; font-weight: 700; color: var(--ink-soft); }
+.intro-rule { padding: 0.5em 0.8em; border: 2.5px dashed var(--ink); border-radius: 14px; background: var(--paper-2); }
 .tuto-fig { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; margin: 12px 0 16px; }
 .tuto-fig figure { margin: 0; text-align: center; }
 .tuto-fig figcaption { font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); margin-top: 8px; max-width: 160px; line-height: 1.3; }
 .mini {
-  display: grid; grid-template-columns: repeat(var(--n), 30px); grid-template-rows: repeat(var(--n), 30px);
+  display: grid; grid-template-columns: repeat(var(--cols, var(--n)), 30px); grid-template-rows: repeat(var(--rows, var(--n)), 30px);
   border: var(--stroke) solid var(--ink); border-radius: 12px; overflow: hidden;
   background: #D3ECFF; margin: 0 auto; width: max-content;
 }
@@ -955,7 +975,8 @@ dialog.modal[open] { animation: pop 0.2s ease-out; }
     align-items: start; gap: 24px; padding: 16px 20px 20px;
   }
   .game-board-col { position: sticky; top: 76px; }
-  .board-wrap { width: min(100%, calc(100vh - 220px)); margin: 0 auto; }
+  /* Le plan tient dans la hauteur de la fenêtre, quelle que soit sa forme. */
+  .board-wrap { width: min(100%, calc((100vh - 220px) * var(--cols, 1) / var(--rows, 1))); margin: 0 auto; }
   /* La légende coiffe la colonne de droite, au-dessus des témoignages. */
   .legend { flex: none; margin: 0 8px 10px 2px; max-height: 38vh; overflow-y: auto; }
   .game-side {

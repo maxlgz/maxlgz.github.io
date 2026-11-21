@@ -35,29 +35,45 @@ function findLevel(id) {
 }
 
 /* ---------------- vignette ---------------- */
+// Dimensions d'un niveau brut (carré : size ; rectangulaire : rows × cols).
+function dimsOf(level) {
+  const map = level.roomMap || [];
+  const R = level.rows ?? level.size ?? (map.length || 5);
+  const C = level.cols ?? level.size ?? ((map[0] && map[0].length) || R);
+  return { R, C };
+}
+const sizeLabel = (level) => { const { R, C } = dimsOf(level); return `${R}×${C}`; };
+
 function thumbSVG(level) {
-  const n = level.size || (level.roomMap ? level.roomMap.length : 5);
+  const { R, C } = dimsOf(level);
   const rooms = Object.fromEntries((level.rooms || []).map((r) => [r.key, r]));
   const map = level.roomMap || [];
   const at = (r, c) => (map[r] ? map[r][c] : undefined);
   let rects = '';
   let walls = '';
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
+  for (let r = 0; r < R; r++) {
+    for (let c = 0; c < C; c++) {
       const room = rooms[at(r, c)];
       let col = '#F2E6CC';
       try { if (room && room.floor) col = floorColor(room.floor) || col; } catch { /* rien */ }
       rects += `<rect x="${c * 10}" y="${r * 10}" width="10.4" height="10.4" fill="${esc(col)}"/>`;
-      if (c < n - 1 && at(r, c + 1) !== at(r, c)) walls += `M${(c + 1) * 10} ${r * 10}v10`;
-      if (r < n - 1 && at(r + 1, c) !== at(r, c)) walls += `M${c * 10} ${(r + 1) * 10}h10`;
+      if (c < C - 1 && at(r, c + 1) !== at(r, c)) walls += `M${(c + 1) * 10} ${r * 10}v10`;
+      if (r < R - 1 && at(r + 1, c) !== at(r, c)) walls += `M${c * 10} ${(r + 1) * 10}h10`;
     }
   }
   let objs = '';
   for (const o of level.objects || []) {
     objs += `<rect x="${o.c * 10 + 2.2}" y="${o.r * 10 + 2.2}" width="${(o.w || 1) * 10 - 4.4}" height="${(o.h || 1) * 10 - 4.4}" rx="2.4" fill="#FFFDF6" fill-opacity=".55" stroke="${INK}" stroke-opacity=".5" stroke-width=".8"/>`;
   }
-  const sw = (0.03 * n * 10).toFixed(2);
-  return `<svg viewBox="0 0 ${n * 10} ${n * 10}" aria-hidden="true" preserveAspectRatio="none">${rects}${objs}<path d="${walls}" stroke="${INK}" stroke-width="${sw}" fill="none" stroke-linecap="round"/></svg>`;
+  const sw = (0.03 * Math.max(R, C) * 10).toFixed(2);
+  return `<svg viewBox="0 0 ${C * 10} ${R * 10}" aria-hidden="true" preserveAspectRatio="none">${rects}${objs}<path d="${walls}" stroke="${INK}" stroke-width="${sw}" fill="none" stroke-linecap="round"/></svg>`;
+}
+/** Vignette d'un plan : carrée telle quelle ; rectangulaire, centrée dans le même emplacement carré. */
+function thumbHTML(level) {
+  const { R, C } = dimsOf(level);
+  if (R === C) return `<span class="thumb">${thumbSVG(level)}</span>`;
+  const w = (100 * Math.min(1, C / R)).toFixed(2);
+  return `<span class="thumb thumb--rect"><span class="thumb-plan" style="width:${w}%;aspect-ratio:${C} / ${R}">${thumbSVG(level)}</span></span>`;
 }
 
 /* ---------------- tutoriel ---------------- */
@@ -86,8 +102,9 @@ const TUTO = [
     fig: () => `<figure>${mini(4, ['aabb', 'aabb', 'aabb', 'aabb'], { '0,1': { cls: 'p', l: 'A' }, '2,3': { cls: 'p v', l: 'V' }, '1,2': { cls: 'obj' } })}<figcaption>Un plan, des pièces, des objets</figcaption></figure>`,
   },
   {
-    title: 'Une personne par ligne et par colonne',
-    html: `<p>Sur chaque ligne et sur chaque colonne du plan se trouve <b>exactement une personne</b>. Dès que vous posez quelqu'un, le reste de sa ligne et de sa colonne se barre de petites croix pâles pour vous le rappeler.</p>`,
+    title: 'Une seule personne par ligne et par colonne',
+    html: `<p>Chaque ligne et chaque colonne du plan accueille <b>une seule personne</b>. Dès que vous posez quelqu'un, le reste de sa ligne et de sa colonne se barre de petites croix pâles pour vous le rappeler.</p>
+      <p class="tuto-note">Sur un plan allongé, certaines lignes restent vides.</p>`,
     fig: () => `<figure>${mini(4, ['aaaa', 'aaaa', 'aaaa', 'aaaa'], {
       '0,2': { cls: 'p', l: 'A' }, '1,0': { cls: 'p', l: 'B' }, '2,3': { cls: 'p', l: 'C' }, '3,1': { cls: 'p', l: 'D' },
     })}<figcaption>Correct : une par ligne, une par colonne</figcaption></figure>
@@ -178,11 +195,11 @@ const getHomeView = () => (loadSettings().homeView === 'compact' ? 'compact' : '
 function levelCard(l, prog) {
   const p = prog[l.id];
   const done = p && p.done;
-  return `<a class="level-card${hasSave(l.id) && !done ? ' has-save' : ''}" href="#/jouer/${encodeURIComponent(l.id)}" aria-label="${esc(l.title)}, ${l.size}×${l.size}${done ? ', résolu' : ''}">
-    <span class="thumb">${thumbSVG(l)}</span>
+  return `<a class="level-card${hasSave(l.id) && !done ? ' has-save' : ''}" href="#/jouer/${encodeURIComponent(l.id)}" aria-label="${esc(l.title)}, ${sizeLabel(l)}${done ? ', résolu' : ''}">
+    ${thumbHTML(l)}
     ${done ? '<span class="stamp stamp--ok">Résolu</span>' : ''}
     <h3>${esc(l.title)}</h3>
-    <span class="sub"><span class="size-pill">${l.size}×${l.size}</span> <span class="ppl">${(l.people || []).length} pers.</span></span>
+    <span class="sub"><span class="size-pill">${sizeLabel(l)}</span> <span class="ppl">${(l.people || []).length} pers.</span></span>
     ${done && p.best ? `<span class="best">Record ${formatTime(p.best)}</span>` : ''}
   </a>`;
 }
@@ -270,8 +287,8 @@ function renderHome() {
     ? `<div class="custom-list">${custom.map((l) => {
       const p = prog[l.id];
       return `<div class="custom-item">
-        <span class="thumb">${thumbSVG(l)}</span>
-        <div><h3>${esc(l.title || 'Sans titre')}</h3><span class="sub">${l.size}×${l.size} · ${(l.people || []).length} pers.${p && p.done ? ` · résolu en ${formatTime(p.best)}` : ''}</span></div>
+        ${thumbHTML(l)}
+        <div><h3>${esc(l.title || 'Sans titre')}</h3><span class="sub">${sizeLabel(l)} · ${(l.people || []).length} pers.${p && p.done ? ` · résolu en ${formatTime(p.best)}` : ''}</span></div>
         <div class="actions">
           <a class="btn btn--small btn--primary" data-play href="#/jouer/${encodeURIComponent(l.id)}" aria-label="Jouer : ${esc(l.title || 'Sans titre')}">${ACT_ICONS.play}<span class="lbl">Jouer</span></a>
           <a class="btn btn--small" href="#/editeur/${encodeURIComponent(l.id)}" aria-label="Modifier : ${esc(l.title || 'Sans titre')}">${ACT_ICONS.edit}<span class="lbl">Modifier</span></a>
@@ -418,7 +435,7 @@ function route() {
   }
   if (parts[0] === 'test') {
     const lvl = readJSON('alibi:test', null, 'session');
-    if (!lvl || !lvl.size) return renderNotice('Aucun niveau à tester', 'Ouvrez l’éditeur et utilisez « Tester » pour jouer votre niveau.');
+    if (!lvl || !(lvl.size || (lvl.rows && lvl.cols))) return renderNotice('Aucun niveau à tester', 'Ouvrez l’éditeur et utilisez « Tester » pour jouer votre niveau.');
     return renderGame(lvl, { test: true });
   }
   if (parts[0] === 'editeur') return renderEditor(parts.slice(1).join('/') || null, token);

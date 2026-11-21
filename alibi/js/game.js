@@ -130,7 +130,7 @@ const DIFF_LABEL = { 1: 'Facile', 2: 'Moyen', 3: 'Difficile' };
 
 function signature(raw) {
   const people = (raw.people || []).map((p) => p.id).join('');
-  return `${raw.size}|${(raw.roomMap || []).join('/')}|${people}|${(raw.objects || []).length}`;
+  return `${raw.size ?? `${raw.rows}x${raw.cols}`}|${(raw.roomMap || []).join('/')}|${people}|${(raw.objects || []).length}`;
 }
 const key = (r, c) => `${r},${c}`;
 const fem = (p, m, f) => (p && p.gender === 'f' ? f : m);
@@ -138,9 +138,17 @@ const fem = (p, m, f) => (p && p.gender === 'f' ? f : m);
 export function mountGame(root, opts = {}) {
   const { level: raw, onExit, onSolved, onNext, onHelp, persist = true, exitLabel = 'Retour' } = opts;
   const level = prepare(raw);
-  const n = level.size;
+  // Dimensions (plan carré : size ; plan rectangulaire : rows × cols).
+  const R = level.rows ?? level.size;
+  const C = level.cols ?? level.size;
+  const rect = R !== C;
+  const dimLabel = `${R}×${C}`;
   const people = level.people || [];
+  const count = level.count ?? Math.min(R, C);
   const byId = Object.fromEntries(people.map((p) => [p.id, p]));
+  // Ordre d'affichage : les suspects dans l'ordre du niveau, la victime toujours en dernier.
+  // (Les couleurs restent attribuées d'après le rang dans level.people.)
+  const shown = [...people.filter((p) => !p.victim), ...people.filter((p) => p.victim)];
   const colors = Object.fromEntries(people.map((p) => [p.id, colorOf(level, p.id)]));
   const pcStyle = (id) => {
     const col = colors[id];
@@ -179,7 +187,7 @@ export function mountGame(root, opts = {}) {
     // on écarte ce qui ne correspond plus au niveau
     for (const id of Object.keys(st.placements)) {
       const p = st.placements[id];
-      if (!byId[id] || !Array.isArray(p) || p[0] >= n || p[1] >= n) delete st.placements[id];
+      if (!byId[id] || !Array.isArray(p) || p[0] >= R || p[1] >= C) delete st.placements[id];
     }
     history = Array.isArray(saved.history) ? saved.history.slice(-80) : [];
     if (saved.selected && byId[saved.selected]) selected = saved.selected;
@@ -195,7 +203,7 @@ export function mountGame(root, opts = {}) {
     <header class="topbar">
       <button type="button" class="icon-btn" data-act="exit" aria-label="${esc(exitLabel)}">${ICONS.back}</button>
       <div class="title"><h1>${esc(level.title || 'Enquête')}</h1>
-        <span class="sub">${esc([diff, `${n}×${n}`, `${people.length} personnes`].filter(Boolean).join(' · '))}</span></div>
+        <span class="sub">${esc([diff, dimLabel, `${people.length} personnes`].filter(Boolean).join(' · '))}</span></div>
       <span class="timer" role="timer" aria-label="Temps écoulé">0:00</span>
       <button type="button" class="icon-btn" data-act="legend" aria-label="Légende du plan" hidden>${ICONS.legend}</button>
       <button type="button" class="icon-btn" data-act="settings" aria-label="Réglages" aria-expanded="false">${ICONS.gear}</button>
@@ -237,7 +245,11 @@ export function mountGame(root, opts = {}) {
   const tools = Object.fromEntries([...screen.querySelectorAll('[data-tool]')].map((b) => [b.dataset.tool, b]));
 
   const board = createBoard(level);
-  $('.board-wrap').appendChild(board.el);
+  const boardWrap = $('.board-wrap');
+  // Forme du plan, pour que le plateau tienne dans la hauteur de l'écran (grand écran).
+  boardWrap.style.setProperty('--rows', String(R));
+  boardWrap.style.setProperty('--cols', String(C));
+  boardWrap.appendChild(board.el);
   board.el.classList.add('board--play');
 
   // légende des objets (construite une seule fois : le rendu ne la touche pas)
@@ -316,12 +328,12 @@ export function mountGame(root, opts = {}) {
   const tok = (id) => (tokenCache[id] ||= tokenHTML(byId[id], { size: 64, color: colors[id] }));
 
   // picker
-  pickerEl.innerHTML = people.map((p) => `<button type="button" class="pick" data-pick="${esc(p.id)}" aria-pressed="false" aria-label="Choisir ${esc(p.name)}${p.victim ? ' (victime)' : ''}">${tokenHTML(p, { size: 40, color: colors[p.id] })}</button>`).join('');
+  pickerEl.innerHTML = shown.map((p) => `<button type="button" class="pick" data-pick="${esc(p.id)}" aria-pressed="false" aria-label="Choisir ${esc(p.name)}${p.victim ? ' (victime)' : ''}">${tokenHTML(p, { size: 40, color: colors[p.id] })}</button>`).join('');
 
   // fiches
   const clueHTML = {};
   const clueOffset = {};
-  cardsEl.innerHTML = people.map((p) => {
+  cardsEl.innerHTML = shown.map((p) => {
     const lines = personCluesHTML(level, p) || [];
     clueHTML[p.id] = lines;
     clueOffset[p.id] = lines.length - ((p.clues || []).length);
@@ -409,8 +421,8 @@ export function mountGame(root, opts = {}) {
     const rows = new Set();
     const cols = new Set();
     for (const p of Object.values(st.placements)) { rows.add(p[0]); cols.add(p[1]); }
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n; c++) {
+    for (let r = 0; r < R; r++) {
+      for (let c = 0; c < C; c++) {
         const cell = board.cells[r][c];
         const layer = cell.querySelector('.cell-layer');
         const k = key(r, c);
@@ -439,7 +451,7 @@ export function mountGame(root, opts = {}) {
 
     // fiches + picker
     const placedCount = Object.keys(st.placements).length;
-    const complete = placedCount === people.length && people.length > 0;
+    const complete = placedCount === count && count > 0;
     let victimState = null;
     try { const v = evaluate(level, st.placements).victimOk; victimState = v === true || v === false ? v : null; } catch { victimState = null; }
     for (const p of people) {
@@ -466,7 +478,7 @@ export function mountGame(root, opts = {}) {
         li.classList.toggle('culprit', !!(bad && bad.has(i)));
       });
     }
-    metaEl.textContent = `${placedCount}/${people.length} posés`;
+    metaEl.textContent = `${placedCount}/${count} posés`;
 
     // outils
     tools.cross.setAttribute('aria-pressed', String(mode === 'cross'));
@@ -574,7 +586,7 @@ export function mountGame(root, opts = {}) {
       const extra = occupant ? ` ${byId[occupant].name} est retiré${fem(byId[occupant], '', 'e')} de la case.` : '';
       setStatus(`${p.name} posé${fem(p, '', 'e')} ${where(r, c)}.${extra}`);
     }
-    if (Object.keys(st.placements).length === people.length) {
+    if (Object.keys(st.placements).length === count) {
       if (!silent) setStatus('Tout le monde est sur le plan. Vérifiez les fiches, puis validez.', 'ok');
     }
   }
@@ -647,7 +659,7 @@ export function mountGame(root, opts = {}) {
       return;
     }
     let target = selected && !st.placements[selected] ? selected : null;
-    if (!target) { const f = people.find((p) => !st.placements[p.id]); target = f ? f.id : null; }
+    if (!target) { const f = shown.find((p) => !st.placements[p.id]); target = f ? f.id : null; }
     if (!target) { setStatus('Tout le monde est déjà à sa place : il ne reste qu’à valider !', 'ok', 'long'); return; }
     const [r, c] = sol[target];
     st.hints++;
@@ -658,7 +670,7 @@ export function mountGame(root, opts = {}) {
 
   function validate() {
     if (phase !== 'play') return;
-    if (Object.keys(st.placements).length !== people.length) return;
+    if (Object.keys(st.placements).length !== count) return;
     let ev;
     try { ev = evaluate(level, st.placements); } catch (err) { console.warn(err); setStatus('Vérification impossible.', 'error'); return; }
     if (ev.ok) {
@@ -839,8 +851,8 @@ export function mountGame(root, opts = {}) {
     if (moves[e.key]) {
       e.preventDefault();
       const [dr, dc] = moves[e.key];
-      const nr = Math.min(n - 1, Math.max(0, r + dr));
-      const nc = Math.min(n - 1, Math.max(0, c + dc));
+      const nr = Math.min(R - 1, Math.max(0, r + dr));
+      const nc = Math.min(C - 1, Math.max(0, c + dc));
       board.cells[nr][nc].focus();
       return;
     }
@@ -990,7 +1002,7 @@ export function mountGame(root, opts = {}) {
     setStatus(settings.oneTap
       ? 'Choisissez un personnage, puis touchez une case pour l’y poser. Appui long : note au crayon.'
       : 'Choisissez un personnage. Toucher une case = note au crayon ; appui long = poser.', '', 'idle');
-    if (level.intro) {
+    if (level.intro || rect) {
       phase = 'intro';
       render();
       renderTimer();
@@ -998,7 +1010,8 @@ export function mountGame(root, opts = {}) {
       modal = openModal((body, close) => {
         body.innerHTML = `<div class="modal-kicker">Dossier ouvert</div>
           <h2>${esc(level.title || 'Enquête')}</h2>
-          <p>${esc(level.intro)}</p>
+          ${rect ? `<p class="intro-rule"><b>Plan allongé (${dimLabel})</b> : au plus une personne par ligne et par colonne.</p>` : ''}
+          ${level.intro ? `<p>${esc(level.intro)}</p>` : ''}
           <div class="modal-actions"><button type="button" class="btn btn--primary" data-go autofocus>Commencer l’enquête</button></div>`;
         body.querySelector('[data-go]').addEventListener('click', () => { close(); start(); });
       }, { label: 'Introduction', onCancel: start });

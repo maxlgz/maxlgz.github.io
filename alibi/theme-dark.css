@@ -54,6 +54,9 @@
 :root[data-theme="dark"] .board { color: #1F2147; box-shadow: 0 0 0 3px #C9CCF4, 0 7px 0 3px #0C0D20; }
 :root[data-theme="dark"] .level-card .thumb,
 :root[data-theme="dark"] .custom-item .thumb { background: #F6E8C8; }
+:root[data-theme="dark"] .level-card .thumb.thumb--rect,
+:root[data-theme="dark"] .custom-item .thumb.thumb--rect { background: transparent; }
+:root[data-theme="dark"] .thumb--rect .thumb-plan { background: #F6E8C8; }
 
 /* ---------- 3. Page ---------- */
 :root[data-theme="dark"] body {
