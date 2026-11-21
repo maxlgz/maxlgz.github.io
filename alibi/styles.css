@@ -332,6 +332,34 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 700; line-height: 1.15; }
 .status[data-tone='ok'] { border-color: var(--ok); background: rgba(61, 125, 79, 0.1); }
 .status[data-tone='hint'] { border-color: var(--brass); background: rgba(200, 151, 58, 0.14); }
 
+/* légende des objets */
+.legend { margin: 10px 2px 0; border: 1px solid var(--line); border-radius: var(--radius); background: rgba(255, 255, 255, 0.45); }
+.legend[hidden] { display: none; }
+.legend > summary {
+  list-style: none; cursor: pointer; min-height: 44px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 12px; font-family: var(--serif); font-weight: 700; letter-spacing: 0.02em; border-radius: var(--radius);
+}
+.legend > summary::-webkit-details-marker { display: none; }
+.legend > summary::after { content: '▾'; transition: transform 0.15s; }
+.legend:not([open]) > summary::after { transform: rotate(-90deg); }
+.legend > summary:focus-visible, .legend-chip:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+.legend-body { padding: 0 10px 10px; }
+.legend-group h3 {
+  margin: 8px 0 6px; font: 700 0.72rem/1.2 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft);
+}
+.legend-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.legend-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 3px 12px 3px 4px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font: 600 0.9rem var(--sans); cursor: pointer;
+}
+.legend-chip:hover { border-color: var(--teal); }
+.legend-group--block .legend-chip { border-style: dashed; }
+.legend-thumb { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 50%; background: rgba(35, 33, 43, 0.06); }
+.legend-thumb svg { width: 30px; height: 30px; display: block; }
+.legend-count { color: var(--ink-soft); font-weight: 700; }
+.board-object.flash { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 8px; background: rgba(179, 38, 47, 0.18); animation: legend-pulse 0.5s ease-in-out 3; z-index: 2; }
+@keyframes legend-pulse { 50% { background: rgba(200, 151, 58, 0.45); box-shadow: 0 0 0 4px rgba(179, 38, 47, 0.45); } }
+
 /* sélecteur rapide sous le plateau */
 .picker { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
 .pick {
@@ -595,6 +623,7 @@ dialog.modal[open] { animation: pop 0.18s ease-out; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .board-object.flash { animation: none; }
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition: none !important; }
   .press-ring circle { animation: none; stroke-dashoffset: 125; }
   .tool.holding .hold { animation: none; width: 50%; }
