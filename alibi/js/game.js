@@ -3,6 +3,7 @@ import { prepare, personCluesHTML, checkClue, evaluate, solve, canPlace, OBJECTS
 import { objectSVG } from './art.js';
 import { createBoard, tokenHTML } from './board.js';
 import { colorOf } from './palette.js';
+import { play, setEnabled as setSoundEnabled } from './sound.js';
 
 /* ------------------------------------------------------------------ */
 /* Utilitaires partagés (aussi utilisés par main.js)                   */
@@ -41,6 +42,13 @@ export function saveSettings(patch) {
   return s;
 }
 
+/** Thème clair / sombre : écrit sur <html> et dans <meta name="theme-color">. */
+export function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', t === 'dark' ? '#14162E' : '#FFF6E3');
+}
+
 export function formatTime(total) {
   const t = Math.max(0, Math.floor(total || 0));
   const h = Math.floor(t / 3600);
@@ -73,7 +81,7 @@ const X_SVG = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2
  * Ouvre une fenêtre modale. `build(body, close)` remplit le contenu.
  * `onCancel` est appelé quand l'utilisateur ferme par Échap.
  */
-export function openModal(build, { label = 'Fenêtre', onCancel, className = '' } = {}) {
+export function openModal(build, { label = 'Fenêtre', onCancel, className = '', silent = false } = {}) {
   const dlg = document.createElement('dialog');
   dlg.className = `modal ${className}`.trim();
   dlg.setAttribute('aria-label', label);
@@ -82,9 +90,10 @@ export function openModal(build, { label = 'Fenêtre', onCancel, className = '' 
   dlg.appendChild(body);
   document.body.appendChild(dlg);
   let closed = false;
-  const close = () => {
+  const close = (quiet = false) => {
     if (closed) return;
     closed = true;
+    if (quiet !== true) play('close');
     try { if (dlg.open) dlg.close(); } catch { /* rien */ }
     dlg.remove();
   };
@@ -95,6 +104,7 @@ export function openModal(build, { label = 'Fenêtre', onCancel, className = '' 
     if (typeof onCancel === 'function') onCancel();
   });
   build(body, close);
+  if (!silent) play('open');
   try { dlg.showModal(); } catch { dlg.setAttribute('open', ''); }
   const auto = body.querySelector('[autofocus]');
   if (auto) auto.focus();
@@ -136,7 +146,7 @@ const key = (r, c) => `${r},${c}`;
 const fem = (p, m, f) => (p && p.gender === 'f' ? f : m);
 
 export function mountGame(root, opts = {}) {
-  const { level: raw, onExit, onSolved, onNext, onHelp, persist = true, exitLabel = 'Retour' } = opts;
+  const { level: raw, onExit, onSolved, onNext, onHelp, persist = true, exitLabel = 'Retour', guide = null } = opts;
   const level = prepare(raw);
   // Dimensions (plan carré : size ; plan rectangulaire : rows × cols).
   const R = level.rows ?? level.size;
@@ -161,7 +171,8 @@ export function mountGame(root, opts = {}) {
   let settings = loadSettings();
   let st = { placements: {}, notes: {}, crosses: {}, seconds: 0, hints: 0, errors: 0 };
   let history = [];
-  let selected = people.length ? people[0].id : null;
+  // Enquête guidée : personne n'est sélectionné d'avance, le guide le demande.
+  let selected = people.length && !guide ? people[0].id : null;
   let mode = null; // null | 'cross' | 'erase'
   let phase = 'play'; // 'intro' | 'play' | 'accuse' | 'won'
   let wrong = new Map(); // id -> Set(indices d'indices fautifs) ; -1 = phrase de la victime
@@ -171,6 +182,18 @@ export function mountGame(root, opts = {}) {
   let modal = null;
   let destroyed = false;
   let lastPointerType = 'mouse';
+
+  // Enquête guidée : le guide peut refuser une action hors sujet (il renvoie alors un rappel).
+  function gate(action) {
+    if (!guide) return true;
+    let r = true;
+    try { r = guide.allow(action); } catch (err) { console.warn(err); r = true; }
+    if (r === true || r == null) return true;
+    play('refuse');
+    if (action.type !== 'accuse') { try { guide.remind(String(r)); } catch { /* rien */ } }
+    return String(r);
+  }
+  const emit = (ev, data) => { if (guide) { try { guide.emit(ev, data); } catch (err) { console.warn(err); } } };
 
   // ---------- reprise ----------
   const saved = persist ? readJSON(saveKey, null) : null;
@@ -197,7 +220,7 @@ export function mountGame(root, opts = {}) {
   // ---------- DOM ----------
   root.innerHTML = '';
   const screen = document.createElement('div');
-  screen.className = 'screen game';
+  screen.className = `screen game${guide ? ' game--guided' : ''}`;
   const diff = DIFF_LABEL[level.difficulty] || '';
   screen.innerHTML = `
     <header class="topbar">
@@ -255,7 +278,7 @@ export function mountGame(root, opts = {}) {
   // légende des objets (construite une seule fois : le rendu ne la touche pas)
   // Grand écran : panneau repliable dans la colonne de droite. Téléphone : fenêtre ouverte par le bouton d'en-tête.
   let legendModal = null;
-  const closeLegendModal = () => { if (legendModal) { legendModal.close(); legendModal = null; } };
+  const closeLegendModal = () => { if (legendModal) { legendModal.close(true); legendModal = null; } };
   (function buildLegend() {
     const det = $('[data-legend]');
     const legendBtn = $('[data-act="legend"]');
@@ -492,6 +515,7 @@ export function mountGame(root, opts = {}) {
     tools.cross.disabled = !playing;
     tools.erase.disabled = !playing;
     tools.hint.querySelector('.count').textContent = st.hints ? String(st.hints) : '';
+    emit('render');
   }
 
   function renderTimer() {
@@ -504,8 +528,11 @@ export function mountGame(root, opts = {}) {
   // ---------- actions ----------
   function select(id, announce = false) {
     if (!byId[id]) return;
+    if (announce && gate({ type: 'select', id }) !== true) return;
+    if (announce) play('tap');
     selected = id;
     render();
+    if (announce) emit('select', { id });
     if (announce) {
       const p = byId[id];
       const pl = st.placements[id];
@@ -519,6 +546,7 @@ export function mountGame(root, opts = {}) {
     void cell.offsetWidth;
     cell.classList.add('shake');
     setTimeout(() => cell.classList.remove('shake'), 350);
+    play('refuse');
     setStatus(msg, 'error');
   }
 
@@ -531,9 +559,11 @@ export function mountGame(root, opts = {}) {
     const at = whoAtMap();
     const occupant = at[key(r, c)];
     if (occupant) { select(occupant, true); return; }
-    if (!selected) { setStatus('Choisissez d’abord un personnage.'); return; }
+    if (gate({ type: 'note', r, c, id: selected }) !== true) return;
+    if (!selected) { play('refuse'); setStatus('Choisissez d’abord un personnage.'); return; }
     const k = key(r, c);
     const p = byId[selected];
+    play('note');
     commit(() => {
       const list = (st.notes[k] || []).slice();
       const i = list.indexOf(selected);
@@ -541,6 +571,7 @@ export function mountGame(root, opts = {}) {
       if (list.length) st.notes[k] = list; else delete st.notes[k];
     });
     setStatus(`Note : ${p.name} peut-être ${where(r, c)}.`);
+    emit('note', { r, c, id: p.id });
   }
 
   function toggleCross(r, c) {
@@ -548,29 +579,38 @@ export function mountGame(root, opts = {}) {
     const k = key(r, c);
     const occupant = whoAtMap()[k];
     if (occupant) { select(occupant, true); return; }
+    if (gate({ type: 'cross', r, c }) !== true) return;
+    play('cross');
     commit(() => { if (st.crosses[k]) delete st.crosses[k]; else st.crosses[k] = true; });
     setStatus(st.crosses[k] ? `Croix posée ${where(r, c)}.` : 'Croix retirée.');
+    emit('cross', { r, c });
   }
 
   function eraseCell(r, c) {
     const k = key(r, c);
     const occupant = whoAtMap()[k];
     if (!occupant && !st.crosses[k] && !(st.notes[k] && st.notes[k].length)) return;
+    if (gate({ type: 'erase', r, c }) !== true) return;
+    play(occupant ? 'remove' : 'erase');
     commit(() => {
       if (occupant) delete st.placements[occupant];
       delete st.crosses[k];
       delete st.notes[k];
     });
     setStatus(occupant ? `${byId[occupant].name} retiré${fem(byId[occupant], '', 'e')} du plan.` : 'Case effacée.');
+    emit('erase', { r, c });
   }
 
   function placeAt(r, c, id = selected, { silent = false } = {}) {
     if (isBlocked(r, c)) return refuse(r, c);
-    if (!id) { setStatus('Choisissez d’abord un personnage.'); return; }
+    if (!id && !silent && gate({ type: 'place', r, c, id }) !== true) return;
+    if (!id) { play('refuse'); setStatus('Choisissez d’abord un personnage.'); return; }
     const k = key(r, c);
     const occupant = whoAtMap()[k];
     if (occupant === id) { select(id, true); return; }
+    if (!silent && gate({ type: 'place', r, c, id }) !== true) return;
     const p = byId[id];
+    const wasComplete = Object.keys(st.placements).length === count;
     commit(() => {
       if (occupant) delete st.placements[occupant];
       st.placements[id] = [r, c];
@@ -586,9 +626,12 @@ export function mountGame(root, opts = {}) {
       const extra = occupant ? ` ${byId[occupant].name} est retiré${fem(byId[occupant], '', 'e')} de la case.` : '';
       setStatus(`${p.name} posé${fem(p, '', 'e')} ${where(r, c)}.${extra}`);
     }
-    if (Object.keys(st.placements).length === count) {
+    const nowComplete = Object.keys(st.placements).length === count;
+    if (!silent) play(nowComplete && !wasComplete ? 'ready' : 'place');
+    if (nowComplete) {
       if (!silent) setStatus('Tout le monde est sur le plan. Vérifiez les fiches, puis validez.', 'ok');
     }
+    if (!silent) emit('place', { r, c, id });
   }
 
   function shortAction(r, c) {
@@ -610,6 +653,7 @@ export function mountGame(root, opts = {}) {
 
   function undo() {
     if (!history.length || phase !== 'play') return;
+    play('undo');
     restore(history.pop());
     wrong = new Map();
     hintWrong = null;
@@ -619,12 +663,14 @@ export function mountGame(root, opts = {}) {
   }
 
   async function clearAll() {
+    if (gate({ type: 'clearAll' }) !== true) return;
     const ok = await confirmDialog({
       kicker: 'Gomme', title: 'Tout effacer et remettre le chronomètre à zéro ?',
       text: 'Les poses, les notes et les croix seront retirées du plan. Le chronomètre, les indices et les erreurs repartent de zéro : c’est une nouvelle tentative.',
       ok: 'Tout effacer', danger: true,
     });
     if (!ok || destroyed) return;
+    play('erase');
     commit(() => { st.placements = {}; st.notes = {}; st.crosses = {}; st.seconds = 0; st.hints = 0; st.errors = 0; });
     tickCount = 0;
     mode = null;
@@ -643,7 +689,8 @@ export function mountGame(root, opts = {}) {
   function hint() {
     if (phase !== 'play') return;
     const sol = getSolution();
-    if (!sol) { setStatus('Impossible de calculer un indice pour ce niveau.', 'error'); return; }
+    if (!sol) { play('refuse'); setStatus('Impossible de calculer un indice pour ce niveau.', 'error'); return; }
+    play('hint');
     const misplaced = people.filter((p) => {
       const pl = st.placements[p.id];
       return pl && sol[p.id] && (pl[0] !== sol[p.id][0] || pl[1] !== sol[p.id][1]);
@@ -677,9 +724,11 @@ export function mountGame(root, opts = {}) {
       phase = 'accuse';
       render();
       renderTimer();
+      emit('validate', { ok: true });
       openAccuse(ev);
       return;
     }
+    play('fail');
     st.errors++;
     wrong = new Map();
     for (const p of people) {
@@ -699,6 +748,7 @@ export function mountGame(root, opts = {}) {
     if (ev.victimOk === false) parts.push('La victime doit être seule avec une seule autre personne dans sa pièce.');
     if (!parts.length) parts.push('Quelque chose cloche dans ce plan.');
     setStatus(`Pas encore… ${parts.join(' ')}`, 'error', 'long');
+    emit('validate', { ok: false });
     const first = [...wrong.keys()][0];
     if (first && cardEls[first]) cardEls[first].scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
@@ -710,16 +760,21 @@ export function mountGame(root, opts = {}) {
       body.innerHTML = `<div class="modal-kicker">Plan reconstitué</div>
         <h2>Qui est le coupable ?</h2>
         <p>Votre plan tient debout : chaque témoignage est respecté.${victim ? ` Qui se trouvait seul à seul avec ${esc(victim.name)} ?` : ' Désignez le coupable.'}</p>
+        ${guide && guide.accuseHTML ? guide.accuseHTML() : ''}
         <div class="suspects">${suspects.map((p) => `<button type="button" class="suspect" data-s="${esc(p.id)}" style="${pcStyle(p.id)}">${tokenHTML(p, { size: 64, color: colors[p.id] })}<span>${esc(p.name)}</span></button>`).join('')}</div>
         <p class="accuse-msg" role="status" aria-live="polite"></p>
         <div class="modal-actions"><button type="button" class="btn btn--ghost" data-back>Revenir au plan</button></div>`;
       const msg = body.querySelector('.accuse-msg');
       body.addEventListener('click', (e) => {
+        if (e.target.closest('[data-guide-quit]')) { close(true); if (guide) guide.quit(); return; }
         if (e.target.closest('[data-back]')) { close(); backToPlay(); return; }
         const b = e.target.closest('[data-s]');
         if (!b || b.classList.contains('nope')) return;
         const id = b.dataset.s;
-        if (id === ev.murderer) { close(); win(id); return; }
+        const g = gate({ type: 'accuse', id, ok: id === ev.murderer });
+        if (g !== true) { msg.textContent = g; msg.dataset.tone = 'hint'; return; }
+        if (id === ev.murderer) { close(true); win(id); return; }
+        play('accuseWrong');
         st.errors++;
         save();
         b.classList.add('nope');
@@ -732,7 +787,7 @@ export function mountGame(root, opts = {}) {
   }
   function backToPlay() {
     modal = null;
-    if (phase === 'accuse') { phase = 'play'; render(); renderTimer(); }
+    if (phase === 'accuse') { phase = 'play'; render(); renderTimer(); emit('back'); }
   }
 
   function win(murdererId) {
@@ -744,7 +799,9 @@ export function mountGame(root, opts = {}) {
     let extra = null;
     try { extra = onSolved ? onSolved(result) : null; } catch (err) { console.warn(err); }
     const m = byId[murdererId];
+    play('win');
     setStatus(`Affaire classée : ${m.name} était ${fem(m, 'le meurtrier', 'la meurtrière')}.`, 'ok');
+    if (guide) { emit('won', { id: murdererId, ...result }); return; }
     modal = openModal((body, close) => {
       body.innerHTML = `<div class="modal-kicker">Affaire classée</div>
         <h2>${esc(level.title || 'Enquête')} : résolu !</h2>
@@ -769,7 +826,7 @@ export function mountGame(root, opts = {}) {
         if (b.dataset.w === 'home') onExit && onExit();
         else if (b.dataset.w === 'next') onNext && onNext();
       });
-    }, { label: 'Victoire', onCancel: () => { modal = null; } });
+    }, { label: 'Victoire', onCancel: () => { modal = null; }, silent: true });
   }
 
   // ---------- événements du plateau ----------
@@ -915,15 +972,20 @@ export function mountGame(root, opts = {}) {
     const b = e.target.closest('[data-tool]');
     if (!b || b.disabled) return;
     const t = b.dataset.tool;
+    if (t === 'erase' && suppressEraseClick) { suppressEraseClick = false; return; }
+    if (gate({ type: 'tool', tool: t, on: (t === 'cross' || t === 'erase') ? mode !== t : undefined }) !== true) return;
+    if (t === 'cross' || t === 'erase') play('tap');
     if (t === 'cross') {
       mode = mode === 'cross' ? null : 'cross';
       render();
       setStatus(mode ? 'Mode croix : touchez une case pour y mettre ou retirer une croix.' : 'Mode croix désactivé.');
+      emit('mode', { mode });
     } else if (t === 'erase') {
       if (suppressEraseClick) { suppressEraseClick = false; return; }
       mode = mode === 'erase' ? null : 'erase';
       render();
       setStatus(mode ? 'Gomme : touchez une case pour l’effacer. Appui long sur la gomme pour tout effacer.' : 'Gomme désactivée.');
+      emit('mode', { mode });
     } else if (t === 'undo') undo();
     else if (t === 'hint') hint();
     else if (t === 'validate') validate();
@@ -931,8 +993,9 @@ export function mountGame(root, opts = {}) {
 
   // en-tête
   let pop = null;
-  function closePop() {
+  function closePop(quiet = false) {
     if (!pop) return;
+    if (quiet !== true) play('close');
     pop.remove();
     pop = null;
     $('[data-act="settings"]').setAttribute('aria-expanded', 'false');
@@ -942,24 +1005,46 @@ export function mountGame(root, opts = {}) {
     pop.className = 'settings-pop';
     pop.setAttribute('role', 'dialog');
     pop.setAttribute('aria-label', 'Réglages');
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
     pop.innerHTML = `<h2>Réglages</h2>
-      <label class="switch"><input type="checkbox" data-set="oneTap" ${settings.oneTap ? 'checked' : ''}>
+      <label class="switch"><input type="checkbox" role="switch" data-set="oneTap" ${settings.oneTap ? 'checked' : ''}>
         <span>Pose en un toucher<small>Toucher une case pose le personnage ; l’appui long ajoute une note.</small></span></label>
+      <label class="switch"><input type="checkbox" role="switch" data-set="sound" ${settings.sound !== false ? 'checked' : ''}>
+        <span>Sons<small>Petits bruitages pendant l’enquête.</small></span></label>
+      <label class="switch"><input type="checkbox" role="switch" data-set="theme" ${dark ? 'checked' : ''}>
+        <span>Mode sombre<small>Fond sombre, plus reposant le soir.</small></span></label>
       ${onHelp ? `<button type="button" class="btn btn--small" data-pop="help">${ICONS.help} Comment jouer</button>` : ''}
       <button type="button" class="btn btn--small btn--ghost" data-pop="clear">${ICONS.erase} Tout effacer</button>`;
     topbar.appendChild(pop);
+    play('open');
     $('[data-act="settings"]').setAttribute('aria-expanded', 'true');
     pop.querySelector('input').focus();
     pop.addEventListener('change', (e) => {
       const inp = e.target.closest('[data-set]');
       if (!inp) return;
-      settings = saveSettings({ [inp.dataset.set]: inp.checked });
+      const k = inp.dataset.set;
+      if (k === 'sound') {
+        if (inp.checked) { setSoundEnabled(true); play('toggle'); } else { play('toggle'); setSoundEnabled(false); }
+        settings = saveSettings({ sound: inp.checked });
+        setStatus(inp.checked ? 'Sons activés.' : 'Sons coupés.');
+        return;
+      }
+      play('toggle');
+      if (k === 'theme') {
+        const t = inp.checked ? 'dark' : 'light';
+        settings = saveSettings({ theme: t });
+        applyTheme(t);
+        setStatus(inp.checked ? 'Mode sombre activé.' : 'Mode clair activé.');
+        return;
+      }
+      settings = saveSettings({ [k]: inp.checked });
       setStatus(settings.oneTap ? 'Pose en un toucher activée : toucher = poser, appui long = note.' : 'Toucher = note, appui long = poser.');
+      emit('settings', { key: k });
     });
     pop.addEventListener('click', (e) => {
       const b = e.target.closest('[data-pop]');
       if (!b) return;
-      closePop();
+      closePop(true);
       if (b.dataset.pop === 'help') onHelp();
       else if (b.dataset.pop === 'clear' && phase === 'play') clearAll();
     });
@@ -967,7 +1052,7 @@ export function mountGame(root, opts = {}) {
   topbar.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!b) return;
-    if (b.dataset.act === 'exit') { save(); onExit && onExit(); }
+    if (b.dataset.act === 'exit') { save(); play('tap'); onExit && onExit(); }
     else if (b.dataset.act === 'settings') { if (pop) closePop(); else openPop(); }
   });
   const onDocDown = (e) => {
@@ -994,9 +1079,27 @@ export function mountGame(root, opts = {}) {
   }, 1000);
 
   // ---------- démarrage ----------
+  if (guide) {
+    guide.attach({
+      screen, board, level, people, byId, cardEls, pickEls, tools, topbar, statusEl,
+      wide: () => wide.matches,
+      state: () => ({ placements: st.placements, notes: st.notes, crosses: st.crosses, selected, mode, phase }),
+      settings: () => settings,
+      setStatus,
+      flashType: (type) => {
+        board.el.querySelectorAll('.board-object.flash').forEach((x) => x.classList.remove('flash'));
+        const hits = board.el.querySelectorAll(`.board-object[data-type="${type}"]`);
+        void board.el.offsetWidth;
+        hits.forEach((x) => x.classList.add('flash'));
+        setTimeout(() => hits.forEach((x) => x.classList.remove('flash')), 1500);
+      },
+    });
+  }
   render();
   renderTimer();
-  if (resumed) {
+  if (guide) {
+    setStatus('', '', 'idle');
+  } else if (resumed) {
     setStatus(`Partie reprise (${formatTime(st.seconds)}). Bonne enquête !`);
   } else {
     setStatus(settings.oneTap
@@ -1025,11 +1128,12 @@ export function mountGame(root, opts = {}) {
       destroyed = true;
       clearInterval(timer);
       cancelPress();
-      closePop();
+      closePop(true);
       closeLegendModal();
+      if (guide) { try { guide.destroy(); } catch { /* rien */ } }
       clearTimeout(statusTimer);
       clearTimeout(statusClear);
-      if (modal) { try { modal.close(); } catch { /* rien */ } modal = null; }
+      if (modal) { try { modal.close(true); } catch { /* rien */ } modal = null; }
       document.removeEventListener('pointerdown', onDocDown);
       document.removeEventListener('keydown', onDocKey);
       document.removeEventListener('visibilitychange', onVis);
