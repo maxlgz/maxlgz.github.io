@@ -155,7 +155,7 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 700; line-height: 1.15; }
   position: absolute; inset: 0; pointer-events: none;
 }
 .board-objects { z-index: 1; }
-.board-labels { z-index: 2; }
+.board-labels { z-index: 4; } /* au-dessus des jetons : le nom d'une pièce doit rester lisible */
 .board-object { position: absolute; padding: 0.6%; }
 .board-object svg {
   display: block; width: 100%; height: 100%;
