@@ -446,7 +446,6 @@ function compileSet(ctx, cluesByIdx) {
   const n = ctx.n;
   const unary = [], bin = [], alonePos = new Uint8Array(n), aloneNeg = new Uint8Array(n), finals = [];
   let impossible = false;
-  if (globalThis.__ss) globalThis.__lastClues = cluesByIdx;
   for (let p = 0; p < n; p++) { unary.push([]); bin.push([]); }
   for (let p = 0; p < n; p++) {
     for (const clue of cluesByIdx[p] || []) {
@@ -475,6 +474,7 @@ function compileSet(ctx, cluesByIdx) {
 function solveCore(ctx, comp, max, rng = null, budget = Infinity, prio = false) {
   const { H, W, NN, n, cellRoom, cellType, blocked } = ctx;
   const out = [];
+  out.done = true; // recherche menée à terme (faux si le budget de nœuds est épuisé)
   if (n === 0 || n > Math.min(H, W) || comp.impossible || max <= 0) return out;
   const R = ctx.R + 1;
   const roomOf = new Int16Array(NN);
@@ -785,11 +785,8 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity, prio = false) 
       if (out.length >= max || nodes > budget) return;
     }
   }
-  const __t0 = globalThis.__ss ? performance.now() : 0;
   dfs(0);
-  if (globalThis.__ss) globalThis.__ss.push({ ms: performance.now() - __t0, nodes, max, budget, found: out.length, rng: !!rng, clues: JSON.stringify(globalThis.__lastClues) });
   out.done = out.length >= max || nodes <= budget;
-  out.nodes = nodes;
   return out;
 }
 
@@ -1011,8 +1008,9 @@ function enumerateCandidates(ctx, pos, p) {
   const { W, NN, n, cellRoom, cellType, blocked } = ctx;
   const victim = ctx.victim;
   const ip = pos[p], r = (ip / W) | 0, c = ip % W;
-  // écart exact proposé : jusqu'à 3 (plan carré), davantage sur un plan rectangulaire
-  const XM = ctx.H === ctx.W ? 3 : TUNE.xm;
+  // écart exact proposé : jusqu'à 3 sur un plan carré ; sans limite sur un plan rectangulaire, où
+  // les grandes lignes vides rendent la victime difficile à situer autrement
+  const XM = ctx.H === ctx.W ? 3 : Math.max(ctx.H, ctx.W) - 1;
   const unblocked = [];
   for (let i = 0; i < NN; i++) if (!blocked[i]) unblocked.push(i);
   const out = [];
@@ -1116,9 +1114,6 @@ function enumerateCandidates(ctx, pos, p) {
   return out;
 }
 
-let RECT_ATTEMPTS = 40, RECT_CAP3_FROM = 99, RECT_DYNAMIC = true;
-const TUNE = { xm: +(globalThis.process?.env?.XM || 3), robust: +(globalThis.process?.env?.ROB || 18), fe: +(globalThis.process?.env?.FE || 2) };
-export function __tune(o) { ({ RECT_ATTEMPTS = RECT_ATTEMPTS, RECT_CAP3_FROM = RECT_CAP3_FROM, RECT_DYNAMIC = RECT_DYNAMIC } = o); }
 export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}) {
   const raw = clone(level && level[PREP] ? stripPrep(level) : (level || {}));
   (raw.people || []).forEach(p => { p.clues = []; });
@@ -1135,7 +1130,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
   // Un plan rectangulaire laisse plus de liberté : un suspect peut y recevoir un 3e indice si nécessaire.
   const rect = ctx.H !== ctx.W;
   const maxCap = rect ? 3 : 2;
-  const attempts = rect ? RECT_ATTEMPTS : 30;
+  const attempts = rect ? 40 : 30;
   if (rows.size !== n || cols.size !== n) return null;
   const vRoom = ctx.cellRoom[pos[ctx.victim]];
   let cntV = 0;
@@ -1166,9 +1161,9 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
   for (let attempt = 0; attempt < attempts; attempt++) {
     const rng = mulberry32(hashSeed(`${seed}#${attempt}`));
     strict = attempt < 8;
-    robust = attempt >= (rect ? TUNE.robust : 18);
+    robust = attempt >= (rect ? 8 : 18);
     // au plus 2 indices par suspect ; 3 sur un plan rectangulaire, seulement quand on est bloqué à 2
-    let cap = rect && attempt >= RECT_CAP3_FROM ? maxCap : 2;
+    let cap = 2;
     const chosen = Array.from({ length: n }, () => []);
     const usedSym = new Set();
     const usedCat = {};
@@ -1239,13 +1234,12 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
           for (const a of alts) if (evalCompiled(ctx, p, c.cc, a) === false) elim++;
           if (!elim) continue;
           const frac = elim / alts.length;
-          opts.push({ p, c, w: robust ? weightOf(c) * frac ** 8 : weightOf(c) * variety(c) * (rect ? frac ** TUNE.fe : frac * frac) * (chosen[p].length ? 1 : 1.5) });
+          opts.push({ p, c, w: robust ? weightOf(c) * frac ** 8 : weightOf(c) * variety(c) * frac * frac * (chosen[p].length ? 1 : 1.5) });
         }
       }
       const o = pick(opts);
       if (!o) {
-        if (cap < maxCap && rect && RECT_DYNAMIC) { cap = maxCap; continue; }
-        if (globalThis.__why) globalThis.__why.push('noopt:' + alts.slice(0, 3).map(a => Array.from(a).map((x, q) => (x !== pos[q] ? `${ctx.people[q].id}${(x / ctx.W) | 0},${x % ctx.W}` : '')).filter(Boolean).join(' ')).join(' | ') + ' || ' + JSON.stringify(chosen.map(l => l.map(c => c.clue))));
+        if (cap < maxCap) { cap = maxCap; continue; }
         break;
       }
       take(o.p, o.c);
@@ -1255,7 +1249,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
       for (const p of suspects) {
         if (chosen[p].length) continue;
         const o = pick(cands[p].filter(c => acceptable(p, c)).map(c => ({ p, c, w: weightOf(c) * variety(c) * (0.15 + c.sel) })));
-        if (!o) { ok = false; if (globalThis.__why) globalThis.__why.push('step2'); break; }
+        if (!o) { ok = false; break; }
         take(p, o.c);
       }
     }
