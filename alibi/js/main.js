@@ -5,8 +5,9 @@ import { tokenHTML } from './board.js';
 import { colorOf, INK } from './palette.js';
 import {
   mountGame, openModal, confirmDialog, loadSettings, saveSettings, applyTheme,
-  readJSON, writeJSON, removeKey, esc, formatTime, ICONS,
+  readJSON, writeJSON, removeKey, esc, formatTime, ICONS, twistOf, TWIST_RULES,
 } from './game.js';
+import { CLUE_TYPES } from './engine.js';
 import { play, setEnabled as setSoundEnabled } from './sound.js';
 import { GUIDE_LEVEL } from './guide-level.js';
 import { createGuide } from './guide.js';
@@ -23,11 +24,13 @@ const getProgress = () => { const p = readJSON('alibi:progress', {}); return p &
 const getCustom = () => { const c = readJSON('alibi:custom', []); return Array.isArray(c) ? c.filter((l) => l && typeof l === 'object' && l.id) : []; };
 const hasSave = (id) => { try { return localStorage.getItem(`alibi:save:${id}`) != null; } catch { return false; } };
 
-function recordSolve(levelId, { seconds }) {
+function recordSolve(levelId, { seconds, bonus }) {
   const prog = getProgress();
   const prev = prog[levelId];
   const record = !prev || !prev.best || seconds < prev.best;
   prog[levelId] = { done: true, best: record ? seconds : prev.best };
+  // Bonus « arme du crime » : acquis une fois pour toutes (le rater ensuite ne le retire pas).
+  if (bonus === true || (prev && prev.bonus === true)) prog[levelId].bonus = true;
   writeJSON('alibi:progress', prog);
   return { record: record && !!prev, best: prog[levelId].best };
 }
@@ -97,6 +100,21 @@ function mini(n, rooms, marks = {}) {
   return `${html}</div>`;
 }
 
+/** Schéma d'une seule rangée de cases (lexique « voyait »). */
+function miniRow(cells) {
+  return `<div class="mini mini--row" style="--rows:1;--cols:${cells.length}" aria-hidden="true">${cells.map((m) => `<i class="a${m.cls ? ` ${m.cls}` : ''}"${m.l ? ` data-l="${esc(m.l)}"` : ''}></i>`).join('')}</div>`;
+}
+const SEES_HELP = (CLUE_TYPES.find((x) => x.t === 'sees') || {}).help || 'Même ligne ou même colonne, dans la même pièce, sans rien entre les deux.';
+const LEXICON = [
+  ['à côté de', 'case voisine par un bord (haut, bas, gauche ou droite), dans la même pièce : ni diagonale, ni à travers un mur.'],
+  ['avec', 'dans la même pièce, n’importe où dans cette pièce.'],
+  ['seul(e) dans sa pièce', 'personne d’autre ne se trouvait dans cette pièce.'],
+  ['plus au nord / sud / est / ouest que', 'le nord est en haut du plan, l’est à droite. « Plus au nord » : sur une ligne au-dessus, quelle que soit la colonne.'],
+  ['exactement N lignes / colonnes', 'l’écart est pile de N lignes (nord, sud) ou N colonnes (est, ouest), ni plus ni moins.'],
+  ['sur la même ligne / dans la même colonne que', 'même rangée horizontale (ligne) ou verticale (colonne), même si un mur sépare.'],
+  ['voyait', `${SEES_HELP} Juste à côté, ça compte ; l’objet sur lequel on se trouve, non.`],
+];
+
 const TUTO = [
   {
     title: 'Un crime, un plan',
@@ -138,6 +156,13 @@ const TUTO = [
     fig: () => `<figure>${mini(4, ['aabb', 'aabb', 'aaab', 'aaab'], {
       '0,3': { cls: 'p v', l: 'V' }, '1,2': { cls: 'p', l: 'M' }, '2,0': { cls: 'p', l: 'C' }, '3,1': { cls: 'p', l: 'D' },
     })}<figcaption>V et M seuls dans la pièce de droite : M est coupable</figcaption></figure>`,
+  },
+  {
+    title: 'Lexique des indices',
+    html: `<dl class="lexicon">${LEXICON.map(([t, d]) => `<div class="lexicon-row${t === 'voyait' ? ' lexicon-row--sees' : ''}"><dt>« ${esc(t)} »</dt><dd>${esc(d)}</dd></div>`).join('')}</dl>
+      <p class="tuto-note">Certaines enquêtes spéciales ajoutent une règle (un témoin menteur, l’arme du crime) : elle est annoncée à l’ouverture du dossier.</p>`,
+    fig: () => `<figure>${miniRow([{ cls: 'p', l: 'A' }, { cls: 'ok' }, { cls: 'ok' }, { cls: 'obj tgt' }])}<figcaption>A voyait l’objet : rien entre les deux</figcaption></figure>
+      <figure>${miniRow([{ cls: 'p', l: 'A' }, { cls: 'obj' }, { cls: 'no' }, { cls: 'obj tgt' }])}<figcaption>A ne le voyait pas : un objet le cache</figcaption></figure>`,
   },
 ];
 
@@ -188,7 +213,7 @@ function showWelcome() {
       <div class="welcome-choices">
         <button type="button" class="btn btn--accent welcome-main" data-w1="guide" autofocus>
           <span class="welcome-label">Enquête guidée</span><small>Recommandé · une petite affaire jouée pas à pas, 3 minutes</small></button>
-        <button type="button" class="btn" data-w1="rules"><span class="welcome-label">Lire les règles</span><small>Le tutoriel illustré, en 5 fiches</small></button>
+        <button type="button" class="btn" data-w1="rules"><span class="welcome-label">Lire les règles</span><small>Le tutoriel illustré, en ${TUTO.length} fiches</small></button>
         <button type="button" class="btn btn--ghost" data-w1="skip"><span class="welcome-label">Je connais déjà</span></button>
       </div>`;
     body.addEventListener('click', (e) => {
@@ -227,13 +252,24 @@ const VIEW_ICONS = {
 };
 const getHomeView = () => (loadSettings().homeView === 'compact' ? 'compact' : 'large');
 
+// Pastilles de variante d'un niveau (« Témoin menteur », « Arme du crime »).
+const twistKeysOf = (l) => { const t = twistOf(l); return ['liar', 'weapon'].filter((k) => t[k]); };
+const twistBadges = (l) => {
+  const ks = twistKeysOf(l);
+  return ks.length ? `<span class="twist-badges">${ks.map((k) => `<span class="twist-badge twist-badge--${k}">${esc(TWIST_RULES[k].badge)}</span>`).join('')}</span>` : '';
+};
+const bonusStar = (p) => (p && p.bonus ? '<span class="bonus-star" title="Bonus de l’arme obtenu" aria-hidden="true">★</span>' : '');
+
 function levelCard(l, prog) {
   const p = prog[l.id];
   const done = p && p.done;
-  return `<a class="level-card${hasSave(l.id) && !done ? ' has-save' : ''}" href="#/jouer/${encodeURIComponent(l.id)}" aria-label="${esc(l.title)}, ${sizeLabel(l)}${done ? ', résolu' : ''}">
+  const ks = twistKeysOf(l);
+  const twLabel = ks.length ? `, enquête spéciale : ${ks.map((k) => TWIST_RULES[k].badge.toLowerCase()).join(' et ')}` : '';
+  return `<a class="level-card${hasSave(l.id) && !done ? ' has-save' : ''}${ks.length ? ' level-card--twist' : ''}" href="#/jouer/${encodeURIComponent(l.id)}" aria-label="${esc(l.title)}, ${sizeLabel(l)}${esc(twLabel)}${done ? ', résolu' : ''}${p && p.bonus ? ', bonus obtenu' : ''}">
     ${thumbHTML(l)}
-    ${done ? '<span class="stamp stamp--ok">Résolu</span>' : ''}
-    <h3>${esc(l.title)}</h3>
+    ${done ? `<span class="stamp stamp--ok">Résolu</span>` : ''}
+    <h3><span class="ttl">${esc(l.title)}</span>${bonusStar(p)}</h3>
+    ${twistBadges(l)}
     <span class="sub"><span class="size-pill">${sizeLabel(l)}</span> <span class="ppl">${(l.people || []).length} pers.</span></span>
     ${done && p.best ? `<span class="best">Record ${formatTime(p.best)}</span>` : ''}
   </a>`;
@@ -310,8 +346,9 @@ function renderHome() {
   const hideSolved = !!loadSettings().hideSolved;
   const isDone = (l) => !!(prog[l.id] && prog[l.id].done);
   let hiddenCount = 0;
+  const isTwist = (l) => twistKeysOf(l).length > 0;
   const sections = DIFFS.map(({ d, label, meta, tone }) => {
-    const all = levels.filter((l) => (l.difficulty || 1) === d);
+    const all = levels.filter((l) => (l.difficulty || 1) === d && !isTwist(l));
     if (!all.length) return '';
     const solved = all.filter(isDone).length;
     const ls = hideSolved ? all.filter((l) => !isDone(l)) : all;
@@ -321,12 +358,24 @@ function renderHome() {
       ${ls.length ? `<div class="level-grid">${ls.map((l) => levelCard(l, prog)).join('')}</div>` : '<p class="all-solved">Toutes résolues</p>'}
     </section>`;
   }).join('');
+  // Enquêtes spéciales : les niveaux à variante, regroupés après « Difficile ».
+  const specials = levels.filter(isTwist);
+  const specialHTML = (() => {
+    if (!specials.length) return '';
+    const solved = specials.filter(isDone).length;
+    const ls = hideSolved ? specials.filter((l) => !isDone(l)) : specials;
+    if (hideSolved) hiddenCount += specials.length - ls.length;
+    return `<section class="home-section home-section--special" data-tone="lilac" aria-labelledby="h-special">
+      <div class="section-head"><h2 id="h-special">Enquêtes spéciales</h2><span class="special-mark" aria-hidden="true">★</span><span class="meta">une règle en plus · <b>${solved}/${specials.length}</b> résolus</span></div>
+      ${ls.length ? `<div class="level-grid">${ls.map((l) => levelCard(l, prog)).join('')}</div>` : '<p class="all-solved">Toutes résolues</p>'}
+    </section>`;
+  })();
   const customHTML = custom.length
     ? `<div class="custom-list">${custom.map((l) => {
       const p = prog[l.id];
       return `<div class="custom-item">
         ${thumbHTML(l)}
-        <div><h3>${esc(l.title || 'Sans titre')}</h3><span class="sub">${sizeLabel(l)} · ${(l.people || []).length} pers.${p && p.done ? ` · résolu en ${formatTime(p.best)}` : ''}</span></div>
+        <div><h3><span class="ttl">${esc(l.title || 'Sans titre')}</span>${bonusStar(p)}</h3>${twistBadges(l)}<span class="sub">${sizeLabel(l)} · ${(l.people || []).length} pers.${p && p.done ? ` · résolu en ${formatTime(p.best)}` : ''}</span></div>
         <div class="actions">
           <a class="btn btn--small btn--primary" data-play href="#/jouer/${encodeURIComponent(l.id)}" aria-label="Jouer : ${esc(l.title || 'Sans titre')}">${ACT_ICONS.play}<span class="lbl">Jouer</span></a>
           <a class="btn btn--small" href="#/editeur/${encodeURIComponent(l.id)}" aria-label="Modifier : ${esc(l.title || 'Sans titre')}">${ACT_ICONS.edit}<span class="lbl">Modifier</span></a>
@@ -358,7 +407,7 @@ function renderHome() {
       </div>
     </header>
     ${filterNote}
-    ${sections || '<p class="empty-note">Aucun niveau officiel disponible.</p>'}
+    ${sections || specialHTML ? `${sections}${specialHTML}` : '<p class="empty-note">Aucun niveau officiel disponible.</p>'}
     <section class="home-section" aria-labelledby="h-perso">
       <div class="section-head"><h2 id="h-perso">Mes niveaux</h2><span class="meta">${custom.length} niveau${custom.length > 1 ? 'x' : ''}</span></div>
       ${customHTML}

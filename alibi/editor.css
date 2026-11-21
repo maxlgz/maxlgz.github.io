@@ -164,3 +164,29 @@ textarea.ed-input{resize:vertical}
 .ed-field>.ed-sub-l{margin-top:6px;font-size:.72rem}
 .ed-seg-wrap{margin-bottom:2px}
 .ed-field .ed-small-note{margin-top:6px}
+
+/* variantes (onglet Général) : interrupteurs */
+.ed-twists{display:grid;gap:8px}
+.ed-switch{position:relative;display:flex;align-items:flex-start;gap:12px;min-height:48px;padding:8px 12px;border:2.5px solid var(--ink);border-radius:18px;background:var(--paper-3);box-shadow:inset 0 -4px 0 var(--band);cursor:pointer}
+.ed-switch input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.ed-switch-track{flex:none;position:relative;width:46px;height:27px;margin-top:2px;border:2.5px solid var(--ink);border-radius:999px;background:var(--paper-2)}
+.ed-switch-track i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--paper-3);border:2.5px solid var(--ink);box-sizing:border-box;transition:transform .15s ease}
+.ed-switch input:checked+.ed-switch-track{background:var(--lilac)}
+.ed-switch input:checked+.ed-switch-track i{transform:translateX(19px);background:var(--ink)}
+.ed-switch:has(input:checked){background:#EFE4FF}
+.ed-switch:focus-within{outline:3px solid var(--teal);outline-offset:2px}
+.ed-switch-text{min-width:0}
+.ed-switch-text b{display:block;font:600 1rem/1.2 var(--display)}
+.ed-switch-text small{display:block;color:var(--ink-soft);font-size:.84rem;font-weight:700;line-height:1.3}
+@media (prefers-reduced-motion:reduce){.ed-switch-track i{transition:none}}
+/* indice : rappel de la règle (« voyait ») */
+.ed-clue-help{margin:8px 0 0;padding:6px 10px;border:2px dashed var(--line);border-radius:12px;font-size:.86rem;color:var(--ink-soft)}
+.ed-clue-help b{color:var(--ink)}
+/* diagnostic des variantes */
+.ed-msgs-twist{list-style:none;padding-left:0}
+.ed-msgs-twist li{position:relative;padding:4px 0 4px 26px}
+.ed-msgs-twist li::before{position:absolute;left:0;top:4px;width:19px;height:19px;display:grid;place-items:center;border:2px solid var(--ink);border-radius:50%;font:700 11px/1 var(--display);color:#1F2147}
+.ed-twist-ok::before{content:"✓";background:var(--mint)}
+.ed-twist-bad::before{content:"!";background:var(--coral)}
+.ed-twist-pend::before{content:"…";background:var(--paper-2)}
+.ed-twist-bad{color:var(--bad-ink)}
