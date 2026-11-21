@@ -242,3 +242,28 @@
 :root[data-theme="dark"] .guide-remind { background: var(--tint-hint); }
 :root[data-theme="dark"] .guide-ring { box-shadow: 0 0 0 3px #0C0D20, inset 0 0 0 2px #0C0D20; }
 :root[data-theme="dark"] .guide-note { background: var(--paper-2); }
+
+/* ---------- 14. Nouvelles mécaniques : aide, « voyait », variantes ---------- */
+:root[data-theme="dark"] :where(.help-panel, .help-kicker, .help-x, .twist-pill, .rule-ico, .sees-ico, .sees-help,
+  .twist-badge, .win-weapon, .win-weapon-thumb, .lexicon-row--sees) { border-color: var(--edge); }
+:root[data-theme="dark"] .help-panel { background: var(--raise); box-shadow: inset 0 -5px 0 var(--band), 0 4px 0 rgba(5, 6, 18, 0.6); }
+:root[data-theme="dark"] .help-x { background: var(--paper-3); }
+:root[data-theme="dark"] :where(.help-kicker, .twist-pill, .rule-ico, .sees-ico, .twist-badge) { color: var(--on-vivid); }
+:root[data-theme="dark"] .intro-rule--liar { background: #2E2752; }
+:root[data-theme="dark"] .intro-rule--weapon { background: #1D3150; }
+:root[data-theme="dark"] .intro-rule--liar, :root[data-theme="dark"] .intro-rule--weapon { border-color: var(--edge); }
+:root[data-theme="dark"] .game--liar .card li[data-state='false']::before { background: var(--lilac); }
+:root[data-theme="dark"] .sees-help { background: var(--paper-2); }
+:root[data-theme="dark"] .win-weapon { background: var(--paper-3); }
+:root[data-theme="dark"] .win-weapon.is-ok { background: var(--tint-hint); }
+:root[data-theme="dark"] .win-weapon-thumb { --ink: #1F2147; background: #F6E8C8; }
+:root[data-theme="dark"] .level-card--twist { box-shadow: inset 0 -6px 0 #3A2F6B; }
+:root[data-theme="dark"] .special-mark,
+:root[data-theme="dark"] .bonus-star { -webkit-text-stroke-color: var(--night); }
+:root[data-theme="dark"] .lexicon-row { background: var(--paper-2); }
+:root[data-theme="dark"] :where(.ed-switch, .ed-switch-track, .ed-switch-track i) { border-color: var(--edge); }
+:root[data-theme="dark"] .ed-msgs-twist li::before { border-color: var(--edge); }
+:root[data-theme="dark"] .ed-switch { background: var(--paper-2); }
+:root[data-theme="dark"] .ed-switch:has(input:checked) { background: #2E2752; }
+:root[data-theme="dark"] .ed-switch input:checked + .ed-switch-track i { background: var(--ink); border-color: var(--on-vivid); }
+:root[data-theme="dark"] .ed-twist-pend::before { color: var(--ink); }

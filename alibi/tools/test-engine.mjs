@@ -3,15 +3,19 @@
 import assert from 'node:assert/strict';
 import {
   OBJECTS, OBJECT_SIZES, FLOORS, CLUE_TYPES, prepare, dims, canPlace, clueHTML, personCluesHTML, checkClue,
-  evaluate, murdererOf, solve, generateClues, validateLevel,
+  evaluate, murdererOf, solve, generateClues, validateLevel, explain, liarOf, weaponOf,
 } from '../js/engine.js';
 import { LEVELS } from '../js/levels.js';
+// Les tests historiques (génération d'indices classiques, parcours avec les aides) portent sur les
+// niveaux sans variante ; les niveaux à menteur ou à arme ont leurs propres tests.
+const CLASSIC = LEVELS.filter((l) => !l.twist);
 
 let passed = 0, failedCount = 0;
 function test(name, fn) {
   try { fn(); passed++; console.log(`  ✓ ${name}`); }
   catch (e) { failedCount++; console.log(`  ✗ ${name}\n    ${e && e.stack ? e.stack.split('\n').slice(0, 3).join('\n    ') : e}`); }
 }
+const clone = x => JSON.parse(JSON.stringify(x));
 const strip = html => html.replace(/<\/?b>/g, '');
 const fnv = s => { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16).padStart(8, '0'); };
 // Non-régression : empreintes capturées avec le moteur d'AVANT les plans rectangulaires.
@@ -23,7 +27,12 @@ const REF_LEVELS = {
   musee: '00a1f512', station: '067dfe82', opera: '1e57c7fb', manoir: 'e49be0df', 'grand-hotel': '7b110764',
 };
 // generateClues sur ces 21 niveaux, difficultés 1 à 3, graines 1, 2, 3, 'abc' (dans l'ordre de LEVELS).
-const REF_GEN = 'af0a0a0d';
+// Moteur d'avant les nouvelles mécaniques : 'af0a0a0d' (les trois difficultés mêlées). Depuis :
+// - difficultés 2 et 3 avec { sees: false } : exactement les mêmes indices qu'avant (empreinte de ces seules
+//   difficultés, calculée avec l'ancien moteur) ; sans cette option, au plus un indice remplacé par un « voyait » ;
+// - difficulté 1 : restreinte aux indices simples (changement voulu), nouvelle empreinte de référence.
+const REF_GEN_D23 = '58d1402e';
+const REF_GEN_D1 = '4454c7f2';
 
 // Petit niveau 5×5 de référence.
 //   a a b b b      a : Atelier (une seule pièce à gauche), b : Grenier, c : Terrasse
@@ -80,7 +89,7 @@ test('OBJECTS contient les 34 types du contrat d’origine et les 38 nouveaux, c
   assert.equal(OBJECTS.tent.on, 'sous');
   assert.equal(OBJECTS.well.pl, 'puits');
   assert.equal(FLOORS.length, 12 + 9);
-  assert.ok(CLUE_TYPES.length === 9 && CLUE_TYPES.every(c => c.t && c.label && Array.isArray(c.fields)));
+  assert.ok(CLUE_TYPES.length === 10 && CLUE_TYPES.every(c => c.t && c.label && Array.isArray(c.fields)));
 });
 
 test('prepare : cellules, objets multi-cases, sans modifier le niveau brut', () => {
@@ -417,17 +426,26 @@ function checkGenerated(level, sol, clues, label, { validate = true } = {}) {
   if (validate) assert.equal(validateLevel(lv).errors.length, 0, `${label} : ${validateLevel(lv).errors}`);
   return lv;
 }
-test('generateClues : solution unique, déterministe, sur les niveaux d’exemple (mêmes indices qu’avant l’extension)', () => {
-  let acc = '';
-  for (const lvl of LEVELS) for (const difficulty of [1, 2, 3]) for (const seed of [1, 2, 3, 'abc']) {
+test('generateClues : solution unique, déterministe, sur les niveaux d’exemple (mêmes indices qu’avant en difficultés 2 et 3)', () => {
+  let d1 = '', d23 = '';
+  for (const lvl of CLASSIC) for (const difficulty of [1, 2, 3]) for (const seed of [1, 2, 3, 'abc']) {
     const sol = Object.fromEntries(lvl.people.map(p => [p.id, lvl.solution[p.id]]));
     const a = generateClues(lvl, sol, { difficulty, seed });
     checkGenerated(lvl, sol, a, `${lvl.id} d${difficulty} s${seed}`);
     assert.deepEqual(generateClues(lvl, sol, { difficulty, seed }), a, 'déterministe');
-    if (REF_LEVELS[lvl.id]) acc += JSON.stringify(a);
+    if (!REF_LEVELS[lvl.id]) continue;
+    if (difficulty === 1) { d1 += JSON.stringify(a); continue; }
+    const b = generateClues(lvl, sol, { difficulty, seed, sees: false });
+    d23 += JSON.stringify(b);
+    // seule différence permise : un indice remplacé par un « voyait »
+    const diff = [];
+    for (const id of Object.keys(a)) for (let i = 0; i < Math.max(a[id].length, b[id].length); i++) if (JSON.stringify(a[id][i]) !== JSON.stringify(b[id][i])) diff.push(a[id][i]);
+    assert.ok(diff.length === 0 || (diff.length === 1 && diff[0].t === 'sees'), `${lvl.id} d${difficulty} s${seed} : ${JSON.stringify(diff)}`);
   }
-  // empreinte des indices générés par le moteur d'avant les plans rectangulaires (21 niveaux carrés)
-  if (Object.keys(REF_LEVELS).every(id => LEVELS.some(l => l.id === id))) assert.equal(fnv(acc), REF_GEN);
+  if (Object.keys(REF_LEVELS).every(id => LEVELS.some(l => l.id === id))) {
+    assert.equal(fnv(d23), REF_GEN_D23, 'difficultés 2 et 3 : indices d’avant les nouvelles mécaniques');
+    assert.equal(fnv(d1), REF_GEN_D1, 'difficulté 1 : référence des indices simples');
+  }
 });
 test('generateClues : grilles aléatoires 6×6 à 8×8, trois difficultés', () => {
   const stats = { 1: {}, 2: {}, 3: {} };
@@ -937,6 +955,464 @@ test('les 21 niveaux gardent leur solution unique et les mêmes phrases d’indi
     const phrases = lv.people.map(p => personCluesHTML(lv, p));
     assert.equal(fnv(JSON.stringify({ sol: sols, phrases })), hash, `${id} : solution ou phrases modifiées`);
   }
+});
+
+/* ------------------------------------------------------------------ */
+/* Nouvelles mécaniques : « voyait », aide qui explique, variantes      */
+/* ------------------------------------------------------------------ */
+
+// Plan 5×5 pour « voyait » et l'arme du crime.
+//   a a a a a     ligne 0 : (0,1)-(0,2) tapis, (0,4) piano
+//   a a a a a     ligne 1 : (1,2) plante
+//   a a a a a     ligne 2 : (2,0) tonneau
+//   b b b b b     ligne 3 : (3,2) chaise
+//   b b b b b     ligne 4 : (4,0)-(4,1) banc, (4,4) tonneau
+function seesBase(extra = {}) {
+  return {
+    id: 'vue', title: 'Vue', difficulty: 2, size: 5,
+    rooms: [{ key: 'a', name: 'Salon', floor: 'wood' }, { key: 'b', name: 'Cuisine', floor: 'tile' }],
+    roomMap: ['aaaaa', 'aaaaa', 'aaaaa', 'bbbbb', 'bbbbb'],
+    objects: [
+      { type: 'piano', r: 0, c: 4 },            // 0
+      { type: 'barrel', r: 2, c: 0 },           // 1
+      { type: 'barrel', r: 4, c: 4 },           // 2
+      { type: 'rug', r: 0, c: 1, w: 2, h: 1 },  // 3
+      { type: 'plant', r: 1, c: 2 },            // 4
+      { type: 'chair', r: 3, c: 2 },            // 5
+      { type: 'bench', r: 4, c: 0, w: 2, h: 1 },// 6
+    ],
+    people: [
+      { id: 'A', name: 'Anna', gender: 'f', clues: [] },
+      { id: 'B', name: 'Bruno', gender: 'm', clues: [] },
+      { id: 'C', name: 'Chloé', gender: 'f', clues: [] },
+      { id: 'D', name: 'Denis', gender: 'm', clues: [] },
+      { id: 'V', name: 'Victor', gender: 'm', victim: true, clues: [] },
+    ],
+    ...extra,
+  };
+}
+const SV = prepare(seesBase());
+const sv = (pl, id, clue) => checkClue(SV, pl, SV.people.find(p => p.id === id), clue);
+const SEES = obj => ({ t: 'sees', obj }), NSEES = obj => ({ t: 'sees', obj, not: true });
+
+console.log('Indice « voyait »');
+test('CLUE_TYPES : entrée « sees » (objet, négation, aide)', () => {
+  const e = CLUE_TYPES.find(c => c.t === 'sees');
+  assert.ok(e);
+  assert.deepEqual(e.fields, ['obj']);
+  assert.equal(e.negatable, true);
+  assert.equal(e.help, 'Même ligne ou même colonne, dans la même pièce, sans rien entre les deux.');
+  assert.match(e.label, /voyait/i);
+});
+test('sees : aligné en ligne, en colonne, adjacent', () => {
+  assert.equal(sv({ A: [2, 4] }, 'A', SEES('piano')), true, 'colonne, une case vide entre');
+  assert.equal(sv({ A: [0, 3] }, 'A', SEES('piano')), true, 'juste à côté');
+  assert.equal(sv({ A: [2, 3] }, 'A', SEES('barrel')), true, 'ligne, deux cases vides entre');
+  assert.equal(sv({ A: [1, 1] }, 'A', SEES('piano')), false, 'ni même ligne ni même colonne');
+  assert.equal(sv({ A: [1, 1] }, 'A', SEES('rug')), true, 'tapis juste au nord');
+});
+test('sees : pièce différente, objet intercalé, personne intercalée', () => {
+  assert.equal(sv({ A: [3, 4] }, 'A', SEES('piano')), false, 'même colonne mais autre pièce');
+  assert.equal(sv({ A: [3, 4] }, 'A', SEES('barrel')), true, 'le tonneau de la Cuisine, juste au sud');
+  assert.equal(sv({ A: [3, 0] }, 'A', SEES('barrel')), false, 'tonneau du Salon : autre pièce');
+  assert.equal(sv({ A: [2, 2] }, 'A', SEES('plant')), true);
+  assert.equal(sv({ A: [2, 2] }, 'A', SEES('rug')), false, 'la plante cache le tapis');
+  assert.equal(sv({ A: [0, 0] }, 'A', SEES('piano')), false, 'le tapis est entre les deux');
+  assert.equal(sv({ A: [2, 4], B: [1, 4] }, 'A', SEES('piano')), false, 'Bruno est entre les deux');
+  assert.equal(sv({ A: [2, 4], B: [0, 4] }, 'A', SEES('piano')), true, 'une personne SUR l’objet ne le cache pas');
+  assert.equal(sv({ A: [2, 4], B: [1, 3] }, 'A', SEES('piano')), true);
+});
+test('sees : l’objet porté est exclu (et arrête le regard), un autre du même type compte', () => {
+  assert.equal(sv({ A: [0, 2] }, 'A', SEES('rug')), false, 'sur le tapis : l’autre case du même tapis ne compte pas');
+  assert.equal(sv({ A: [0, 2] }, 'A', SEES('piano')), true, 'depuis le tapis, vers l’est');
+  assert.equal(sv({ A: [0, 1] }, 'A', SEES('piano')), false, 'l’autre case du tapis est entre les deux');
+  assert.equal(sv({ A: [4, 1] }, 'A', SEES('bench')), false, 'sur le banc');
+  const two = prepare(seesBase({ objects: [{ type: 'chair', r: 1, c: 1 }, { type: 'chair', r: 1, c: 3 }] }));
+  assert.equal(checkClue(two, { A: [1, 1] }, two.people[0], SEES('chair')), true, 'sur une chaise, en voit une autre');
+});
+test('sees : négation et placements partiels', () => {
+  assert.equal(sv({ A: [2, 4] }, 'A', NSEES('piano')), false);
+  assert.equal(sv({ A: [1, 1] }, 'A', NSEES('piano')), true);
+  assert.equal(sv({}, 'A', SEES('piano')), null, 'sujet non posé');
+  assert.equal(sv({ B: [2, 4] }, 'A', NSEES('piano')), null);
+  // une personne non posée ne peut pas s'interposer (elle partagerait la ligne ou la colonne) : tranché
+  assert.equal(sv({ A: [2, 4] }, 'A', SEES('piano')), true);
+});
+test('sees : textes défini / indéfini, accords', () => {
+  const t = (id, c) => clueHTML(SV, SV.people.find(p => p.id === id), c);
+  assert.equal(t('A', SEES('piano')), 'Elle <b>voyait</b> le <b>piano</b>.');
+  assert.equal(t('B', SEES('piano')), 'Il <b>voyait</b> le <b>piano</b>.');
+  assert.equal(t('A', NSEES('piano')), 'Elle <b>ne voyait pas</b> le <b>piano</b>.');
+  assert.equal(t('A', SEES('barrel')), 'Elle <b>voyait</b> un <b>tonneau</b>.');
+  assert.equal(t('B', NSEES('barrel')), 'Il <b>ne voyait pas</b> de <b>tonneau</b>.');
+  assert.equal(t('A', SEES('plant')), 'Elle <b>voyait</b> la <b>plante</b>.');
+  const two = prepare(seesBase({ objects: [{ type: 'aquarium', r: 0, c: 0 }, { type: 'aquarium', r: 0, c: 4 }, { type: 'statue', r: 2, c: 2 }] }));
+  assert.equal(strip(clueHTML(two, two.people[0], NSEES('aquarium'))), "Elle ne voyait pas d'aquarium.");
+  assert.equal(strip(clueHTML(two, two.people[0], SEES('aquarium'))), 'Elle voyait un aquarium.');
+  assert.equal(strip(clueHTML(two, two.people[1], SEES('statue'))), 'Il voyait la statue.');
+});
+test('sees : validateLevel, solve = force brute, evaluate', () => {
+  const raw = seesBase();
+  raw.people[0].clues = [SEES('piano')];
+  assert.deepEqual(validateLevel(raw).errors, []);
+  raw.people[1].clues = [{ t: 'sees', obj: 'dragon' }];
+  assert.ok(validateLevel(raw).errors.some(e => e.includes('dragon')));
+  const rnd = lcg(99);
+  const pool = [SEES('piano'), SEES('barrel'), SEES('plant'), SEES('rug'), SEES('chair'), SEES('bench'),
+    { t: 'room', room: 'a' }, { t: 'on', obj: 'rug' }, { t: 'beside', obj: 'barrel' }, { t: 'with', who: 'B' }];
+  let nonTrivial = 0;
+  for (let k = 0; k < 14; k++) {
+    const lv = seesBase();
+    for (const p of lv.people) {
+      if (p.victim) continue;
+      const nb = rnd() < 0.8 ? 1 : 0;
+      for (let j = 0; j < nb; j++) {
+        const c = { ...pool[Math.floor(rnd() * pool.length)] };
+        if (c.who === p.id) continue;
+        if (rnd() < 0.3) c.not = true;
+        p.clues.push(c);
+      }
+    }
+    const expected = brute(lv);
+    assert.equal(solve(lv, { max: 1e5 }).length, expected, JSON.stringify(lv.people.map(p => p.clues)));
+    if (expected > 0 && expected < 1000) nonTrivial++;
+  }
+  assert.ok(nonTrivial >= 6, `trop peu de cas non triviaux (${nonTrivial})`);
+});
+test('sees : generateClues en produit aux difficultés 2 et 3, jamais en 1, au plus un par niveau', () => {
+  const count = { 1: 0, 2: 0, 3: 0 };
+  for (const lvl of LEVELS.slice(0, 14)) for (const difficulty of [1, 2, 3]) for (const seed of [1, 2, 3]) {
+    const a = generateClues(lvl, lvl.solution, { difficulty, seed });
+    checkGenerated(lvl, lvl.solution, a, `${lvl.id} d${difficulty} s${seed}`);
+    const k = Object.values(a).flat().filter(c => c.t === 'sees').length;
+    assert.ok(k <= 1, `${lvl.id} : ${k} « voyait »`);
+    count[difficulty] += k;
+  }
+  assert.equal(count[1], 0);
+  assert.ok(count[2] + count[3] >= 3, JSON.stringify(count));
+  assert.ok(count[2] + count[3] <= 0.5 * 14 * 3 * 2, `trop de « voyait » : ${JSON.stringify(count)}`);
+});
+
+console.log('« h » muet et « h » aspiré');
+test('pièces : élision devant un h muet, pas devant un h aspiré', () => {
+  const names = ['Habitat', 'Hôtel', 'Hôpital', 'Herbier', 'Horloge', 'Hall', 'Hangar', 'Halle', 'Hublot', 'Hamac', 'Yourte'];
+  const lv = prepare({ id: 'h', title: 'H', size: 5, rooms: names.map((name, i) => ({ key: 'abcdefghijk'[i], name, floor: 'wood' })),
+    roomMap: ['abcde', 'fghij', 'kkkkk', 'kkkkk', 'kkkkk'], objects: [], people: base().people });
+  const t = k => strip(clueHTML(lv, lv.people[0], { t: 'room', room: k }));
+  assert.deepEqual('abcdefghijk'.split('').map(t), [
+    "Elle était dans l'Habitat.", "Elle était dans l'Hôtel.", "Elle était dans l'Hôpital.", "Elle était dans l'Herbier.",
+    "Elle était dans l'Horloge.", 'Elle était dans le Hall.', 'Elle était dans le Hangar.', 'Elle était dans la Halle.',
+    'Elle était dans le Hublot.', 'Elle était dans la pièce Hamac.', 'Elle était dans la Yourte.']);
+  assert.equal(strip(clueHTML(lv, lv.people[1], { t: 'room', room: 'b', not: true })), "Il n'était pas dans l'Hôtel.");
+});
+test('objets : « de l’horloge », « l’herbier », mais « le hamac », « du hamac », « du hublot »', () => {
+  OBJECTS.__horloge = { occ: false, g: 'f', n: 'horloge', pl: 'horloges' };
+  OBJECTS.__herbier = { occ: false, g: 'm', n: 'herbier', pl: 'herbiers' };
+  OBJECTS.__hublot = { occ: false, g: 'm', n: 'hublot', pl: 'hublots' };
+  try {
+    const lv = prepare(base({ objects: [{ type: '__horloge', r: 0, c: 0 }, { type: '__herbier', r: 1, c: 0 }, { type: '__hublot', r: 2, c: 0 },
+      { type: 'hammock', r: 3, c: 0 }, { type: 'hammock', r: 4, c: 3 }, { type: 'hammock', r: 0, c: 3 }] }));
+    const A = lv.people[0];
+    assert.equal(strip(clueHTML(lv, A, { t: 'beside', obj: '__horloge' })), "Elle était à côté de l'horloge.");
+    assert.equal(strip(clueHTML(lv, A, { t: 'sameRow', obj: '__herbier' })), "Elle était sur la même ligne que l'herbier.");
+    assert.equal(strip(clueHTML(lv, A, { t: 'sees', obj: '__herbier' })), "Elle voyait l'herbier.");
+    assert.equal(strip(clueHTML(lv, A, { t: 'beside', obj: '__hublot' })), 'Elle était à côté du hublot.');
+    assert.equal(strip(clueHTML(lv, A, { t: 'beside', obj: 'hammock' })), "Elle était à côté d'un hamac.");
+  } finally { delete OBJECTS.__horloge; delete OBJECTS.__herbier; delete OBJECTS.__hublot; }
+  const one = prepare(base({ objects: [{ type: 'hammock', r: 0, c: 0 }] }));
+  assert.equal(strip(clueHTML(one, one.people[0], { t: 'on', obj: 'hammock' })), 'Elle était allongée dans le hamac.');
+  assert.equal(strip(clueHTML(one, one.people[1], { t: 'beside', obj: 'hammock' })), 'Il était à côté du hamac.');
+  assert.equal(strip(clueHTML(one, one.people[1], { t: 'dir', dir: 'S', of: { obj: 'hammock' } })), 'Il était plus au sud que le hamac.');
+  assert.equal(strip(clueHTML(one, one.people[1], { t: 'sees', obj: 'hammock', not: true })), 'Il ne voyait pas le hamac.');
+  assert.equal(Object.keys(OBJECTS).length, 34 + 38);
+});
+
+console.log('Aide qui explique');
+const solPl = lv => solve(lv, { max: 2 })[0];
+const sameCell = (a, b) => a && b && a[0] === b[0] && a[1] === b[1];
+// Joue un niveau en suivant les aides du début à la fin ; vérifie les garanties à chaque étape.
+function playWithHints(raw, { rnd = null, stats = null } = {}) {
+  const lv = prepare(raw);
+  const sol = solPl(lv);
+  const pl = {};
+  for (let step = 0; step <= lv.people.length + 1; step++) {
+    const unplaced = lv.people.filter(p => !pl[p.id]).map(p => p.id);
+    const prefer = rnd && unplaced.length ? unplaced[Math.floor(rnd() * unplaced.length)] : undefined;
+    const e = explain(lv, pl, prefer ? { prefer } : {});
+    assert.ok(['forced', 'narrow', 'reveal', 'done'].includes(e.kind), `${raw.id} : ${e.kind}`);
+    assert.equal(typeof e.html, 'string');
+    assert.ok(!/<(?!\/?b>)/.test(e.html), e.html);
+    if (e.kind === 'done') { assert.equal(unplaced.length, 0, `${raw.id} : done trop tôt`); return lv; }
+    assert.ok(unplaced.includes(e.person), `${raw.id} : ${e.person} déjà posé`);
+    if (e.kind === 'narrow') {
+      assert.ok(e.cells.length >= 2 && e.cells.some(c => sameCell(c, sol[e.person])), `${raw.id} : narrow sans la bonne case`);
+    } else {
+      assert.ok(sameCell(e.cell, sol[e.person]), `${raw.id} : ${e.kind} ${e.person} ${e.cell} ≠ ${sol[e.person]} (${e.html})`);
+      assert.deepEqual(e.cells, [e.cell]);
+    }
+    if (stats) stats[e.kind]++;
+    pl[e.person] = sol[e.person];
+  }
+  assert.fail(`${raw.id} : pas de fin`);
+}
+test('explain : les 24 niveaux joués pas à pas (forced/reveal = solution, narrow la contient, done à la fin)', () => {
+  const stats = { forced: 0, narrow: 0, reveal: 0 };
+  let tmax = 0;
+  for (const raw of CLASSIC) {
+    const t0 = performance.now();
+    playWithHints(raw, { stats });
+    tmax = Math.max(tmax, (performance.now() - t0) / (raw.people.length + 1));
+  }
+  const tot = stats.forced + stats.narrow + stats.reveal;
+  const pc = k => `${(100 * stats[k] / tot).toFixed(1)} %`;
+  console.log(`    (étapes : forced ${stats.forced} = ${pc('forced')}, narrow ${stats.narrow} = ${pc('narrow')}, reveal ${stats.reveal} = ${pc('reveal')} ; ${tot} au total)`);
+  assert.ok(stats.forced / tot > 0.5, JSON.stringify(stats));
+  assert.ok(stats.reveal / tot < 0.1, JSON.stringify(stats));
+  assert.ok(tmax < 30, `explain trop lent : ${tmax.toFixed(1)} ms`);
+});
+test('explain : préférence du joueur, ordres de pose quelconques', () => {
+  for (const raw of CLASSIC) playWithHints(raw, { rnd: lcg(raw.id.length * 31) });
+  // depuis des états partiels corrects tirés au hasard
+  const rnd = lcg(5);
+  for (const raw of CLASSIC) {
+    const lv = prepare(raw), sol = solPl(lv);
+    for (let k = 0; k < 6; k++) {
+      const pl = {};
+      for (const p of lv.people) if (rnd() < 0.4) pl[p.id] = sol[p.id];
+      const e = explain(lv, pl);
+      if (e.kind === 'done') { assert.equal(Object.keys(pl).length, lv.people.length); continue; }
+      if (e.kind === 'narrow') assert.ok(e.cells.some(c => sameCell(c, sol[e.person])));
+      else assert.ok(sameCell(e.cell, sol[e.person]), `${raw.id} ${e.kind}`);
+    }
+  }
+  // un personnage forcé est annoncé en priorité s'il est celui que le joueur a sélectionné
+  const lv = prepare(LEVELS.find(l => l.id === 'boulangerie'));
+  const e0 = explain(lv, {});
+  assert.equal(e0.kind, 'forced');
+  assert.equal(explain(lv, {}, { prefer: e0.person }).person, e0.person);
+});
+test('explain : wrong détecte un personnage déplacé, done quand tout est en place', () => {
+  for (const raw of CLASSIC) {
+    const lv = prepare(raw), sol = solPl(lv);
+    const all = Object.fromEntries(lv.people.map(p => [p.id, sol[p.id]]));
+    const done = explain(lv, all);
+    assert.equal(done.kind, 'done');
+    assert.equal(done.person, null);
+    // déplacer un personnage sur une autre case libre
+    const p = lv.people[raw.id.length % lv.people.length];
+    const { rows, cols } = dims(lv);
+    let moved = null;
+    for (let r = 0; r < rows && !moved; r++) for (let c = 0; c < cols && !moved; c++) if (canPlace(lv, r, c) && !sameCell([r, c], sol[p.id])) moved = [r, c];
+    const pl = { ...all, [p.id]: moved };
+    const e = explain(lv, pl);
+    assert.equal(e.kind, 'wrong', raw.id);
+    assert.equal(e.person, p.id);
+    assert.deepEqual(e.cell, moved);
+    assert.ok(e.html.includes(`<b>${p.name}</b>`), e.html);
+    // seul le mal placé est en cause, même avec d'autres absents
+    const partial = { [p.id]: moved, [lv.people[0].id === p.id ? lv.people[1].id : lv.people[0].id]: sol[lv.people[0].id === p.id ? lv.people[1].id : lv.people[0].id] };
+    assert.equal(explain(lv, partial).person, p.id);
+  }
+});
+test('explain : textes (raison décisive, échappement)', () => {
+  const lv = prepare(LEVELS.find(l => l.id === 'boulangerie'));
+  const e = explain(lv, {});
+  assert.equal(strip(e.html), "Sonia était assise sur le tabouret : il n'y a qu'un tabouret sur le plan.");
+  const sol = solPl(lv);
+  const e2 = explain(lv, { S: sol.S });
+  assert.equal(strip(e2.html), "Lucie était assise sur le banc : deux cases conviennent, mais l'une est dans la ligne de Sonia.");
+  const raw = clone(LEVELS.find(l => l.id === 'boulangerie'));
+  raw.people.find(p => p.id === 'S').name = 'So<nia>';
+  const e3 = explain(raw, {});
+  assert.ok(e3.html.includes('<b>So&lt;nia&gt;</b>'), e3.html);
+});
+
+console.log('Variante : témoin menteur');
+const withClues = (lv, clues, extra = {}) => ({ ...lv, ...extra, people: lv.people.map(p => ({ ...p, clues: clues[p.id] || [] })) });
+test('liarOf / evaluate : menteur unique, indices factuels', () => {
+  const raw = withClues(base(), {
+    A: [{ t: 'room', room: 'a' }], B: [{ t: 'room', room: 'c' }], C: [{ t: 'room', room: 'b' }], D: [{ t: 'room', room: 'c' }],
+  }, { twist: { liar: true } });
+  // tous les indices vrais : personne ne ment, la disposition n'est pas valable
+  const allTrue = { A: [2, 0], B: [3, 3], C: [0, 2], D: [4, 4], V: [1, 1] };
+  assert.equal(liarOf(raw, allTrue), null);
+  const ev0 = evaluate(raw, allTrue);
+  assert.equal(ev0.liar, null); assert.equal(ev0.lines.ok, true); assert.equal(ev0.victimOk, true);
+  assert.equal(ev0.ok, false, 'il faut un menteur');
+  // C (4,4) n'est pas dans le Grenier, seul son indice est faux → C ment
+  const pl = { A: [0, 1], V: [1, 0], B: [2, 2], D: [3, 3], C: [4, 4] };
+  assert.equal(liarOf(raw, pl), 'C');
+  const ev = evaluate(raw, pl);
+  assert.equal(ev.liar, 'C'); assert.equal(ev.ok, true);
+  assert.deepEqual(ev.people.C.clues, [false]); assert.equal(ev.people.C.ok, false);
+  assert.deepEqual(ev.people.A.clues, [true]);
+  // plusieurs suspects aux indices faux : pas de menteur
+  assert.equal(liarOf(raw, { A: [0, 3], B: [1, 0], C: [2, 2], D: [3, 1], V: [4, 4] }), null);
+  assert.equal(evaluate(raw, { A: [0, 3], B: [1, 0], C: [2, 2], D: [3, 1], V: [4, 4] }).ok, false);
+  assert.equal(liarOf(raw, { A: [0, 1] }), null, 'incomplet');
+  assert.equal(evaluate(raw, { A: [0, 1] }).liar, null);
+  // niveau classique : pas de champ « liar », résultat inchangé
+  const classic = withClues(base(), { A: [{ t: 'room', room: 'a' }] });
+  assert.equal('liar' in evaluate(classic, SOL), false);
+});
+test('solve avec menteur = force brute (5×5 et 4×6)', () => {
+  const rnd = lcg(2024);
+  const pool = [
+    { t: 'room', room: 'a' }, { t: 'room', room: 'c' }, { t: 'on', obj: 'chair' }, { t: 'beside', obj: 'sofa' },
+    { t: 'beside', obj: 'tree' }, { t: 'with', who: 'B' }, { t: 'alone' }, { t: 'dir', dir: 'N', of: { who: 'D' } },
+    { t: 'sameRow', obj: 'tree' }, { t: 'sameCol', obj: 'sofa' }, { t: 'sees', obj: 'barrel' }, { t: 'dir', dir: 'S', of: { on: 'chair' } },
+  ];
+  let nonTrivial = 0;
+  for (let k = 0; k < 10; k++) {
+    const lv = base({ twist: { liar: true } });
+    for (const p of lv.people) {
+      if (p.victim) continue;
+      const nb = 1 + Math.floor(rnd() * 2);
+      while (p.clues.length < nb) {
+        const c = { ...pool[Math.floor(rnd() * pool.length)] };
+        if (c.who === p.id || (c.of && c.of.who === p.id)) continue;
+        if (rnd() < 0.3) c.not = true;
+        p.clues.push(c);
+      }
+    }
+    const expected = brute(lv);
+    const got = solve(lv, { max: 1e5 });
+    assert.equal(got.length, expected, JSON.stringify(lv.people.map(p => p.clues)));
+    assert.equal(new Set(got.map(s => JSON.stringify(s))).size, got.length);
+    for (const s of got.slice(0, 10)) { assert.ok(liarOf(lv, s)); assert.equal(evaluate(lv, s).ok, true); }
+    assert.equal(solve(lv, { max: 2 }).length, Math.min(2, expected));
+    if (expected > 0 && expected < 1000) nonTrivial++;
+  }
+  assert.ok(nonTrivial >= 4, `trop peu de cas non triviaux (${nonTrivial})`);
+  for (let k = 0; k < 6; k++) {
+    const { level } = randomRect(4, 6, 31 + k, 0.15);
+    const types = [...new Set(level.objects.map(o => o.type))];
+    for (const p of level.people) if (!p.victim) p.clues = [k % 2 ? { t: 'room', room: level.rooms[(p.id.charCodeAt(0) + k) % level.rooms.length].key } : { t: 'beside', obj: types[(p.id.charCodeAt(0) + k) % types.length] }];
+    level.twist = { liar: true };
+    assert.equal(solve(level, { max: 1e6 }).length, bruteRect(level), `4×6 n°${k}`);
+  }
+});
+test('validateLevel : variantes', () => {
+  const raw = withClues(base(), { A: [{ t: 'room', room: 'a' }], B: [{ t: 'room', room: 'a' }], C: [{ t: 'room', room: 'c' }] }, { twist: { liar: true } });
+  assert.ok(validateLevel(raw).errors.some(e => e.includes('Denis') && e.includes('menteur')), 'suspect sans indice');
+  assert.ok(validateLevel({ ...raw, twist: 'oui' }).errors.length > 0);
+  assert.ok(validateLevel({ ...raw, twist: { liar: 1 } }).errors.some(e => e.includes('liar')));
+  assert.ok(validateLevel({ ...raw, twist: { color: true } }).warnings.some(e => e.includes('color')));
+  for (const lv of LEVELS) {
+    assert.equal(validateLevel({ ...lv, twist: { weapon: true } }).errors.length === 0, weaponOf(lv, lv.solution) != null, lv.id);
+  }
+});
+test('generateClues({ liar: true }) : unique, menteur aux indices tous faux, carrés et rectangles', () => {
+  const cases = [];
+  for (const id of ['peniche', 'librairie', 'vignoble', 'chapiteau', 'opera', 'aeroport', 'lune']) {
+    const lv = LEVELS.find(l => l.id === id);
+    cases.push({ level: lv, sol: lv.solution, label: id });
+  }
+  for (const N of [6, 7, 8]) cases.push({ ...randomLevel(N, N * 7 + 3), label: `${N}×${N}` });
+  for (const [H, W] of [[4, 9], [6, 9], [9, 6]]) cases.push({ ...randomRect(H, W, H * 13 + W), label: `${H}×${W}` });
+  let ok = 0, total = 0;
+  const liars = new Set();
+  for (const { level, sol, label } of cases) for (const difficulty of [1, 2, 3]) for (const seed of [1, 2]) {
+    if (dims(level).rows > 7 && seed === 2) continue;
+    total++;
+    const g = generateClues(level, sol, { difficulty, seed, liar: true });
+    if (!g) continue;
+    const lv = withClues(level, g, { twist: { liar: true } });
+    const L = `${label} d${difficulty} s${seed}`;
+    const s = solve(lv, { max: 2 });
+    assert.equal(s.length, 1, `${L} : ${s.length} solutions`);
+    assert.deepEqual(s[0], Object.fromEntries(lv.people.map(p => [p.id, sol[p.id]])), L);
+    const liar = liarOf(lv, sol);
+    assert.ok(liar, L);
+    liars.add(`${label}:${liar}`);
+    const ev = evaluate(lv, sol);
+    assert.equal(ev.ok, true, L); assert.equal(ev.liar, liar);
+    for (const p of lv.people) {
+      if (p.victim) { assert.deepEqual(p.clues, []); continue; }
+      assert.ok(p.clues.length >= 1 && p.clues.length <= (dims(lv).rows === dims(lv).cols ? 2 : 3), `${L} : ${p.id}`);
+      assert.deepEqual(ev.people[p.id].clues, p.clues.map(() => p.id !== liar), `${L} : ${p.id}`);
+      for (const c of p.clues) if (c.t === 'with' || c.t === 'besidePerson') assert.notEqual(c.who, lv.people.find(q => q.victim).id);
+    }
+    if (dims(lv).cols <= 9) assert.deepEqual(validateLevel(lv).errors, [], L);
+    if (seed === 1 && difficulty === 2 && dims(level).rows < 8) assert.deepEqual(generateClues(level, sol, { difficulty, seed, liar: true }), g, `${L} : déterministe`);
+    // sans la variante, la solution n'en est pas une (les indices du menteur y sont faux)
+    assert.equal(evaluate(withClues(level, g), sol).ok, false, `${L} : sans menteur`);
+    ok++;
+  }
+  // « null si impossible » est permis : cela arrive surtout sur un 4×9 (trois suspects seulement)
+  console.log(`    (${ok}/${total} générations avec menteur réussies)`);
+  assert.ok(ok >= total - 4, `seulement ${ok}/${total}`);
+  assert.ok(liars.size >= 8, 'menteurs variés');
+});
+test('explain sur un niveau à menteur : seulement wrong, reveal, done', () => {
+  const lv0 = LEVELS.find(l => l.id === 'librairie');
+  const lv = prepare(withClues(lv0, generateClues(lv0, lv0.solution, { difficulty: 2, seed: 3, liar: true }), { twist: { liar: true } }));
+  const sol = solPl(lv);
+  const pl = {};
+  for (let k = 0; k < lv.people.length; k++) {
+    const e = explain(lv, pl);
+    assert.equal(e.kind, 'reveal');
+    assert.ok(/menteur/.test(e.html), e.html);
+    assert.ok(sameCell(e.cell, sol[e.person]));
+    pl[e.person] = sol[e.person];
+  }
+  assert.equal(explain(lv, pl).kind, 'done');
+  const p = lv.people[0];
+  const other = sol[lv.people[1].id];
+  const w = explain(lv, { [p.id]: [sol[p.id][0], other[1]] });
+  assert.equal(w.kind, 'wrong');
+  assert.ok(!w.html.includes('indice'), w.html);
+});
+
+console.log('Variante : arme du crime');
+test('weaponOf : zéro, un, plusieurs objets voisins ; objet porté et autre pièce exclus', () => {
+  const W5 = prepare(seesBase({ twist: { weapon: true } }));
+  const others = { B: [0, 0], C: [1, 1], D: [2, 3] }; // dans le Salon
+  const at = (a, v = [4, 3]) => ({ ...others, A: a, V: v });
+  assert.equal(murdererOf(W5, at([3, 3])), 'A');
+  assert.equal(weaponOf(W5, at([3, 3])), 5, 'la chaise seulement (au nord : autre pièce)');
+  assert.equal(weaponOf(W5, at([4, 3], [3, 4])), 2, 'le tonneau de la Cuisine');
+  assert.equal(weaponOf(W5, at([3, 1])), null, 'chaise et banc : deux objets');
+  assert.equal(weaponOf(W5, at([3, 0])), 6, 'le banc compte ; le tonneau du Salon (autre pièce) non');
+  assert.equal(weaponOf(W5, at([4, 1])), null, 'sur le banc : son autre case ne compte pas');
+  assert.equal(weaponOf(W5, at([3, 2])), null, 'sur la chaise, sans objet voisin');
+  assert.equal(weaponOf(W5, { ...others, A: [3, 3] }), null, 'disposition incomplète');
+  assert.equal(weaponOf(W5, { B: [0, 0], C: [1, 1], D: [3, 1], A: [3, 3], V: [4, 3] }), null, 'meurtrier non identifié');
+  // objet multi-cases touché par deux côtés (pièces superposées) : compté une fois
+  const ov = prepare(seesBase({ objects: [{ type: 'chair', r: 3, c: 0 }, { type: 'rug', r: 3, c: 0, w: 2, h: 2 }] }));
+  assert.equal(weaponOf(ov, at([3, 0], [4, 3])), 1);
+  assert.equal(weaponOf(W5, at([3, 3])), weaponOf(prepare(seesBase()), at([3, 3])), 'indépendant de la variante');
+});
+
+console.log('Génération en difficulté 1');
+test('generateClues difficulté 1 : indices simples (au plus un with/sameRow/sameCol, au plus une négation)', () => {
+  const simple = clues => {
+    const all = Object.values(clues).flat();
+    return all.every(c => ['room', 'on', 'beside', 'alone', 'with', 'sameRow', 'sameCol'].includes(c.t))
+      && all.filter(c => ['with', 'sameRow', 'sameCol'].includes(c.t)).length <= 1
+      && all.filter(c => c.not).length <= 1;
+  };
+  let kept = 0, total = 0;
+  for (const lvl of CLASSIC) {
+    const small = dims(lvl).rows * dims(lvl).cols <= 45;
+    for (const seed of [1, 2, 3, 'abc']) {
+      const a = generateClues(lvl, lvl.solution, { difficulty: 1, seed });
+      checkGenerated(lvl, lvl.solution, a, `${lvl.id} s${seed}`);
+      if (small) { total++; if (simple(a)) kept++; }
+    }
+  }
+  assert.equal(kept, total, `${kept}/${total} générations simples sur les petits plans`);
+  let n = 0, s = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const { level, sol } = randomLevel(6, 600 + seed);
+    const a = generateClues(level, sol, { difficulty: 1, seed });
+    if (!a) continue;
+    checkGenerated(level, sol, a, `6×6 s${seed}`);
+    n++; if (simple(a)) s++;
+  }
+  // plans aléatoires (pièces et objets tirés au hasard) : l'unicité y exige souvent d'autres types,
+  // le repli est alors permis ; on le signale seulement
+  console.log(`    (6×6 aléatoires : ${s}/${n} générations limitées aux indices simples)`);
 });
 
 console.log(`\n${passed} réussi(s), ${failedCount} échoué(s).`);

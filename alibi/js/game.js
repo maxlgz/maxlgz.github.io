@@ -1,5 +1,5 @@
 // Alibi — écran de jeu.
-import { prepare, personCluesHTML, checkClue, evaluate, solve, canPlace, OBJECTS } from './engine.js';
+import { prepare, personCluesHTML, checkClue, evaluate, solve, canPlace, explain, weaponOf, OBJECTS, CLUE_TYPES } from './engine.js';
 import { objectSVG } from './art.js';
 import { createBoard, tokenHTML } from './board.js';
 import { colorOf } from './palette.js';
@@ -69,7 +69,36 @@ export const ICONS = {
   pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 013 3L8 18.5z"/><path d="M13.5 7l3 3"/></svg>',
   legend: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="6.5" r="1.8"/><circle cx="5.5" cy="12" r="1.8"/><circle cx="5.5" cy="17.5" r="1.8"/><path d="M10.5 6.5H20M10.5 12H20M10.5 17.5H20"/></svg>',
   help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.6 2.6 0 115 1c-.8 1-2.5 1.4-2.5 3"/><path d="M12 17.2v.1"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>',
+  mask: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5c3-1.6 6-1.6 9 0 3-1.6 6-1.6 9 0-.3 4.6-2.6 7.5-5.6 7.5-1.6 0-2.6-1.2-3.4-2.6-.8 1.4-1.8 2.6-3.4 2.6C5.6 16 3.3 13.1 3 8.5z"/><path d="M6.6 10.6c.8-.5 1.7-.5 2.5 0M14.9 10.6c.8-.5 1.7-.5 2.5 0"/></svg>',
+  knife: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 9.5L20.5 3.5c.6 3.8-.9 7.4-4 9.6z"/><path d="M14.5 9.5l2 3.6L8 21.5 4.5 18z"/><path d="M6.2 16.3l1.5 1.5"/></svg>',
 };
+
+/** Variantes d'un niveau brut : { liar, weapon } (champ `twist`, absent = niveau classique). */
+export function twistOf(level) {
+  const t = level && level.twist && typeof level.twist === 'object' ? level.twist : {};
+  return { liar: t.liar === true, weapon: t.weapon === true };
+}
+export const TWIST_RULES = {
+  liar: {
+    pill: 'Un témoin ment', badge: 'Témoin menteur', title: 'Variante — témoin menteur',
+    text: 'Un des suspects ment : tout ce qu’il dit est faux. Les autres disent vrai. Le menteur n’est pas forcément le coupable.',
+  },
+  weapon: {
+    pill: 'Bonus : arme', badge: 'Arme du crime', title: 'Bonus — arme du crime',
+    text: 'Après avoir démasqué le coupable, désignez l’arme : elle se trouvait à côté du meurtrier.',
+  },
+};
+const ruleBoxHTML = (k) => `<p class="intro-rule intro-rule--${k}"><span class="rule-ico">${k === 'liar' ? ICONS.mask : ICONS.knife}</span><span><b>${esc(TWIST_RULES[k].title)}.</b> ${esc(TWIST_RULES[k].text)}</span></p>`;
+const SEES_HELP = (CLUE_TYPES.find((x) => x.t === 'sees') || {}).help || 'Même ligne ou même colonne, dans la même pièce, sans rien entre les deux.';
+const cap1 = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+/** Groupe nominal défini d'un objet (« le piano », « l’horloge »). */
+function objDef(type) {
+  const o = OBJECTS[type];
+  if (!o) return esc(type);
+  if (/^[aeiouyéèêâîô]/i.test(o.n) || (/^h/i.test(o.n) && !/^h(all|angar|alle|amac|ublot|aut|ach|arpe|ibou|être|oux|otte)/i.test(o.n))) return `l’${esc(o.n)}`;
+  return o.g === 'f' ? `la ${esc(o.n)}` : `le ${esc(o.n)}`;
+}
 
 // Croix « cartoon » : trait bleu nuit aux bouts arrondis, cerné d'un halo crème pour se détacher des sols.
 const X_SVG = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2L2 8" stroke="var(--x-halo, #FFF6E3)" stroke-width="2.7" stroke-linecap="round" fill="none"/><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" fill="none"/></svg>';
@@ -167,6 +196,9 @@ export function mountGame(root, opts = {}) {
   const roomsByKey = Object.fromEntries((level.rooms || []).map((r) => [r.key, r]));
   const saveKey = `alibi:save:${raw.id || 'sans-id'}`;
   const sig = signature(raw);
+  // Variantes (champ `twist` du niveau) : rien ne change sur un niveau classique.
+  const tw = guide ? { liar: false, weapon: false } : twistOf(raw);
+  const twistKeys = ['liar', 'weapon'].filter((k) => tw[k]);
 
   let settings = loadSettings();
   let st = { placements: {}, notes: {}, crosses: {}, seconds: 0, hints: 0, errors: 0 };
@@ -174,9 +206,12 @@ export function mountGame(root, opts = {}) {
   // Enquête guidée : personne n'est sélectionné d'avance, le guide le demande.
   let selected = people.length && !guide ? people[0].id : null;
   let mode = null; // null | 'cross' | 'erase'
-  let phase = 'play'; // 'intro' | 'play' | 'accuse' | 'won'
+  let phase = 'play'; // 'intro' | 'play' | 'accuse' | 'weapon' | 'won'
   let wrong = new Map(); // id -> Set(indices d'indices fautifs) ; -1 = phrase de la victime
   let hintWrong = null;
+  let help = null; // panneau d'aide ouvert : { type: 'hint' | 'weapon', keys: Set('r,c'), … }
+  let weaponState = null; // étape bonus de l'arme
+  let ruleModal = null;
   let justPlaced = null;
   let solution;
   let modal = null;
@@ -220,7 +255,10 @@ export function mountGame(root, opts = {}) {
   // ---------- DOM ----------
   root.innerHTML = '';
   const screen = document.createElement('div');
-  screen.className = `screen game${guide ? ' game--guided' : ''}`;
+  screen.className = `screen game${guide ? ' game--guided' : ''}${tw.liar ? ' game--liar' : ''}${tw.weapon ? ' game--weapon' : ''}`;
+  const pillsHTML = twistKeys.length
+    ? `<span class="twist-pills">${twistKeys.map((k) => `<button type="button" class="twist-pill twist-pill--${k}" data-twist="${k}" aria-label="${esc(TWIST_RULES[k].pill)} : revoir la règle">${k === 'liar' ? ICONS.mask : ICONS.knife}<span>${esc(TWIST_RULES[k].pill)}</span></button>`).join('')}</span>`
+    : '';
   const diff = DIFF_LABEL[level.difficulty] || '';
   screen.innerHTML = `
     <header class="topbar">
@@ -236,6 +274,7 @@ export function mountGame(root, opts = {}) {
         <div class="board-wrap"></div>
         <div class="picker" role="group" aria-label="Choisir un personnage"></div>
         <p class="status" role="status" aria-live="polite"></p>
+        <section class="help-panel" aria-label="Aide" aria-live="polite" hidden></section>
       </section>
       <section class="game-side" aria-label="Dossier">
         <details class="legend" data-legend hidden>
@@ -243,7 +282,7 @@ export function mountGame(root, opts = {}) {
           <div class="legend-body"></div>
         </details>
         <div class="cards-scroll">
-          <div class="dossier-head"><h2>Témoignages</h2><span class="meta"></span></div>
+          <div class="dossier-head"><h2>Témoignages</h2>${pillsHTML}<span class="meta"></span></div>
           <div class="cards"></div>
         </div>
         <nav class="toolbar" aria-label="Outils">
@@ -364,7 +403,14 @@ export function mountGame(root, opts = {}) {
       <div class="card-face">${tokenHTML(p, { size: 64, color: colors[p.id] })}</div>
       <div class="card-name"><strong>${esc(p.name)}</strong>${p.victim ? '<span class="victim-tag">Victime</span>' : ''}<span class="placed-tag"></span></div>
       <span class="card-letter" aria-hidden="true">${esc(p.id)}</span>
-      <ul>${lines.map((h, i) => `<li data-i="${i}">${h}</li>`).join('')}</ul>
+      <ul>${lines.map((h, i) => {
+        const cl = i >= clueOffset[p.id] ? (p.clues || [])[i - clueOffset[p.id]] : null;
+        if (cl && cl.t === 'sees') {
+          // « voyait » : petite icône d'œil ; un appui (ou le focus clavier) rappelle la règle
+          return `<li data-i="${i}" class="clue-sees" tabindex="0" aria-describedby="sees-${esc(p.id)}-${i}"><span class="sees-ico" aria-hidden="true">${ICONS.eye}</span>${h}<span class="sees-help" id="sees-${esc(p.id)}-${i}"><b>Voyait</b> : ${esc(SEES_HELP)}</span></li>`;
+        }
+        return `<li data-i="${i}">${h}</li>`;
+      }).join('')}</ul>
     </div>`;
   }).join('');
   const cardEls = Object.fromEntries([...cardsEl.querySelectorAll('[data-card]')].map((el) => [el.dataset.card, el]));
@@ -389,6 +435,7 @@ export function mountGame(root, opts = {}) {
     fn();
     wrong = new Map();
     hintWrong = null;
+    closeHelp({ redraw: false }); // tout changement du plan ferme le panneau d'aide
     render();
     save();
   }
@@ -465,7 +512,9 @@ export function mountGame(root, opts = {}) {
             html += `<span class="notes">${notes.map((nid) => `<span class="note${nid === selected ? ' sel' : ''}" style="${pcStyle(nid)}">${esc(nid)}</span>`).join('')}</span>`;
           }
         }
+        if (help && help.keys.has(k)) html += '<span class="help-ring" aria-hidden="true"></span>';
         if (layer.innerHTML !== html) layer.innerHTML = html;
+        cell.classList.toggle('is-help', !!(help && help.keys.has(k)));
         const label = id ? `${byId[id].name}` : (st.crosses[k] ? 'croix' : '');
         cell.dataset.state = label;
       }
@@ -635,6 +684,7 @@ export function mountGame(root, opts = {}) {
   }
 
   function shortAction(r, c) {
+    if (phase === 'weapon') return pickWeapon(r, c);
     if (phase !== 'play') return;
     if (mode === 'cross') return toggleCross(r, c);
     if (mode === 'erase') return eraseCell(r, c);
@@ -657,6 +707,7 @@ export function mountGame(root, opts = {}) {
     restore(history.pop());
     wrong = new Map();
     hintWrong = null;
+    closeHelp({ redraw: false });
     render();
     save();
     setStatus('Dernière action annulée.');
@@ -686,7 +737,124 @@ export function mountGame(root, opts = {}) {
     return solution;
   }
 
+  // ---------- panneau d'aide (indice qui explique) ----------
+  const helpEl = $('.help-panel');
+  const HELP_KICKER = {
+    forced: 'Déduction', narrow: 'Piste', reveal: 'Coup de pouce', revealed: 'La bonne case',
+    wrong: 'Erreur repérée', done: 'Tout est en place',
+  };
+  const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function closeHelp({ redraw = true } = {}) {
+    if (!help) return;
+    if (help.type === 'weapon') return; // le bandeau de l'arme ne se ferme qu'en répondant
+    const was = help;
+    help = null;
+    helpEl.hidden = true;
+    helpEl.innerHTML = '';
+    delete helpEl.dataset.kind;
+    screen.classList.remove('help-open');
+    screen.style.removeProperty('--help-h');
+    if (was.kind === 'wrong' && hintWrong === was.person) hintWrong = null;
+    if (redraw) render();
+  }
+  function paintHelp({ kicker, kind, html, actions }) {
+    helpEl.dataset.kind = kind;
+    helpEl.innerHTML = `<div class="help-head"><span class="help-kicker">${esc(kicker)}</span>
+        ${help.type === 'hint' ? `<button type="button" class="help-x" data-help="close" aria-label="Fermer l’aide">${ICONS.cross}</button>` : ''}</div>
+      <p class="help-text">${html}</p>
+      <div class="help-actions">${actions.map(([act, label, cls]) => `<button type="button" class="btn btn--small ${cls || ''}" data-help="${act}">${label}</button>`).join('')}</div>`;
+    helpEl.hidden = false;
+    screen.classList.add('help-open');
+    hideBubble();
+    render();
+    // téléphone : on réserve sous le contenu la hauteur du panneau, pour pouvoir tout faire défiler
+    screen.style.setProperty('--help-h', `${Math.ceil(helpEl.getBoundingClientRect().height)}px`);
+    const first = helpEl.querySelector('.help-actions button');
+    if (first) { try { first.focus({ preventScroll: true }); } catch { /* rien */ } }
+    revealHelpCells();
+  }
+  // Le plateau défile en vue si une case mise en évidence est cachée (en-tête, panneau d'aide, bord).
+  function revealHelpCells() {
+    if (!help || !help.keys.size) return;
+    const rects = [...help.keys].map((k) => { const [r, c] = k.split(',').map(Number); return board.cells[r][c].getBoundingClientRect(); });
+    const topY = Math.min(...rects.map((x) => x.top));
+    const botY = Math.max(...rects.map((x) => x.bottom));
+    const minY = topbar.getBoundingClientRect().bottom + 8;
+    const maxY = (wide.matches || helpEl.hidden ? window.innerHeight : helpEl.getBoundingClientRect().top) - 8;
+    if (topY >= minY && botY <= maxY) return;
+    const span = botY - topY;
+    const delta = span > maxY - minY ? topY - minY : (topY + botY) / 2 - (minY + maxY) / 2;
+    window.scrollBy({ top: delta, behavior: reduceMotion() ? 'auto' : 'smooth' });
+  }
+  function showHelp(ex, { revealed = false } = {}) {
+    const kind = revealed ? 'revealed' : ex.kind;
+    const p = ex.person ? byId[ex.person] : null;
+    const cells = (kind === 'wrong' ? [ex.cell] : ex.cells || []).filter((x) => Array.isArray(x));
+    help = { type: 'hint', ex, kind, person: p ? p.id : null, cell: ex.cell || null, keys: new Set(cells.map(([r, c]) => key(r, c))) };
+    if (p) selected = p.id;
+    hintWrong = kind === 'wrong' && p ? p.id : null;
+    let html = ex.html || '';
+    let actions = [['ok', 'J’ai compris', 'btn--primary']];
+    if ((kind === 'forced' || kind === 'reveal' || kind === 'revealed') && p && ex.cell) {
+      actions = [['place', 'Poser pour moi', 'btn--accent'], ['ok', 'J’ai compris', '']];
+    } else if (kind === 'narrow' && p) {
+      actions = [['ok', 'J’ai compris', 'btn--primary'], ['show', 'Montrer la case', '']];
+    } else if (kind === 'wrong' && p) {
+      actions = [['remove', 'Retirer ce personnage', 'btn--accent'], ['ok', 'J’ai compris', '']];
+    } else if (kind === 'done') {
+      const complete = Object.keys(st.placements).length === count;
+      html = `${html}${complete ? ' Touchez <b>Valider</b> pour confirmer votre plan.' : ''}`;
+      actions = complete ? [['validate', 'Valider', 'btn--accent'], ['ok', 'Fermer', '']] : [['ok', 'Fermer', 'btn--primary']];
+    }
+    paintHelp({ kicker: HELP_KICKER[kind] || 'Indice', kind, html, actions });
+  }
+  helpEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-help]');
+    if (!b || !help) return;
+    const act = b.dataset.help;
+    if (help.type === 'weapon') { weaponAction(act); return; }
+    const h = help;
+    if (act === 'close' || act === 'ok') { play('close'); closeHelp(); return; }
+    if (act === 'place' && h.person && h.cell) { placeAt(h.cell[0], h.cell[1], h.person); return; }
+    if (act === 'remove' && h.person && st.placements[h.person]) {
+      const p = byId[h.person];
+      play('remove');
+      commit(() => { delete st.placements[h.person]; });
+      selected = p.id;
+      render();
+      setStatus(`${p.name} retiré${fem(p, '', 'e')} du plan.`);
+      return;
+    }
+    if (act === 'validate') { closeHelp(); validate(); return; }
+    if (act === 'show' && h.person) {
+      const sol = getSolution();
+      const pos = sol && sol[h.person];
+      if (!pos) return;
+      play('hint');
+      st.hints++;
+      save();
+      const p = byId[h.person];
+      const [r, c] = pos;
+      showHelp({
+        kind: 'reveal', person: p.id, cell: [r, c], cells: [[r, c]],
+        html: `La bonne case de <b>${esc(p.name)}</b>, c’est celle-ci : ${esc(where(r, c))}.`,
+      }, { revealed: true });
+    }
+  });
+
   function hint() {
+    if (guide) return legacyHint(); // enquête guidée : comportement d'origine
+    if (phase !== 'play') return;
+    let ex = null;
+    try { ex = explain(level, st.placements, { prefer: selected || undefined }); } catch (err) { console.warn(err); ex = null; }
+    if (!ex) { play('refuse'); setStatus('Impossible de calculer un indice pour ce niveau.', 'error'); return; }
+    play('hint');
+    if (ex.person || ex.kind === 'done') st.hints++;
+    save();
+    showHelp(ex);
+  }
+
+  function legacyHint() {
     if (phase !== 'play') return;
     const sol = getSolution();
     if (!sol) { play('refuse'); setStatus('Impossible de calculer un indice pour ce niveau.', 'error'); return; }
@@ -721,6 +889,7 @@ export function mountGame(root, opts = {}) {
     let ev;
     try { ev = evaluate(level, st.placements); } catch (err) { console.warn(err); setStatus('Vérification impossible.', 'error'); return; }
     if (ev.ok) {
+      closeHelp({ redraw: false });
       phase = 'accuse';
       render();
       renderTimer();
@@ -731,6 +900,18 @@ export function mountGame(root, opts = {}) {
     play('fail');
     st.errors++;
     wrong = new Map();
+    if (tw.liar) {
+      // Témoin menteur : un indice faux n'est pas une faute en soi ; aucune fiche n'est désignée.
+      render();
+      save();
+      const parts = [];
+      if (ev.lines && ev.lines.ok === false) parts.push('Une ligne ou une colonne contient plusieurs personnes.');
+      if (ev.victimOk === false) parts.push('La victime doit être seule avec une seule autre personne dans sa pièce.');
+      if (!parts.length) parts.push('Ça ne colle pas : il faut exactement un menteur dont tout est faux, et tous les autres doivent dire vrai.');
+      setStatus(`Pas encore… ${parts.join(' ')}`, 'error', 'long');
+      emit('validate', { ok: false });
+      return;
+    }
     for (const p of people) {
       const info = ev.people && ev.people[p.id];
       const off = clueOffset[p.id];
@@ -753,36 +934,77 @@ export function mountGame(root, opts = {}) {
     if (first && cardEls[first]) cardEls[first].scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
 
+  const suspectsHTML = (attr, list) => `<div class="suspects">${list.map((p) => `<button type="button" class="suspect" data-${attr}="${esc(p.id)}" style="${pcStyle(p.id)}">${tokenHTML(p, { size: 64, color: colors[p.id] })}<span>${esc(p.name)}</span></button>`).join('')}</div>`;
+
   function openAccuse(ev) {
     const suspects = people.filter((p) => !p.victim);
     const victim = people.find((p) => p.victim);
+    let murdererId = null;
     modal = openModal((body, close) => {
-      body.innerHTML = `<div class="modal-kicker">Plan reconstitué</div>
-        <h2>Qui est le coupable ?</h2>
-        <p>Votre plan tient debout : chaque témoignage est respecté.${victim ? ` Qui se trouvait seul à seul avec ${esc(victim.name)} ?` : ' Désignez le coupable.'}</p>
-        ${guide && guide.accuseHTML ? guide.accuseHTML() : ''}
-        <div class="suspects">${suspects.map((p) => `<button type="button" class="suspect" data-s="${esc(p.id)}" style="${pcStyle(p.id)}">${tokenHTML(p, { size: 64, color: colors[p.id] })}<span>${esc(p.name)}</span></button>`).join('')}</div>
-        <p class="accuse-msg" role="status" aria-live="polite"></p>
-        <div class="modal-actions"><button type="button" class="btn btn--ghost" data-back>Revenir au plan</button></div>`;
-      const msg = body.querySelector('.accuse-msg');
-      body.addEventListener('click', (e) => {
-        if (e.target.closest('[data-guide-quit]')) { close(true); if (guide) guide.quit(); return; }
-        if (e.target.closest('[data-back]')) { close(); backToPlay(); return; }
-        const b = e.target.closest('[data-s]');
-        if (!b || b.classList.contains('nope')) return;
-        const id = b.dataset.s;
-        const g = gate({ type: 'accuse', id, ok: id === ev.murderer });
-        if (g !== true) { msg.textContent = g; msg.dataset.tone = 'hint'; return; }
-        if (id === ev.murderer) { close(true); win(id); return; }
+      let msg = null;
+      const drawCulprit = () => {
+        body.innerHTML = `<div class="modal-kicker">Plan reconstitué</div>
+          <h2>Qui est le coupable ?</h2>
+          <p>Votre plan tient debout : ${tw.liar ? 'un seul témoin ment, tous les autres disent vrai.' : 'chaque témoignage est respecté.'}${victim ? ` Qui se trouvait seul à seul avec ${esc(victim.name)} ?` : ' Désignez le coupable.'}</p>
+          ${guide && guide.accuseHTML ? guide.accuseHTML() : ''}
+          ${suspectsHTML('s', suspects)}
+          <p class="accuse-msg" role="status" aria-live="polite"></p>
+          <div class="modal-actions"><button type="button" class="btn btn--ghost" data-back>Revenir au plan</button></div>`;
+        msg = body.querySelector('.accuse-msg');
+      };
+      // Témoin menteur : seconde question, avec les mêmes jetons de suspects.
+      const drawLiar = () => {
+        const m = byId[murdererId];
+        body.innerHTML = `<div class="modal-kicker">Coupable démasqué</div>
+          <h2>Et qui mentait ?</h2>
+          <p>Bien vu : <b>${esc(m.name)}</b> était ${fem(m, 'le meurtrier', 'la meurtrière')}. Reste à désigner le témoin menteur, celui dont tout le témoignage est faux.</p>
+          ${suspectsHTML('l', suspects)}
+          <p class="accuse-msg" role="status" aria-live="polite"></p>
+          <div class="modal-actions"><button type="button" class="btn btn--ghost" data-back>Revenir au plan</button></div>`;
+        msg = body.querySelector('.accuse-msg');
+        const h = body.querySelector('h2');
+        if (h) { h.tabIndex = -1; try { h.focus({ preventScroll: true }); } catch { /* rien */ } }
+      };
+      const finish = (liarId) => {
+        close(true);
+        modal = null;
+        if (tw.weapon) startWeapon(murdererId, liarId); else win(murdererId, { liarId });
+      };
+      const miss = (b, text) => {
         play('accuseWrong');
         st.errors++;
         save();
         b.classList.add('nope');
         b.disabled = true;
-        const p = byId[id];
-        msg.textContent = `Mauvaise piste : ${p.name} n’était pas seul${fem(p, '', 'e')} avec la victime. Erreurs : ${st.errors}.`;
+        msg.textContent = `${text} Erreurs : ${st.errors}.`;
         msg.dataset.tone = 'error';
+      };
+      body.addEventListener('click', (e) => {
+        if (e.target.closest('[data-guide-quit]')) { close(true); if (guide) guide.quit(); return; }
+        if (e.target.closest('[data-back]')) { close(); backToPlay(); return; }
+        const lb = e.target.closest('[data-l]');
+        if (lb && !lb.classList.contains('nope')) {
+          const id = lb.dataset.l;
+          if (id === ev.liar) { finish(id); return; }
+          const p = byId[id];
+          miss(lb, `Non : le témoignage de ${p.name} n’est pas entièrement faux.`);
+          return;
+        }
+        const b = e.target.closest('[data-s]');
+        if (!b || b.classList.contains('nope')) return;
+        const id = b.dataset.s;
+        const g = gate({ type: 'accuse', id, ok: id === ev.murderer });
+        if (g !== true) { msg.textContent = g; msg.dataset.tone = 'hint'; return; }
+        if (id === ev.murderer) {
+          murdererId = id;
+          if (tw.liar && ev.liar) { play('ready'); drawLiar(); return; }
+          finish(null);
+          return;
+        }
+        const p = byId[id];
+        miss(b, `Mauvaise piste : ${p.name} n’était pas seul${fem(p, '', 'e')} avec la victime.`);
       });
+      drawCulprit();
     }, { label: 'Qui est le coupable ?', onCancel: backToPlay });
   }
   function backToPlay() {
@@ -790,23 +1012,112 @@ export function mountGame(root, opts = {}) {
     if (phase === 'accuse') { phase = 'play'; render(); renderTimer(); emit('back'); }
   }
 
-  function win(murdererId) {
+  // ---------- bonus : l'arme du crime ----------
+  const objEls = [...board.el.querySelectorAll('.board-object')];
+  function objectAt(r, c) {
+    const cell = level.cells[r] && level.cells[r][c];
+    if (cell && cell.objIndex != null) return cell.objIndex;
+    return (level.objects || []).findIndex((o) => r >= o.r && r < o.r + (o.h || 1) && c >= o.c && c < o.c + (o.w || 1));
+  }
+  function startWeapon(murdererId, liarId) {
+    let answer = null;
+    try { answer = weaponOf(level, st.placements); } catch (err) { console.warn(err); }
+    if (answer == null || !level.objects[answer]) { win(murdererId, { liarId }); return; }
+    phase = 'weapon';
+    weaponState = { murdererId, liarId, answer, choice: null, ok: false, done: false };
+    board.el.classList.add('board--weapon');
+    help = { type: 'weapon', keys: new Set() };
+    render();
+    renderTimer();
+    const m = byId[murdererId];
+    paintHelp({
+      kicker: 'Bonus', kind: 'weapon',
+      html: `<b>Bonus : touchez l’objet qui a servi d’arme.</b> Il se trouvait à côté de ${esc(m.name)}. Une seule tentative, sans pénalité.`,
+      actions: [['skip', 'Passer', 'btn--ghost']],
+    });
+    setStatus('Bonus : touchez l’objet qui a servi d’arme.', 'hint', 'idle');
+    const reduce = reduceMotion();
+    if (wide.matches) boardWrap.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+    else window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+  }
+  function pickWeapon(r, c) {
+    if (phase !== 'weapon' || !weaponState || weaponState.done) return;
+    const k = objectAt(r, c);
+    if (k == null || k < 0) {
+      play('refuse');
+      const cell = board.cells[r][c];
+      cell.classList.remove('shake'); void cell.offsetWidth; cell.classList.add('shake');
+      setTimeout(() => cell.classList.remove('shake'), 350);
+      setStatus('Touchez un objet du plan.', 'hint');
+      return;
+    }
+    weaponState.choice = k;
+    weaponState.ok = k === weaponState.answer;
+    endWeapon();
+  }
+  function endWeapon(skipped = false) {
+    const ws = weaponState;
+    ws.done = true;
+    ws.skipped = skipped;
+    board.el.classList.remove('board--weapon');
+    board.el.classList.add('board--weapon-done');
+    if (objEls[ws.answer]) objEls[ws.answer].classList.add('weapon-answer');
+    if (!skipped && !ws.ok && objEls[ws.choice]) objEls[ws.choice].classList.add('weapon-miss');
+    const o = level.objects[ws.answer];
+    const m = byId[ws.murdererId];
+    const name = objDef(o.type);
+    play(ws.ok ? 'ready' : 'tap');
+    let html;
+    if (ws.ok) html = `<b>Bien vu !</b> ${cap1(name)} était l’arme du crime.`;
+    else if (skipped) html = `L’arme du crime était <b>${name}</b>, à côté de ${esc(m.name)}.`;
+    else html = `Ce n’était pas ça : l’arme était <b>${name}</b>, à côté de ${esc(m.name)}. Aucune pénalité.`;
+    paintHelp({ kicker: ws.ok ? 'Bonus réussi' : 'Arme du crime', kind: ws.ok ? 'weapon-ok' : 'weapon-miss', html, actions: [['finish', 'Voir le bilan', 'btn--accent']] });
+  }
+  function weaponAction(act) {
+    if (!weaponState) return;
+    if (act === 'skip' && !weaponState.done) { endWeapon(true); return; }
+    if (act === 'finish' && weaponState.done) {
+      const ws = weaponState;
+      help = null;
+      helpEl.hidden = true;
+      helpEl.innerHTML = '';
+      screen.classList.remove('help-open');
+      win(ws.murdererId, { liarId: ws.liarId, weapon: { index: ws.answer, ok: ws.ok } });
+    }
+  }
+  board.el.addEventListener('click', (e) => {
+    if (phase !== 'weapon' || e.detail === 0) return; // clavier : traité par onCellKey
+    const cell = cellFrom(e);
+    if (cell) pickWeapon(+cell.dataset.r, +cell.dataset.c);
+  });
+
+  // Vignette d'objet dans le bilan : 64 px sur la grande dimension, proportions respectées.
+  const thumbBox = (o) => { const w = o.w || 1, h = o.h || 1, m = Math.max(w, h); return `width:${Math.round(64 * w / m)}px;height:${Math.round(64 * h / m)}px`; };
+  function win(murdererId, { liarId = null, weapon = null } = {}) {
     phase = 'won';
     if (persist) removeKey(saveKey);
     render();
     renderTimer();
     const result = { seconds: st.seconds, hints: st.hints, errors: st.errors };
+    if (weapon) result.bonus = !!weapon.ok;
     let extra = null;
     try { extra = onSolved ? onSolved(result) : null; } catch (err) { console.warn(err); }
     const m = byId[murdererId];
+    const liarP = liarId ? byId[liarId] : null;
     play('win');
-    setStatus(`Affaire classée : ${m.name} était ${fem(m, 'le meurtrier', 'la meurtrière')}.`, 'ok');
+    setStatus(`Affaire classée : ${m.name} était ${fem(m, 'le meurtrier', 'la meurtrière')}.${liarP ? ` ${liarP.name} mentait.` : ''}`, 'ok');
     if (guide) { emit('won', { id: murdererId, ...result }); return; }
+    const many = !!(liarP || weapon);
+    const wObj = weapon ? level.objects[weapon.index] : null;
     modal = openModal((body, close) => {
       body.innerHTML = `<div class="modal-kicker">Affaire classée</div>
         <h2>${esc(level.title || 'Enquête')} : résolu !</h2>
-        <div class="win-reveal" style="${pcStyle(m.id)}">${tokenHTML(m, { size: 96, color: colors[m.id] })}
+        <div class="win-reveal${many ? ' win-reveal--compact' : ''}" style="${pcStyle(m.id)}">${tokenHTML(m, { size: 96, color: colors[m.id] })}
           <div><span class="stamp stamp--culprit">Coupable</span><p style="margin:.4em 0 0"><strong>${esc(m.name)}</strong> était ${fem(m, 'le meurtrier', 'la meurtrière')}.</p></div></div>
+        ${liarP ? `<div class="win-reveal win-reveal--compact win-reveal--liar" style="${pcStyle(liarP.id)}">${tokenHTML(liarP, { size: 96, color: colors[liarP.id] })}
+          <div><span class="stamp stamp--liar">${fem(liarP, 'Menteur', 'Menteuse')}</span><p style="margin:.4em 0 0"><strong>${esc(liarP.name)}</strong> mentait : tout son témoignage était faux.</p></div></div>` : ''}
+        ${wObj ? `<div class="win-weapon${weapon.ok ? ' is-ok' : ''}"><span class="win-weapon-thumb" style="${thumbBox(wObj)}">${objectSVG(wObj.type, { w: wObj.w || 1, h: wObj.h || 1 })}</span>
+          <div><span class="stamp ${weapon.ok ? 'stamp--bonus' : 'stamp--brass'}">${weapon.ok ? 'Bonus réussi' : 'Arme du crime'}</span><p style="margin:.4em 0 0"><strong>${cap1(objDef(wObj.type))}</strong> ${weapon.ok ? 'a servi d’arme : bien vu !' : 'a servi d’arme. Bonus manqué, sans pénalité.'}</p></div></div>` : ''}
         <dl class="win-stats">
           <div><dt>Temps</dt><dd>${formatTime(st.seconds)}</dd></div>
           <div><dt>Indices</dt><dd>${st.hints}</dd></div>
@@ -935,9 +1246,45 @@ export function mountGame(root, opts = {}) {
   board.el.addEventListener('selectstart', (e) => e.preventDefault());
 
   // fiches / picker
+  let seesPress = false;
   cardsEl.addEventListener('click', (e) => {
     const card = e.target.closest('[data-card]');
     if (card) select(card.dataset.card, true);
+    // « voyait » : un appui sur l'indice affiche (ou masque) le rappel de la règle
+    const sees = e.target.closest('.clue-sees');
+    if (sees) {
+      const on = !sees.classList.contains('show-help');
+      cardsEl.querySelectorAll('.clue-sees.show-help').forEach((x) => x.classList.remove('show-help'));
+      sees.classList.toggle('show-help', on);
+    }
+    seesPress = false;
+  });
+  // focus clavier : le rappel s'affiche ; au pointeur, c'est le clic (ci-dessus) qui bascule
+  cardsEl.addEventListener('pointerdown', (e) => { seesPress = !!(e.target.closest && e.target.closest('.clue-sees')); });
+  cardsEl.addEventListener('focusin', (e) => {
+    const sees = e.target.closest && e.target.closest('.clue-sees');
+    if (sees && e.target === sees && !seesPress) sees.classList.add('show-help');
+    seesPress = false;
+  });
+  cardsEl.addEventListener('focusout', (e) => {
+    const sees = e.target.closest && e.target.closest('.clue-sees');
+    if (sees && e.target === sees) sees.classList.remove('show-help');
+  });
+  // pastilles de variante : rouvrent la règle
+  screen.querySelector('.dossier-head').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-twist]');
+    if (!b || (ruleModal && !ruleModal.closed)) return;
+    const k = b.dataset.twist;
+    const extra = k === 'liar'
+      ? '<p class="tuto-note">Les puces des fiches restent factuelles : ✓ vrai, ✗ faux d’après votre plan. Sur cette enquête, un ✗ n’est pas forcément une erreur : c’est peut-être le menteur.</p>'
+      : '<p class="tuto-note">Le bonus se joue après l’accusation. Le rater ne coûte rien.</p>';
+    ruleModal = openModal((body, close) => {
+      body.innerHTML = `<div class="modal-kicker">Enquête spéciale</div>
+        <h2>${esc(k === 'liar' ? 'Un témoin ment' : 'Bonus : l’arme du crime')}</h2>
+        ${ruleBoxHTML(k)}${extra}
+        <div class="modal-actions"><button type="button" class="btn btn--primary" data-close autofocus>Compris</button></div>`;
+      body.querySelector('[data-close]').addEventListener('click', () => { close(); b.focus(); });
+    }, { label: TWIST_RULES[k].title });
   });
   cardsEl.addEventListener('keydown', (e) => {
     const card = e.target.closest('[data-card]');
@@ -1099,23 +1446,26 @@ export function mountGame(root, opts = {}) {
   renderTimer();
   if (guide) {
     setStatus('', '', 'idle');
-  } else if (resumed) {
-    setStatus(`Partie reprise (${formatTime(st.seconds)}). Bonne enquête !`);
   } else {
-    setStatus(settings.oneTap
-      ? 'Choisissez un personnage, puis touchez une case pour l’y poser. Appui long : note au crayon.'
-      : 'Choisissez un personnage. Toucher une case = note au crayon ; appui long = poser.', '', 'idle');
-    if (level.intro || rect) {
+    if (resumed) setStatus(`Partie reprise (${formatTime(st.seconds)}). Bonne enquête !`);
+    else {
+      setStatus(settings.oneTap
+        ? 'Choisissez un personnage, puis touchez une case pour l’y poser. Appui long : note au crayon.'
+        : 'Choisissez un personnage. Toucher une case = note au crayon ; appui long = poser.', '', 'idle');
+    }
+    // Enquête spéciale : la règle de la variante s'affiche à chaque ouverture, même en reprise.
+    if ((!resumed && (level.intro || rect)) || twistKeys.length) {
       phase = 'intro';
       render();
       renderTimer();
       const start = () => { modal = null; if (phase === 'intro') { phase = 'play'; render(); renderTimer(); } };
       modal = openModal((body, close) => {
-        body.innerHTML = `<div class="modal-kicker">Dossier ouvert</div>
+        body.innerHTML = `<div class="modal-kicker">${twistKeys.length ? 'Enquête spéciale' : 'Dossier ouvert'}</div>
           <h2>${esc(level.title || 'Enquête')}</h2>
+          ${twistKeys.map(ruleBoxHTML).join('')}
           ${rect ? `<p class="intro-rule"><b>Plan allongé (${dimLabel})</b> : au plus une personne par ligne et par colonne.</p>` : ''}
           ${level.intro ? `<p>${esc(level.intro)}</p>` : ''}
-          <div class="modal-actions"><button type="button" class="btn btn--primary" data-go autofocus>Commencer l’enquête</button></div>`;
+          <div class="modal-actions"><button type="button" class="btn btn--primary" data-go autofocus>${resumed ? 'Reprendre l’enquête' : 'Commencer l’enquête'}</button></div>`;
         body.querySelector('[data-go]').addEventListener('click', () => { close(); start(); });
       }, { label: 'Introduction', onCancel: start });
     }
@@ -1134,6 +1484,7 @@ export function mountGame(root, opts = {}) {
       clearTimeout(statusTimer);
       clearTimeout(statusClear);
       if (modal) { try { modal.close(true); } catch { /* rien */ } modal = null; }
+      if (ruleModal && !ruleModal.closed) { try { ruleModal.close(true); } catch { /* rien */ } }
       document.removeEventListener('pointerdown', onDocDown);
       document.removeEventListener('keydown', onDocKey);
       document.removeEventListener('visibilitychange', onVis);

@@ -2,7 +2,7 @@
 // mountEditor(root, { level, onTest, onExit }) → { destroy() }
 import {
   OBJECTS, CLUE_TYPES, FLOORS, prepare, canPlace, clueHTML, personCluesHTML,
-  checkClue, solve, generateClues, validateLevel,
+  checkClue, solve, generateClues, validateLevel, liarOf, weaponOf,
 } from './engine.js';
 // Espace de noms : lit sans erreur les exports qui n'existent pas encore (OBJECT_SIZES, nouveau moteur).
 import * as ENGINE from './engine.js';
@@ -53,7 +53,13 @@ const FALLBACK_CLUES = [
   { t: 'besidePerson', label: 'À côté d’une personne' }, { t: 'with', label: 'Avec une personne' }, { t: 'alone', label: 'Seul(e)' },
   { t: 'dir', label: 'Position (N/S/E/O)' }, { t: 'sameRow', label: 'Même ligne qu’un objet' }, { t: 'sameCol', label: 'Même colonne qu’un objet' },
 ];
-const clueTypes = () => (Array.isArray(CLUE_TYPES) && CLUE_TYPES.length ? CLUE_TYPES : FALLBACK_CLUES).map((x) => ({ t: x.t, label: x.label || x.t }));
+const clueTypes = () => (Array.isArray(CLUE_TYPES) && CLUE_TYPES.length ? CLUE_TYPES : FALLBACK_CLUES).map((x) => ({ t: x.t, label: x.label || x.t, help: x.help || '' }));
+// Variantes du niveau (champ `twist`) : objet absent quand aucune n'est cochée.
+const TWISTS = [
+  ['liar', 'Témoin menteur', 'Un suspect ment : tous ses indices sont faux, ceux des autres sont vrais.'],
+  ['weapon', 'Arme du crime (bonus)', 'Après l’accusation, le joueur désigne l’objet voisin du meurtrier.'],
+];
+const twistFrom = (t) => ({ liar: !!(t && t.liar === true), weapon: !!(t && t.weapon === true) });
 const TABS = [['general', 'Général'], ['rooms', 'Pièces'], ['objects', 'Objets'], ['people', 'Personnages'], ['clues', 'Indices'], ['file', 'Fichier']];
 const DRAFT_KEY = 'alibi:editdraft';
 
@@ -98,7 +104,7 @@ function defaultState() {
       { type: 'sofa', r: 1, c: 0, w: 2, h: 1 }, { type: 'table', r: 3, c: 1, w: 1, h: 1 }, { type: 'armchair', r: 4, c: 0, w: 1, h: 1 },
       { type: 'tree', r: 0, c: 5, w: 1, h: 1 }, { type: 'bench', r: 4, c: 4, w: 2, h: 1 }, { type: 'bush', r: 2, c: 4, w: 1, h: 1 },
     ],
-    people, solution: {},
+    people, solution: {}, twist: { liar: false, weapon: false },
   };
 }
 
@@ -126,7 +132,7 @@ function fromRaw(raw) {
   return {
     id: typeof raw.id === 'string' && raw.id.startsWith('perso-') ? raw.id : null,
     title: String(raw.title || ''), intro: String(raw.intro || ''), difficulty: Math.min(3, Math.max(1, Number(raw.difficulty) | 0 || 1)),
-    rows, cols, rooms, grid, objects, people, solution,
+    rows, cols, rooms, grid, objects, people, solution, twist: twistFrom(raw.twist),
   };
 }
 
@@ -198,6 +204,11 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
       })),
     };
     if (S.intro.trim()) o.intro = S.intro.trim();
+    if (S.twist && (S.twist.liar || S.twist.weapon)) {
+      o.twist = {};
+      if (S.twist.liar) o.twist.liar = true;
+      if (S.twist.weapon) o.twist.weapon = true;
+    }
     const placed = placedList();
     if (placed.length && (!forCheck || solutionInfo().ok)) {
       o.solution = {};
@@ -405,7 +416,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
   function runDiag() {
     const raw = toRaw({ forCheck: true });
     const v = safe(() => validateLevel(raw), { errors: ['Validation indisponible.'], warnings: [] });
-    const d = { status: 'invalid', errors: v.errors || [], warnings: [...(v.warnings || [])], found: null, differs: false };
+    const d = { status: 'invalid', errors: v.errors || [], warnings: [...(v.warnings || [])], found: null, differs: false, infos: [] };
     const info = solutionInfo();
     if (!info.complete) d.warnings.push(`Solution posée : ${info.placed.length}/${count()} personnages.`);
     info.conflicts.forEach((c) => d.warnings.push(`Conflit : ${c}`));
@@ -419,6 +430,24 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
       const sols = safe(() => solve(raw, { max: 2 }), null);
       if (!sols) { d.status = 'invalid'; d.errors.push('Le solveur a échoué sur ce niveau.'); } else if (sols.length === 0) d.status = 'none';
       else if (sols.length === 1) { d.status = 'unique'; d.found = sols[0]; d.differs = !(info.complete && sameSol(S.solution, sols[0])); } else { d.status = 'multi'; d.found = sols[0]; }
+    }
+    // Variantes : qui ment, quelle arme, d'après la solution posée
+    const tw = S.twist || {};
+    if ((tw.liar || tw.weapon) && !info.complete) d.infos.push(['pend', 'Variantes : posez la solution complète pour voir le menteur et l’arme.']);
+    else if (tw.liar || tw.weapon) {
+      const sol = placementsMap();
+      if (tw.liar) {
+        const l = safe(() => liarOf(raw, sol), null);
+        const lp = l && S.people.find((p) => p.id === l);
+        if (lp) d.infos.push(['ok', `Témoin menteur : d’après la solution posée, ${lp.name} ment (tous ses indices sont faux, ceux des autres sont vrais).`]);
+        else d.infos.push(['bad', 'Témoin menteur : la solution posée ne correspond à aucun menteur. Il faut exactement un suspect dont tous les indices sont faux, tous les autres étant vrais.']);
+      }
+      if (tw.weapon) {
+        const k = safe(() => weaponOf(raw, sol), null);
+        const o = k != null ? S.objects[k] : null;
+        if (o) d.infos.push(['ok', `Arme du crime : ${objLabel(o.type).toLowerCase()} (ligne ${o.r + 1}, colonne ${o.c + 1}), seul objet à côté du meurtrier.`]);
+        else if (!d.errors.some((m) => /^Arme du crime/.test(m))) d.infos.push(['bad', 'Arme du crime : dans la solution, le meurtrier doit avoir exactement un objet à côté de lui (case voisine, même pièce ; l’objet sur lequel il se trouve ne compte pas).']);
+      }
     }
     S.diag = d;
     renderDiag();
@@ -436,6 +465,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
       h += `<p class="ed-note ed-note-warn">La solution trouvée par le solveur ${placedList().length ? 'diffère de celle que vous avez posée' : 'n’est pas encore posée sur le plateau'}.</p>
         <button type="button" class="ed-btn ed-small" data-diag="adopt">Adopter la solution trouvée</button>`;
     }
+    if (d.infos && d.infos.length) h += `<ul class="ed-msgs ed-msgs-twist">${d.infos.map(([k, m]) => `<li class="ed-twist-${k}">${esc(m)}</li>`).join('')}</ul>`;
     if (d.errors && d.errors.length) h += `<ul class="ed-msgs ed-msgs-err">${d.errors.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>`;
     if (d.warnings && d.warnings.length) h += `<ul class="ed-msgs">${d.warnings.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>`;
     diagEl.innerHTML = h;
@@ -464,6 +494,10 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
     return `
       <label class="ed-field"><span>Titre</span><input class="ed-input" data-f="title" maxlength="60" value="${esc(S.title)}" autocomplete="off"></label>
       <label class="ed-field"><span>Texte d’introduction</span><textarea class="ed-input" data-f="intro" rows="3" maxlength="300">${esc(S.intro)}</textarea></label>
+      <div class="ed-field"><span>Variantes</span>
+        <div class="ed-twists">${TWISTS.map(([k, l, h]) => `<label class="ed-switch"><input type="checkbox" role="switch" data-f="twist" data-k="${k}"${S.twist && S.twist[k] ? ' checked' : ''}>
+          <span class="ed-switch-track" aria-hidden="true"><i></i></span><span class="ed-switch-text"><b>${l}</b><small>${h}</small></span></label>`).join('')}</div>
+        <small class="ed-small-note">Une enquête à variante est rangée dans les « Enquêtes spéciales » et annonce sa règle à l’ouverture.</small></div>
       <div class="ed-field"><span>Difficulté</span>
         <div class="ed-seg" role="group" aria-label="Difficulté">${[[1, 'Facile'], [2, 'Moyen'], [3, 'Difficile']].map(([v, l]) => `<button type="button" class="ed-btn" data-act="diff" data-v="${v}" aria-pressed="${S.difficulty === v}">${v} · ${l}</button>`).join('')}</div></div>
       <div class="ed-field"><span>Dimensions du plan</span>
@@ -579,7 +613,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
     switch (cl.t) {
       case 'room': return fs('Pièce', 'room', selOpts(S.rooms.map((r) => [r.key, r.name]), cl.room));
       case 'on': return fs('Objet', 'obj', objOptions(true, cl.obj));
-      case 'beside': case 'sameRow': case 'sameCol': return fs('Objet', 'obj', objOptions(false, cl.obj));
+      case 'beside': case 'sameRow': case 'sameCol': case 'sees': return fs('Objet', 'obj', objOptions(false, cl.obj));
       case 'besidePerson': case 'with': return fs('Personne', 'who', selOpts(others(p), cl.who));
       case 'dir': {
         const kind = cl.of && cl.of.who !== undefined ? 'who' : cl.of && cl.of.on !== undefined ? 'on' : 'obj';
@@ -617,11 +651,11 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
             ${clueFields(p, pi, cl, ci)}
             <label class="ed-check"><input type="checkbox" data-f="cnot" data-p="${pi}" data-i="${ci}"${cl.not ? ' checked' : ''}><span>Négation (« pas… »)</span></label>
             <button type="button" class="ed-btn ed-small" data-act="cdel" data-p="${pi}" data-i="${ci}">Supprimer</button>
-          </div></article>`;
+          </div>${(types.find((x) => x.t === cl.t) || {}).help ? `<p class="ed-clue-help"><b>${esc((types.find((x) => x.t === cl.t) || {}).label)}</b> : ${esc(types.find((x) => x.t === cl.t).help)}</p>` : ''}</article>`;
       }).join('')}
       <div class="ed-row"><button type="button" class="ed-btn" data-act="cadd" data-p="${pi}">+ Ajouter un indice</button></div>
       <hr class="ed-hr">
-      <p class="ed-lead">Le générateur écrit des indices vrais pour la solution posée, avec la difficulté du niveau (${S.difficulty}), et vise une solution unique.</p>
+      <p class="ed-lead">${S.twist && S.twist.liar ? `Témoin menteur : le générateur choisit un menteur et lui donne des indices faux, ceux des autres restant vrais pour la solution posée (difficulté ${S.difficulty}, solution unique visée). Les pastilles vrai / faux ci-dessus restent factuelles.` : `Le générateur écrit des indices vrais pour la solution posée, avec la difficulté du niveau (${S.difficulty}), et vise une solution unique.`}</p>
       <button type="button" class="ed-btn ed-primary" data-act="cgen">Générer les indices</button>`;
   }
   const placementsMap = () => { const m = {}; Object.entries(S.solution).forEach(([id, rc]) => { m[id] = [...rc]; }); return m; };
@@ -717,7 +751,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
     switch (t) {
       case 'room': return { t, room: S.rooms[0].key };
       case 'on': return { t, obj: occ };
-      case 'beside': case 'sameRow': case 'sameCol': return { t, obj: anyObj };
+      case 'beside': case 'sameRow': case 'sameCol': case 'sees': return { t, obj: anyObj };
       case 'besidePerson': case 'with': return { t, who: o };
       case 'dir': return { t, dir: 'N', of: { who: o } };
       default: return { t };
@@ -732,11 +766,14 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
     say('Génération en cours…');
     await new Promise((r) => later(r, 30));
     const seed = Math.floor(Math.random() * 2147483000) + 1;
-    const res = safe(() => generateClues(toRaw({ noClues: true }), placementsMap(), { difficulty: S.difficulty, seed }), null);
+    const liar = !!(S.twist && S.twist.liar);
+    const res = safe(() => generateClues(toRaw({ noClues: true }), placementsMap(), { difficulty: S.difficulty, seed, ...(liar ? { liar: true } : {}) }), null);
     if (!res) { say('Impossible de générer des indices uniques ici. Modifiez la solution, les objets ou les pièces, ou réessayez.', 'err'); return; }
     S.people.forEach((p) => { p.clues = clone(res[p.id] || []); });
     changed();
-    say('Indices générés.');
+    const lid = liar ? safe(() => liarOf(toRaw(), placementsMap()), null) : null;
+    const lp = lid && S.people.find((p) => p.id === lid);
+    say(lp ? `Indices générés : ${lp.name} est le témoin menteur.` : 'Indices générés.');
   }
 
   function newId() { return `perso-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`; }
@@ -903,6 +940,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
     if (!f) return;
     if (f === 'title') { S.title = t.value; changed({ panel: false }); } else if (f === 'intro') { S.intro = t.value; changed({ panel: false }); } else if (f === 'json') S.jsonText = t.value;
     else if (f === 'rname') { S.rooms[+t.dataset.i].name = t.value; changed({ panel: false }); } else if (f === 'pname') nameField(t, isChange);
+    else if (f === 'twist') { if (isChange) { S.twist = { ...(S.twist || {}), [t.dataset.k]: t.checked }; changed(); } }
     else if (isChange) clueField(t, f);
     else if (f === 'file') { /* géré au change */ }
   };
