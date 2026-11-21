@@ -395,7 +395,7 @@ function compileSet(ctx, cluesByIdx) {
   return { unary, bin, alonePos, aloneNeg, finals, impossible };
 }
 
-function solveCore(ctx, comp, max, rng = null) {
+function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
   const { N, NN, n, cellRoom, cellType, blocked } = ctx;
   const out = [];
   if (n === 0 || n > N || comp.impossible || max <= 0) return out;
@@ -415,6 +415,28 @@ function solveCore(ctx, comp, max, rng = null) {
     domains.push(d);
   }
   const { bin, alonePos, aloneNeg, finals } = comp;
+  // Cohérence d'arc à la racine : chaque case doit avoir un support chez l'autre personne
+  // de chaque contrainte binaire (sur une autre ligne et une autre colonne).
+  for (let changed = true, guard = 0; changed && guard < 50; guard++) {
+    changed = false;
+    for (let p = 0; p < n; p++) {
+      for (const b of bin[p]) {
+        const od = domains[b.o];
+        const kept = domains[p].filter(i => {
+          const r = (i / N) | 0, c = i % N;
+          for (let y = 0; y < od.length; y++) {
+            const j = od[y];
+            if ((j / N | 0) !== r && j % N !== c && b.t(i, j)) return true;
+          }
+          return false;
+        });
+        if (kept.length !== domains[p].length) {
+          if (!kept.length) return out;
+          domains[p] = kept; changed = true;
+        }
+      }
+    }
+  }
   const victim = ctx.victim;
   const pos = new Int16Array(n).fill(-1);
   const roomCount = new Int8Array(R);
@@ -435,6 +457,7 @@ function solveCore(ctx, comp, max, rng = null) {
     return { ...f, sitters };
   });
   for (const f of posFinals) if (!f.sitters.length) return out;
+  const forbid = new Uint8Array(n * NN);
   const inDom = domains.map(d => { const m = new Uint8Array(NN); for (const i of d) m[i] = 1; return m; });
   const occupant = new Int16Array(NN).fill(-1);
   const typeCells = {};
@@ -478,6 +501,7 @@ function solveCore(ctx, comp, max, rng = null) {
   let markStamp = 0;
 
   function feasible(p, i) {
+    if (forbid[p * NN + i]) return false;
     const r = (i / N) | 0, c = i % N;
     if ((rowUsed >> r) & 1 || (colUsed >> c) & 1) return false;
     const room = roomOf[i];
@@ -529,28 +553,6 @@ function solveCore(ctx, comp, max, rng = null) {
     }
     return true;
   }
-  function posFinalsAlive() {
-    for (let x = 0; x < posFinals.length; x++) {
-      const { p, cc, sitters } = posFinals[x];
-      if (pos[p] < 0) continue;
-      let found = false;
-      for (const q of sitters) {
-        if (pos[q] < 0) {
-          // un « assis » non placé peut-il encore convenir ?
-          const d = domains[q];
-          for (let y = 0; y < d.length; y++) {
-            const j = d[y];
-            if (cellType[j] === cc.type && cc.test(pos[p], j) && feasible(q, j)) { found = true; break; }
-          }
-          if (found) break;
-          continue;
-        }
-        if (cellType[pos[q]] === cc.type && cc.test(pos[p], pos[q])) { found = true; break; }
-      }
-      if (!found) return false;
-    }
-    return true;
-  }
   function place(p, i) {
     pos[p] = i; occupant[i] = p; rowUsed |= 1 << ((i / N) | 0); colUsed |= 1 << (i % N);
     const room = roomOf[i]; roomCount[room]++; if (alonePos[p]) aloner[room]++;
@@ -560,12 +562,31 @@ function solveCore(ctx, comp, max, rng = null) {
     rowUsed &= ~(1 << ((i / N) | 0)); colUsed &= ~(1 << (i % N));
     const room = roomOf[i]; roomCount[room]--; if (alonePos[p]) aloner[room]--;
   }
+  let nodes = 0;
   function dfs(depth) {
+    if (++nodes > budget) return;
     if (depth === n) {
       if (finalOk()) out.push(new Int16Array(pos));
       return;
     }
-    if (posFinals.length && !posFinalsAlive()) return;
+    // Indices « {on:…} » positifs dont le sujet est placé mais pas encore satisfaits :
+    // quelqu'un doit occuper l'une des cases-cibles ; on peut brancher directement dessus.
+    let fOpts = null;
+    for (let x = 0; x < posFinals.length; x++) {
+      const f = posFinals[x];
+      if (pos[f.p] < 0) continue;
+      const tg = targetsOf(f, pos[f.p]);
+      let sat = false;
+      for (let y = 0; y < tg.length; y++) if (occupant[tg[y]] >= 0) { sat = true; break; }
+      if (sat) continue;
+      const opts = [];
+      for (let y = 0; y < tg.length; y++) {
+        const j = tg[y];
+        for (const q of f.sitters) if (pos[q] < 0 && inDom[q][j] && feasible(q, j)) opts.push(q, j);
+      }
+      if (!opts.length) return;
+      if (!fOpts || opts.length < fOpts.length) fOpts = opts;
+    }
     // pièces où il manque encore quelqu'un
     const stamp = ++markStamp;
     let missing = 0;
@@ -616,12 +637,27 @@ function solveCore(ctx, comp, max, rng = null) {
         }
       }
     }
+    if (fOpts && fOpts.length / 2 < bestCount) {
+      // branche k : l'option k est vraie, les options précédentes sont interdites (pas de doublon)
+      for (let x = 0; x < fOpts.length; x += 2) {
+        const q = fOpts[x], j = fOpts[x + 1];
+        if (!forbid[q * NN + j] && feasible(q, j)) {
+          place(q, j);
+          dfs(depth + 1);
+          unplace(q);
+        }
+        forbid[q * NN + j]++;
+        if (out.length >= max || nodes > budget) break;
+      }
+      for (let x = 0; x < fOpts.length; x += 2) forbid[fOpts[x] * NN + fOpts[x + 1]]--;
+      return;
+    }
     if (rng) for (let x = bestCount - 1; x > 0; x--) { const y = Math.floor(rng() * (x + 1)); const t = bestBuf[x]; bestBuf[x] = bestBuf[y]; bestBuf[y] = t; }
     for (let x = 0; x < bestCount; x++) {
       place(best, bestBuf[x]);
       dfs(depth + 1);
       unplace(best);
-      if (out.length >= max) return;
+      if (out.length >= max || nodes > budget) return;
     }
   }
   dfs(0);
@@ -858,7 +894,11 @@ function enumerateCandidates(ctx, pos, p) {
   if (cellType[ip] && OBJECTS[cellType[ip]] && OBJECTS[cellType[ip]].occ) add({ t: 'on', obj: cellType[ip] }, 'on');
   for (const t of occTypes) if (t !== cellType[ip]) add({ t: 'on', obj: t, not: true }, 'on');
   // beside
-  for (const t of types) { add({ t: 'beside', obj: t }, 'beside'); add({ t: 'beside', obj: t, not: true }, 'beside'); }
+  // (pas d'indice « à côté » du type sur lequel la personne se trouve : vrai mais déroutant)
+  for (const t of types) {
+    if (t === cellType[ip]) continue;
+    add({ t: 'beside', obj: t }, 'beside'); add({ t: 'beside', obj: t, not: true }, 'beside');
+  }
   // sameRow / sameCol
   for (const t of types) {
     if (t === cellType[ip]) continue;
@@ -952,7 +992,15 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
   for (let p = 0; p < n; p++) if (p !== ctx.victim) suspects.push(p);
   const cands = [];
   for (let p = 0; p < n; p++) cands.push(p === ctx.victim ? [] : enumerateCandidates(ctx, pos, p));
-  const weightOf = cand => W[cand.cat] * cand.norm * (cand.neg ? W.neg : 1);
+  // Premières tentatives « strictes » : les catégories marginales pour cette difficulté sont exclues.
+  // Dernières tentatives « robustes » : poids de difficulté atténués, indices forts favorisés.
+  let strict = true, robust = false;
+  const weightOf = cand => {
+    const w = W[cand.cat];
+    if (strict && w < 0.2) return 0;
+    const v = w * cand.norm * (cand.neg ? W.neg : 1);
+    return robust ? Math.sqrt(v) : v;
+  };
 
   const samePos = a => { for (let p = 0; p < n; p++) if (a[p] !== pos[p]) return false; return true; };
   const isUnique = chosen => {
@@ -960,8 +1008,10 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
     return solveCore(ctx, comp, 2);
   };
 
-  for (let attempt = 0; attempt < 40; attempt++) {
+  for (let attempt = 0; attempt < 30; attempt++) {
     const rng = mulberry32(hashSeed(`${seed}#${attempt}`));
+    strict = attempt < 8;
+    robust = attempt >= 18;
     const chosen = Array.from({ length: n }, () => []);
     const usedSym = new Set();
     const usedCat = {};
@@ -995,6 +1045,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
       return true;
     };
     const pick = options => {
+      options = options.filter(o => o.w > 0);
       let tot = 0;
       for (const o of options) tot += o.w;
       if (tot <= 0) return null;
@@ -1012,10 +1063,13 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
     //    (échantillon aléatoire de solutions alternatives), pondérés selon la difficulté.
     let ok = false;
     for (let iter = 0; iter < 2 * n + 4; iter++) {
-      const sols = solveCore(ctx, compileSet(ctx, chosen.map(list => list.map(c => c.clue))), 40, rng);
-      if (sols.length === 1) { ok = true; break; }
-      if (sols.length === 0) break;
-      const alts = sols.filter(x => !samePos(x));
+      const comp = compileSet(ctx, chosen.map(list => list.map(c => c.clue)));
+      const exact = solveCore(ctx, comp, 2);
+      if (exact.length === 1) { ok = true; break; }
+      if (exact.length === 0) break;
+      // échantillon aléatoire (borné) de solutions alternatives
+      let alts = solveCore(ctx, comp, robust ? 60 : 24, rng, robust ? 5000 : 1500).filter(x => !samePos(x));
+      if (!alts.length) alts = exact.filter(x => !samePos(x));
       const opts = [];
       for (const p of suspects) {
         if (chosen[p].length >= 2) continue;
@@ -1028,7 +1082,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
           for (const a of alts) if (evalCompiled(ctx, p, c.cc, a) === false) elim++;
           if (!elim) continue;
           const frac = elim / alts.length;
-          opts.push({ p, c, w: weightOf(c) * variety(c) * frac * frac * (chosen[p].length ? 1 : 1.5) });
+          opts.push({ p, c, w: robust ? weightOf(c) * frac ** 8 : weightOf(c) * variety(c) * frac * frac * (chosen[p].length ? 1 : 1.5) });
         }
       }
       const o = pick(opts);
