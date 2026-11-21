@@ -1032,3 +1032,130 @@ dialog.modal[open] { animation: pop 0.2s ease-out; }
 @media (prefers-reduced-motion: reduce) and (max-width: 899.98px) {
   .status, .status.is-on { transition: none; transform: translate(-50%, 0); }
 }
+
+/* =========================================================
+   ENQUÊTE GUIDÉE
+   ========================================================= */
+/* deux interrupteurs dans un même groupe de réglages */
+.sw + .sw { margin-top: 8px; }
+
+/* première visite : trois façons de commencer */
+.welcome-choices { display: grid; gap: 10px; margin-top: 16px; }
+.welcome-choices .btn {
+  flex-direction: column; align-items: flex-start; gap: 2px; width: 100%;
+  padding: 0.6em 1.1em 0.72em; border-radius: 22px; text-align: left;
+}
+.welcome-choices .welcome-label { font-size: 1.08rem; }
+.welcome-choices small { font-family: var(--sans); font-weight: 700; font-size: 0.84rem; line-height: 1.25; }
+.welcome-main { min-height: 64px; }
+.tuto-guide {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px;
+  margin: 16px 0 0 !important; padding-top: 14px; border-top: 2.5px dashed var(--line);
+  font-size: 0.92rem; color: var(--ink-soft);
+}
+
+/* bulle d'explication, ancrée près de l'élément visé */
+.guide-bubble {
+  position: fixed; z-index: 50; left: 8px; top: 80px;
+  box-sizing: border-box; max-width: calc(100vw - 16px);
+  padding: 10px 14px 12px;
+  background: var(--paper-3); color: var(--ink);
+  border: var(--stroke) solid var(--ink); border-radius: 22px;
+  box-shadow: inset 0 -5px 0 var(--band), 0 4px 0 rgba(31, 33, 71, 0.22);
+  font-size: 0.95rem; line-height: 1.4;
+  animation: guide-in 0.22s ease-out;
+}
+.guide-bubble[hidden] { display: none; }
+.guide-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.guide-step {
+  display: inline-flex; align-items: center; padding: 0.32em 0.75em 0.28em;
+  font-family: var(--display); font-weight: 600; font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1;
+  color: var(--ink); background: var(--mint); border: 2.5px solid var(--ink); border-radius: 999px;
+}
+.guide-quit { min-height: 44px; padding: 0.3em 0.8em 0.38em; font-size: 0.86rem; margin-right: -6px; }
+.guide-text { margin: 4px 0 0; font-weight: 700; }
+.guide-text b { font-weight: 800; }
+.guide-kbd { display: block; margin-top: 4px; color: var(--ink-soft); font-size: 0.84rem; font-weight: 700; }
+.guide-remind {
+  margin: 8px 0 0; padding: 0.45em 0.7em; border: 2.5px dashed var(--ink); border-radius: 14px;
+  background: #FFF0C7; font-weight: 800; font-size: 0.9rem;
+}
+.guide-remind[hidden] { display: none; }
+.guide-remind.wiggle { animation: guide-wiggle 0.4s ease; }
+.guide-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.guide-actions:not(:empty) { margin-top: 10px; }
+.guide-arrow {
+  position: absolute; width: 16px; height: 16px; background: var(--paper-3);
+  border: var(--stroke) solid var(--ink); border-radius: 3px; transform: rotate(45deg);
+}
+.guide-arrow[hidden] { display: none; }
+.guide-bubble[data-side='top'] .guide-arrow { top: -10px; border-right: 0; border-bottom: 0; }
+.guide-bubble[data-side='bottom'] .guide-arrow { bottom: -10px; border-left: 0; border-top: 0; }
+.guide-bubble[data-side='left'] .guide-arrow { left: -10px; border-top: 0; border-right: 0; }
+.guide-bubble[data-side='right'] .guide-arrow { right: -10px; border-bottom: 0; border-left: 0; }
+
+/* mise en évidence : anneau tournesol cerné, posé au-dessus du plan et de la barre d'outils */
+.guide-ring {
+  position: fixed; z-index: 45; pointer-events: none;
+  border: 4px solid var(--sun); border-radius: 14px;
+  box-shadow: 0 0 0 3px var(--ink), inset 0 0 0 2px var(--ink);
+  animation: guide-pulse 1.3s ease-in-out infinite;
+}
+@keyframes guide-pulse { 50% { box-shadow: 0 0 0 3px var(--ink), 0 0 0 9px rgba(255, 200, 61, 0.45), inset 0 0 0 2px var(--ink); } }
+@keyframes guide-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes guide-wiggle { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+/* démonstration du geste : un doigt qui appuie, un cercle qui se remplit */
+.guide-hand { position: fixed; z-index: 46; pointer-events: none; display: grid; place-items: center; }
+.guide-hand svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.guide-hand .gh-track { fill: rgba(255, 253, 246, 0.35); stroke: rgba(31, 33, 71, 0.25); stroke-width: 8; }
+.guide-hand .gh-fill {
+  fill: none; stroke: var(--coral); stroke-width: 9; stroke-linecap: round;
+  stroke-dasharray: 251; stroke-dashoffset: 251; animation: guide-hold 2.2s ease-in-out infinite;
+}
+.guide-hand .gh-dot {
+  width: 34%; height: 34%; border-radius: 50%; background: var(--sun);
+  border: 3px solid #1F2147; box-shadow: 0 3px 0 rgba(31, 33, 71, 0.3);
+  animation: guide-press 2.2s ease-in-out infinite;
+}
+.guide-hand .gh-label {
+  position: absolute; top: 100%; left: 50%; transform: translate(-50%, 4px);
+  padding: 0.2em 0.6em; border-radius: 999px; white-space: nowrap;
+  font-family: var(--display); font-weight: 600; font-size: 0.72rem; line-height: 1.1;
+  color: #1F2147; background: var(--sun); border: 2px solid #1F2147;
+}
+.guide-hand--tap .gh-fill { display: none; }
+.guide-hand--tap .gh-dot { animation: guide-tap 1.4s ease-in-out infinite; }
+@keyframes guide-hold {
+  0%, 12% { stroke-dashoffset: 251; opacity: 1; }
+  55%, 80% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes guide-press {
+  0% { transform: scale(1.25); opacity: 0; }
+  12%, 80% { transform: scale(0.88); opacity: 1; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+@keyframes guide-tap {
+  0% { transform: scale(1.25); opacity: 0; }
+  20% { transform: scale(0.85); opacity: 1; }
+  40%, 100% { transform: scale(1.2); opacity: 0; }
+}
+
+/* note du guide dans la fenêtre « Qui est le coupable ? » */
+.guide-note {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px;
+  margin: 4px 0 6px; padding: 0.55em 0.8em; border: 2.5px dashed var(--ink); border-radius: 16px; background: var(--paper-2);
+}
+.guide-note p { margin: 0 !important; flex: 1 1 14em; font-size: 0.92rem; }
+.guide-end-actions .btn { flex: 1 1 10em; }
+
+@media (min-width: 900px) {
+  .guide-bubble { font-size: 0.98rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-ring { animation: none; box-shadow: 0 0 0 3px var(--ink), 0 0 0 8px rgba(255, 200, 61, 0.45), inset 0 0 0 2px var(--ink); }
+  .guide-bubble, .guide-remind.wiggle { animation: none; }
+  .guide-hand .gh-fill { animation: none; stroke-dashoffset: 80; }
+  .guide-hand .gh-dot, .guide-hand--tap .gh-dot { animation: none; opacity: 1; transform: scale(0.9); }
+}

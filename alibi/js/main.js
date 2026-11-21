@@ -4,9 +4,12 @@ import { floorColor } from './art.js';
 import { tokenHTML } from './board.js';
 import { colorOf, INK } from './palette.js';
 import {
-  mountGame, openModal, confirmDialog, loadSettings, saveSettings,
+  mountGame, openModal, confirmDialog, loadSettings, saveSettings, applyTheme,
   readJSON, writeJSON, removeKey, esc, formatTime, ICONS,
 } from './game.js';
+import { play, setEnabled as setSoundEnabled } from './sound.js';
+import { GUIDE_LEVEL } from './guide-level.js';
+import { createGuide } from './guide.js';
 
 const app = document.getElementById('app');
 const DIFFS = [
@@ -154,7 +157,8 @@ function showTutorial() {
         <div class="modal-actions">
           ${step === 0 ? '<button type="button" class="btn btn--ghost" data-t="skip">Passer</button>' : '<button type="button" class="btn btn--ghost" data-t="prev">Précédent</button>'}
           ${step < TUTO.length - 1 ? '<button type="button" class="btn btn--primary" data-t="next" autofocus>Suivant</button>' : '<button type="button" class="btn btn--accent" data-t="done" autofocus>C’est parti</button>'}
-        </div>`;
+        </div>
+        ${inGuide() ? '' : `<p class="tuto-guide">Envie d’apprendre en jouant ? <button type="button" class="btn btn--small" data-t="guide">${ICONS.help} Enquête guidée</button></p>`}`;
       const primary = body.querySelector('[data-t="next"],[data-t="done"]');
       if (primary) primary.focus();
     };
@@ -162,13 +166,44 @@ function showTutorial() {
       const b = e.target.closest('[data-t]');
       if (!b) return;
       const t = b.dataset.t;
-      if (t === 'next') { step++; draw(); } else if (t === 'prev') { step--; draw(); } else { close(); finish(); }
+      if (t === 'next') { play('tap'); step++; draw(); } else if (t === 'prev') { play('tap'); step--; draw(); } else if (t === 'guide') { close(true); finish(); startGuide(); } else { close(); finish(); }
     });
     draw();
   }, { label: 'Comment jouer', className: 'modal--tuto', onCancel: finish });
 }
+/* ---------------- première visite : choisir sa façon d'apprendre ---------------- */
+const inGuide = () => /^#\/guide\b/.test(location.hash || '');
+function startGuide() {
+  if (inGuide()) return;
+  location.hash = '#/guide';
+}
+let welcomeOpen = null;
+function showWelcome() {
+  if (welcomeOpen || tutoOpen) return;
+  const seen = () => { welcomeOpen = null; saveSettings({ tutoSeen: true }); };
+  welcomeOpen = openModal((body, close) => {
+    body.innerHTML = `<div class="modal-kicker">Bienvenue</div>
+      <h2>Première enquête ?</h2>
+      <p>Alibi se joue avec un peu de logique et beaucoup de flair. Comment voulez-vous commencer ?</p>
+      <div class="welcome-choices">
+        <button type="button" class="btn btn--accent welcome-main" data-w1="guide" autofocus>
+          <span class="welcome-label">Enquête guidée</span><small>Recommandé · une petite affaire jouée pas à pas, 3 minutes</small></button>
+        <button type="button" class="btn" data-w1="rules"><span class="welcome-label">Lire les règles</span><small>Le tutoriel illustré, en 5 fiches</small></button>
+        <button type="button" class="btn btn--ghost" data-w1="skip"><span class="welcome-label">Je connais déjà</span></button>
+      </div>`;
+    body.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-w1]');
+      if (!b) return;
+      const v = b.dataset.w1;
+      close(v !== 'skip');
+      seen();
+      if (v === 'guide') startGuide();
+      else if (v === 'rules') showTutorial();
+    });
+  }, { label: 'Première enquête ?', className: 'modal--welcome', onCancel: seen });
+}
 function maybeFirstTutorial() {
-  if (!loadSettings().tutoSeen) showTutorial();
+  if (!loadSettings().tutoSeen) showWelcome();
 }
 
 /* ---------------- écrans ---------------- */
@@ -214,11 +249,6 @@ function setHomeView(v) {
   saveSettings({ homeView: v });
   if (anchor) window.scrollBy(0, anchor.getBoundingClientRect().top - before);
 }
-function applyTheme(t) {
-  document.documentElement.setAttribute('data-theme', t);
-  const m = document.querySelector('meta[name="theme-color"]');
-  if (m) m.setAttribute('content', t === 'dark' ? '#14162E' : '#FFF6E3');
-}
 const switchHTML = (key, title, hint, on) => `<button type="button" class="sw" role="switch" aria-checked="${on}" data-set="${key}">
   <span class="sw-text"><b>${title}</b>${hint ? `<small>${hint}</small>` : ''}</span>
   <span class="sw-ctl"><span class="sw-track" aria-hidden="true"><i></i></span><span class="sw-state">${on ? 'Activé' : 'Désactivé'}</span></span></button>`;
@@ -239,12 +269,14 @@ function openHomeSettings() {
         </div></div>
       <div class="set-group"><h3>Thème</h3>${switchHTML('theme', 'Mode sombre', 'Fond sombre, plus reposant le soir.', st.theme === 'dark')}</div>
       <div class="set-group"><h3>Liste</h3>${switchHTML('hideSolved', 'Masquer les énigmes résolues', 'Les énigmes déjà résolues disparaissent de la liste.', !!st.hideSolved)}</div>
-      <div class="set-group"><h3>En jeu</h3>${switchHTML('oneTap', 'Pose en un toucher', 'Toucher une case pose le personnage ; l’appui long ajoute une note.', !!st.oneTap)}</div>
+      <div class="set-group"><h3>En jeu</h3>${switchHTML('oneTap', 'Pose en un toucher', 'Toucher une case pose le personnage ; l’appui long ajoute une note.', !!st.oneTap)}
+        ${switchHTML('sound', 'Sons', 'Petits bruitages pendant l’enquête.', st.sound !== false)}</div>
       <div class="modal-actions"><button type="button" class="btn btn--primary" data-close autofocus>Fermer</button></div>`;
     body.addEventListener('click', (e) => {
       if (e.target.closest('[data-close]')) { close(); back(); return; }
       const vb = e.target.closest('[data-view]');
       if (vb) {
+        play('toggle');
         setHomeView(vb.dataset.view);
         body.querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b === vb)));
         return;
@@ -255,6 +287,12 @@ function openHomeSettings() {
       const on = sw.getAttribute('aria-checked') !== 'true';
       sw.setAttribute('aria-checked', String(on));
       sw.querySelector('.sw-state').textContent = on ? 'Activé' : 'Désactivé';
+      if (key === 'sound') {
+        if (on) { setSoundEnabled(true); play('toggle'); } else { play('toggle'); setSoundEnabled(false); }
+        saveSettings({ sound: on });
+        return;
+      }
+      play('toggle');
       if (key === 'theme') { saveSettings({ theme: on ? 'dark' : 'light' }); applyTheme(on ? 'dark' : 'light'); }
       else if (key === 'hideSolved') { saveSettings({ hideSolved: on }); if (document.querySelector('.home')) renderHome(); }
       else saveSettings({ [key]: on });
@@ -330,7 +368,7 @@ function renderHome() {
   app.appendChild(el);
   el.addEventListener('click', async (e) => {
     if (e.target.closest('[data-act="home-settings"]')) { openHomeSettings(); return; }
-    if (e.target.closest('[data-act="show-solved"]')) { saveSettings({ hideSolved: false }); renderHome(); return; }
+    if (e.target.closest('[data-act="show-solved"]')) { play('tap'); saveSettings({ hideSolved: false }); renderHome(); return; }
     // En compact, toute la ligne d'un niveau perso ouvre le niveau (hors boutons d'action).
     const row = e.target.closest('.custom-item');
     if (row && el.dataset.homeView === 'compact' && !e.target.closest('a, button')) {
@@ -387,6 +425,28 @@ function renderGame(level, { test = false } = {}) {
   if (!test) maybeFirstTutorial();
 }
 
+function renderGuide() {
+  unmount();
+  document.title = 'Enquête guidée — Alibi';
+  saveSettings({ tutoSeen: true });
+  const first = officialLevels()[0];
+  const home = () => { location.hash = '#/'; };
+  current = mountGame(app, {
+    level: GUIDE_LEVEL,
+    persist: false,
+    exitLabel: 'Accueil',
+    onExit: home,
+    onSolved: () => null,
+    onNext: null,
+    onHelp: showTutorial,
+    guide: createGuide({
+      onQuit: home,
+      onHome: home,
+      onFirst: first ? () => { location.hash = `#/jouer/${encodeURIComponent(first.id)}`; } : home,
+    }),
+  });
+}
+
 async function renderEditor(id, token) {
   unmount();
   document.title = 'Éditeur — Alibi';
@@ -439,6 +499,7 @@ function route() {
     return renderGame(lvl, { test: true });
   }
   if (parts[0] === 'editeur') return renderEditor(parts.slice(1).join('/') || null, token);
+  if (parts[0] === 'guide') return renderGuide();
   return renderHome();
 }
 
