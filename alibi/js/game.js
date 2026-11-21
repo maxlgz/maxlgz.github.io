@@ -146,6 +146,9 @@ export function mountGame(root, opts = {}) {
   const people = level.people || [];
   const count = level.count ?? Math.min(R, C);
   const byId = Object.fromEntries(people.map((p) => [p.id, p]));
+  // Ordre d'affichage : les suspects dans l'ordre du niveau, la victime toujours en dernier.
+  // (Les couleurs restent attribuées d'après le rang dans level.people.)
+  const shown = [...people.filter((p) => !p.victim), ...people.filter((p) => p.victim)];
   const colors = Object.fromEntries(people.map((p) => [p.id, colorOf(level, p.id)]));
   const pcStyle = (id) => {
     const col = colors[id];
@@ -325,12 +328,12 @@ export function mountGame(root, opts = {}) {
   const tok = (id) => (tokenCache[id] ||= tokenHTML(byId[id], { size: 64, color: colors[id] }));
 
   // picker
-  pickerEl.innerHTML = people.map((p) => `<button type="button" class="pick" data-pick="${esc(p.id)}" aria-pressed="false" aria-label="Choisir ${esc(p.name)}${p.victim ? ' (victime)' : ''}">${tokenHTML(p, { size: 40, color: colors[p.id] })}</button>`).join('');
+  pickerEl.innerHTML = shown.map((p) => `<button type="button" class="pick" data-pick="${esc(p.id)}" aria-pressed="false" aria-label="Choisir ${esc(p.name)}${p.victim ? ' (victime)' : ''}">${tokenHTML(p, { size: 40, color: colors[p.id] })}</button>`).join('');
 
   // fiches
   const clueHTML = {};
   const clueOffset = {};
-  cardsEl.innerHTML = people.map((p) => {
+  cardsEl.innerHTML = shown.map((p) => {
     const lines = personCluesHTML(level, p) || [];
     clueHTML[p.id] = lines;
     clueOffset[p.id] = lines.length - ((p.clues || []).length);
@@ -656,7 +659,7 @@ export function mountGame(root, opts = {}) {
       return;
     }
     let target = selected && !st.placements[selected] ? selected : null;
-    if (!target) { const f = people.find((p) => !st.placements[p.id]); target = f ? f.id : null; }
+    if (!target) { const f = shown.find((p) => !st.placements[p.id]); target = f ? f.id : null; }
     if (!target) { setStatus('Tout le monde est déjà à sa place : il ne reste qu’à valider !', 'ok', 'long'); return; }
     const [r, c] = sol[target];
     st.hints++;

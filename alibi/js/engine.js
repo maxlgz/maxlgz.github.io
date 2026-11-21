@@ -794,15 +794,25 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity, prio = false) 
 // Rectangle : la liberté des lignes non couvertes rend certaines recherches très inégales selon
 // l'ordre de branchement ; on alterne deux ordres avec des budgets croissants (toute solution
 // trouvée est valide ; la première recherche menée à terme donne la réponse exacte).
-function solveExact(ctx, comp, max) {
+// `limit` (rectangle seulement) borne le budget : au-delà, le résultat porte done = false.
+function solveExact(ctx, comp, max, limit = Infinity) {
   if (ctx.H === ctx.W) return solveCore(ctx, comp, max);
   const seen = new Map();
-  for (let b = 3000; ; b *= 4) {
-    for (const prio of [false, true]) {
-      const res = solveCore(ctx, comp, max, null, b, prio);
+  for (let b = 3000, round = 0; ; b *= 4, round++) {
+    for (let v = 0; v < 4; v++) {
+      // ordres : le plus contraint d'abord, la victime et les personnes seules d'abord, puis les
+      // mêmes avec un ordre des cases mélangé (déterministe) pour couper les longues traînes
+      const prio = (v & 1) === 1;
+      const rng = v >= 2 ? mulberry32(hashSeed(`solve#${round}#${v}`)) : null;
+      const res = solveCore(ctx, comp, max, rng, b, prio);
       if (res.done) return res;
       for (const sol of res) { const key = sol.join(','); if (!seen.has(key)) seen.set(key, sol); }
       if (seen.size >= max) return Array.from(seen.values()).slice(0, max);
+    }
+    if (b >= limit) {
+      const out = Array.from(seen.values());
+      out.done = false;
+      return out;
     }
   }
 }
@@ -1153,9 +1163,12 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
   };
 
   const samePos = a => { for (let p = 0; p < n; p++) if (a[p] !== pos[p]) return false; return true; };
+  // Plan rectangulaire : budget de preuve par vérification d'unicité (le résultat rendu est toujours prouvé).
+  const PROOF_LIMIT = 48000;
   const isUnique = chosen => {
     const comp = compileSet(ctx, chosen.map(list => list.map(c => c.clue)));
-    return solveExact(ctx, comp, 2);
+    const res = solveExact(ctx, comp, 2, PROOF_LIMIT);
+    return res.done && res.length === 1;
   };
 
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -1216,9 +1229,10 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
     let ok = false;
     for (let iter = 0, iterMax = (rect ? 3 : 2) * n + 4; iter < iterMax; iter++) {
       const comp = compileSet(ctx, chosen.map(list => list.map(c => c.clue)));
-      const exact = solveExact(ctx, comp, 2);
-      if (exact.length === 1) { ok = true; break; }
-      if (exact.length === 0) break;
+      const exact = solveExact(ctx, comp, 2, PROOF_LIMIT);
+      // (rectangle : une recherche trop longue reste indécise ; on continue d'ajouter des indices)
+      if (exact.done && exact.length === 1) { ok = true; break; }
+      if (exact.done && exact.length === 0) break;
       // échantillon aléatoire (borné) de solutions alternatives
       let alts = solveCore(ctx, comp, robust ? 60 : 24, rng, robust ? 5000 : 1500).filter(x => !samePos(x));
       if (!alts.length) alts = exact.filter(x => !samePos(x));
@@ -1262,7 +1276,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
       if (chosen[p].length < 2) continue;
       const idx = chosen[p].indexOf(c);
       chosen[p].splice(idx, 1);
-      if (isUnique(chosen).length !== 1) chosen[p].splice(idx, 0, c);
+      if (!isUnique(chosen)) chosen[p].splice(idx, 0, c);
     }
     const res = {};
     ctx.people.forEach((person, p) => { res[person.id] = chosen[p].map(c => clone(c.clue)); });
