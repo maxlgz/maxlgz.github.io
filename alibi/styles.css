@@ -63,7 +63,9 @@ body {
   font-weight: 600;
   font-size: 16px;
   line-height: 1.45;
-  overflow-x: hidden;
+  /* « clip » et non « hidden » : sur iOS, overflow-x: hidden sur le corps de page fait du corps un
+     conteneur de défilement et les éléments fixés en bas (barre d'outils) suivent le défilement. */
+  overflow-x: clip;
 }
 
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -767,6 +769,8 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.12; l
 /* ---------- barre d'outils ---------- */
 .toolbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  /* Calque à part : la barre reste collée au bas de l'écran pendant le défilement à inertie d'iOS. */
+  transform: translate3d(0, 0, 0); -webkit-backface-visibility: hidden; backface-visibility: hidden;
   display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;
   padding: 9px 8px calc(9px + env(safe-area-inset-bottom));
   background: var(--paper); color: var(--ink);

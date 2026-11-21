@@ -446,6 +446,7 @@ function compileSet(ctx, cluesByIdx) {
   const n = ctx.n;
   const unary = [], bin = [], alonePos = new Uint8Array(n), aloneNeg = new Uint8Array(n), finals = [];
   let impossible = false;
+  if (globalThis.__ss) globalThis.__lastClues = cluesByIdx;
   for (let p = 0; p < n; p++) { unary.push([]); bin.push([]); }
   for (let p = 0; p < n; p++) {
     for (const clue of cluesByIdx[p] || []) {
@@ -558,6 +559,9 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
   for (let d = 0; d <= n; d++) { rcAdj.push(new Int32Array(NP)); rcFree.push(new Int32Array(NP)); }
   const pRows = new Int32Array(Math.max(n, NL)), pCols = new Int32Array(Math.max(n, NL));
   const matchOf = new Int8Array(NL);
+  const lineBranch = H !== W && exactLines && globalThis.__LB !== false;
+  const lineCnt = [], lineOpts = [];
+  if (lineBranch) for (let d = 0; d <= n; d++) { lineCnt.push(new Int16Array(NP)); lineOpts.push(new Int16Array(2 * n * Math.max(H, W))); }
   // Couplage parfait (Kuhn) : chaque élément gauche g reçoit un bit distinct de adjM[g].
   function matching(adjM, m, stopOnFail) {
     matchOf.fill(-1);
@@ -681,8 +685,8 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
     }
     let best = -1, bestCount = 1e9, bestBuf = bufA[depth], scratch = bufB[depth];
     let rowsCov = 0, colsCov = 0, k = 0;
-    const rc = rcAdj[depth], rcF = rcFree[depth];
-    rc.fill(0); rcF.fill(0);
+    const rc = rcAdj[depth], rcF = rcFree[depth], lc = lineCnt[depth];
+    rc.fill(0); rcF.fill(0); if (lineBranch) lc.fill(0);
     const vRoomNow = victim >= 0 && pos[victim] >= 0 ? roomOf[pos[victim]] : -1;
     for (let p = 0; p < n; p++) {
       if (pos[p] >= 0) continue;
@@ -694,8 +698,8 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
           scratch[cnt++] = i;
           const r = (i / W) | 0, c = i % W;
           pr |= 1 << r; pc |= 1 << c;
-          if (primRows) { rc[r] |= 1 << c; if (roomOf[i] !== vRoomNow) rcF[r] |= 1 << c; }
-          else { rc[c] |= 1 << r; if (roomOf[i] !== vRoomNow) rcF[c] |= 1 << r; }
+          if (primRows) { rc[r] |= 1 << c; if (roomOf[i] !== vRoomNow) rcF[r] |= 1 << c; if (lineBranch) lc[r]++; }
+          else { rc[c] |= 1 << r; if (roomOf[i] !== vRoomNow) rcF[c] |= 1 << r; if (lineBranch) lc[c]++; }
           if (missing) { const rm = roomOf[i]; if (roomMark[rm] === stamp) { roomMark[rm] = -stamp; missing--; } }
         }
       }
@@ -725,6 +729,34 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
         }
       }
     }
+    if (lineBranch) {
+      // Plan rectangulaire : chaque ligne libre de la dimension couverte recevra exactement une
+      // personne ; brancher sur la ligne la plus contrainte est souvent bien plus efficace.
+      const used = primRows ? rowUsed : colUsed;
+      let line = -1, lineMin = bestCount;
+      if (fOpts) lineMin = Math.min(lineMin, fOpts.length / 2);
+      for (let r = 0; r < NP; r++) if (!((used >> r) & 1) && lc[r] < lineMin) { lineMin = lc[r]; line = r; }
+      if (line >= 0) {
+        const opts = lineOpts[depth];
+        let m = 0;
+        for (let p = 0; p < n; p++) {
+          if (pos[p] >= 0) continue;
+          const d = domains[p];
+          for (let x = 0; x < d.length; x++) {
+            const i = d[x];
+            if ((primRows ? (i / W) | 0 : i % W) === line && feasible(p, i)) { opts[m++] = p; opts[m++] = i; }
+          }
+        }
+        if (rng) for (let x = m / 2 - 1; x > 0; x--) { const y = Math.floor(rng() * (x + 1)); let t = opts[2 * x]; opts[2 * x] = opts[2 * y]; opts[2 * y] = t; t = opts[2 * x + 1]; opts[2 * x + 1] = opts[2 * y + 1]; opts[2 * y + 1] = t; }
+        for (let x = 0; x < m; x += 2) {
+          place(opts[x], opts[x + 1]);
+          dfs(depth + 1);
+          unplace(opts[x]);
+          if (out.length >= max || nodes > budget) return;
+        }
+        return;
+      }
+    }
     if (fOpts && fOpts.length / 2 < bestCount) {
       // branche k : l'option k est vraie, les options précédentes sont interdites (pas de doublon)
       for (let x = 0; x < fOpts.length; x += 2) {
@@ -748,7 +780,9 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
       if (out.length >= max || nodes > budget) return;
     }
   }
+  const __t0 = globalThis.__ss ? performance.now() : 0;
   dfs(0);
+  if (globalThis.__ss) globalThis.__ss.push({ ms: performance.now() - __t0, nodes, max, budget, found: out.length, rng: !!rng, clues: JSON.stringify(globalThis.__lastClues) });
   return out;
 }
 
