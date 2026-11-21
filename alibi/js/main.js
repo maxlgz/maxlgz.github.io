@@ -159,10 +159,10 @@ const TUTO = [
   },
   {
     title: 'Lexique des indices',
-    html: `<dl class="lexicon">${LEXICON.map(([t, d]) => `<div class="lexicon-row${t === 'voyait' ? ' lexicon-row--sees' : ''}"><dt>« ${esc(t)} »</dt><dd>${esc(d)}</dd></div>`).join('')}</dl>
+    html: `<dl class="lexicon">${LEXICON.map(([t, d]) => `<div class="lexicon-row${t === 'voyait' ? ' lexicon-row--sees' : ''}"><dt>« ${esc(t)} »</dt><dd>${esc(d)}${t === 'voyait' ? `<div class="tuto-fig lexicon-figs"><figure>${miniRow([{ cls: 'p', l: 'A' }, { cls: 'ok' }, { cls: 'ok' }, { cls: 'obj tgt' }])}<figcaption>A voyait l’objet ★ : rien entre les deux</figcaption></figure>
+      <figure>${miniRow([{ cls: 'p', l: 'A' }, { cls: 'obj' }, { cls: 'no' }, { cls: 'obj tgt' }])}<figcaption>A ne le voyait pas : un objet le cache</figcaption></figure></div>` : ''}</dd></div>`).join('')}</dl>
       <p class="tuto-note">Certaines enquêtes spéciales ajoutent une règle (un témoin menteur, l’arme du crime) : elle est annoncée à l’ouverture du dossier.</p>`,
-    fig: () => `<figure>${miniRow([{ cls: 'p', l: 'A' }, { cls: 'ok' }, { cls: 'ok' }, { cls: 'obj tgt' }])}<figcaption>A voyait l’objet : rien entre les deux</figcaption></figure>
-      <figure>${miniRow([{ cls: 'p', l: 'A' }, { cls: 'obj' }, { cls: 'no' }, { cls: 'obj tgt' }])}<figcaption>A ne le voyait pas : un objet le cache</figcaption></figure>`,
+    fig: () => '',
   },
 ];
 
@@ -185,7 +185,10 @@ function showTutorial() {
         </div>
         ${inGuide() ? '' : `<p class="tuto-guide">Envie d’apprendre en jouant ? <button type="button" class="btn btn--small" data-t="guide">${ICONS.help} Enquête guidée</button></p>`}`;
       const primary = body.querySelector('[data-t="next"],[data-t="done"]');
-      if (primary) primary.focus();
+      // focus sans défilement : chaque fiche s'ouvre par le haut (le lexique est long)
+      if (primary) { try { primary.focus({ preventScroll: true }); } catch { primary.focus(); } }
+      const dlg = body.closest('dialog');
+      if (dlg) dlg.scrollTop = 0;
     };
     body.addEventListener('click', (e) => {
       const b = e.target.closest('[data-t]');

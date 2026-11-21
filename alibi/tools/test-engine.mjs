@@ -6,6 +6,9 @@ import {
   evaluate, murdererOf, solve, generateClues, validateLevel, explain, liarOf, weaponOf,
 } from '../js/engine.js';
 import { LEVELS } from '../js/levels.js';
+// Les tests historiques (génération d'indices classiques, parcours avec les aides) portent sur les
+// niveaux sans variante ; les niveaux à menteur ou à arme ont leurs propres tests.
+const CLASSIC = LEVELS.filter((l) => !l.twist);
 
 let passed = 0, failedCount = 0;
 function test(name, fn) {
@@ -425,7 +428,7 @@ function checkGenerated(level, sol, clues, label, { validate = true } = {}) {
 }
 test('generateClues : solution unique, déterministe, sur les niveaux d’exemple (mêmes indices qu’avant en difficultés 2 et 3)', () => {
   let d1 = '', d23 = '';
-  for (const lvl of LEVELS) for (const difficulty of [1, 2, 3]) for (const seed of [1, 2, 3, 'abc']) {
+  for (const lvl of CLASSIC) for (const difficulty of [1, 2, 3]) for (const seed of [1, 2, 3, 'abc']) {
     const sol = Object.fromEntries(lvl.people.map(p => [p.id, lvl.solution[p.id]]));
     const a = generateClues(lvl, sol, { difficulty, seed });
     checkGenerated(lvl, sol, a, `${lvl.id} d${difficulty} s${seed}`);
@@ -1155,7 +1158,7 @@ function playWithHints(raw, { rnd = null, stats = null } = {}) {
 test('explain : les 24 niveaux joués pas à pas (forced/reveal = solution, narrow la contient, done à la fin)', () => {
   const stats = { forced: 0, narrow: 0, reveal: 0 };
   let tmax = 0;
-  for (const raw of LEVELS) {
+  for (const raw of CLASSIC) {
     const t0 = performance.now();
     playWithHints(raw, { stats });
     tmax = Math.max(tmax, (performance.now() - t0) / (raw.people.length + 1));
@@ -1168,10 +1171,10 @@ test('explain : les 24 niveaux joués pas à pas (forced/reveal = solution, narr
   assert.ok(tmax < 30, `explain trop lent : ${tmax.toFixed(1)} ms`);
 });
 test('explain : préférence du joueur, ordres de pose quelconques', () => {
-  for (const raw of LEVELS) playWithHints(raw, { rnd: lcg(raw.id.length * 31) });
+  for (const raw of CLASSIC) playWithHints(raw, { rnd: lcg(raw.id.length * 31) });
   // depuis des états partiels corrects tirés au hasard
   const rnd = lcg(5);
-  for (const raw of LEVELS) {
+  for (const raw of CLASSIC) {
     const lv = prepare(raw), sol = solPl(lv);
     for (let k = 0; k < 6; k++) {
       const pl = {};
@@ -1189,7 +1192,7 @@ test('explain : préférence du joueur, ordres de pose quelconques', () => {
   assert.equal(explain(lv, {}, { prefer: e0.person }).person, e0.person);
 });
 test('explain : wrong détecte un personnage déplacé, done quand tout est en place', () => {
-  for (const raw of LEVELS) {
+  for (const raw of CLASSIC) {
     const lv = prepare(raw), sol = solPl(lv);
     const all = Object.fromEntries(lv.people.map(p => [p.id, sol[p.id]]));
     const done = explain(lv, all);
@@ -1390,7 +1393,7 @@ test('generateClues difficulté 1 : indices simples (au plus un with/sameRow/sam
       && all.filter(c => c.not).length <= 1;
   };
   let kept = 0, total = 0;
-  for (const lvl of LEVELS) {
+  for (const lvl of CLASSIC) {
     const small = dims(lvl).rows * dims(lvl).cols <= 45;
     for (const seed of [1, 2, 3, 'abc']) {
       const a = generateClues(lvl, lvl.solution, { difficulty: 1, seed });

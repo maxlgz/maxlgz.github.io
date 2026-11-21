@@ -1331,6 +1331,9 @@ dialog.modal[open] { animation: pop 0.2s ease-out; }
 .lexicon { display: grid; gap: 6px; margin: 0 0 10px; }
 .lexicon-row { padding: 0.35em 0.7em 0.4em; background: var(--paper-2); border-radius: 12px; }
 .lexicon-row--sees { border: 2.5px dashed var(--ink); }
+.tuto-fig:empty { display: none; }
+.lexicon-figs { margin: 8px 0 2px; gap: 12px; }
+.lexicon-figs figcaption { max-width: 140px; }
 .lexicon dt { font-family: var(--display); font-weight: 600; font-size: 0.98rem; }
 .lexicon dd { margin: 1px 0 0; font-size: 0.9rem; font-weight: 700; line-height: 1.35; }
 .mini--row i:last-child { border-right: 0; }

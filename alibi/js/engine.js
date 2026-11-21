@@ -1296,8 +1296,10 @@ function flipCandidate(ctx, p, cand, unblocked) {
 
 // Options : difficulty (1 à 3), seed, liar (témoin menteur). `sees: false` désactive le remplacement
 // occasionnel par un « voyait » (difficultés 2 et 3 : on retrouve alors exactement l'ancien générateur).
-export function generateClues(level, solution, { difficulty = 1, seed = 1, liar = false, sees = true } = {}) {
+export function generateClues(level, solution, { difficulty = 1, seed = 1, liar, sees = true } = {}) {
   const raw = clone(level && level[PREP] ? stripPrep(level) : (level || {}));
+  // Sans précision, un niveau qui porte la variante « témoin menteur » reçoit des indices à menteur.
+  if (liar === undefined) liar = !!(raw.twist && raw.twist.liar);
   (raw.people || []).forEach(p => { p.clues = []; });
   const L = prepare(raw), ctx = L[PREP];
   const { n, count } = ctx;
