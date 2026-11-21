@@ -1,1 +1,232 @@
-/* Alibi — thème sombre. Toutes les règles vivent sous :root[data-theme="dark"]. */
+/* Alibi — thème sombre. Toutes les règles vivent sous :root[data-theme="dark"].
+   Principe : nuit profonde, surfaces bleu nuit hiérarchisées, textes crème, traits indigo clair,
+   aplats vifs inchangés (texte bleu nuit dessus). Le plateau et les dessins restent des « îlots clairs ». */
+
+/* ---------- 1. Variables ---------- */
+:root[data-theme="dark"] {
+  --ink: #FFF6E3;          /* texte principal (crème) */
+  --ink-soft: #C4BCD3;     /* texte secondaire : crème atténué */
+  --edge: #8A90D8;         /* trait « cartoon » des éléments d'interface : indigo clair */
+  --edge-soft: #5A5F96;    /* trait discret (décor grisé) */
+  --on-vivid: #1F2147;     /* texte posé sur un aplat vif */
+  --night: #14162E;        /* fond de page */
+  --raise: #1F2147;        /* en-tête, barre d'outils, fenêtres */
+
+  --paper: #14162E;
+  --paper-2: #1B1D3D;      /* creux : sélecteurs, onglets */
+  --paper-3: #272B58;      /* surfaces : cartes, boutons, panneaux */
+  --band: #111329;         /* bande de relief sous les surfaces */
+  --line: rgba(255, 246, 227, 0.24);
+  --teal: #8CCBFF;         /* liens et anneau de focus */
+  --accent-ink: #FF9C92;
+  --bad-ink: #FF9C92;      /* texte d'erreur sur fond sombre */
+  --ok-ink: #7FE6C1;       /* texte de réussite sur fond sombre */
+  --ok: #7FE6C1;
+  --victim: #FF5A4E;
+  --victim-ink: #C42F27;   /* pastille « Victime » : texte crème */
+  --coral-d: #C4433A;
+  --sun-d: #C98E12;
+  --mint-d: #26896A;
+  --sky-d: #2A78BA;
+
+  --tint-bad: #4A2A3C;
+  --tint-ok: #1F4646;
+  --tint-hint: #4A4334;
+  --tint-hover: #353A70;
+  color-scheme: dark;
+}
+
+/* ---------- 2. Îlots clairs : plateau, vignettes, dessins, portraits, schémas ---------- */
+:root[data-theme="dark"] :where(.board, .mini, .token, .thumb, .legend-thumb, .ed-palimg, .ed-av) {
+  --ink: #1F2147;
+  --ink-soft: #4A4C70;
+  --paper: #FFF6E3;
+  --paper-2: #F6E8C8;
+  --paper-3: #FFFDF6;
+  --band: #EADCBB;
+  --line: rgba(31, 33, 71, 0.22);
+  --teal: #1A6FB8;
+  --bad-ink: #A3241C;
+  --ok-ink: #17704F;
+  --victim: #E0463B;
+  color-scheme: light;
+}
+:root[data-theme="dark"] .board { color: #1F2147; box-shadow: 0 0 0 3px #C9CCF4, 0 7px 0 3px #0C0D20; }
+:root[data-theme="dark"] .level-card .thumb,
+:root[data-theme="dark"] .custom-item .thumb { background: #F6E8C8; }
+
+/* ---------- 3. Page ---------- */
+:root[data-theme="dark"] body {
+  background-color: var(--night);
+  background-image:
+    radial-gradient(rgba(255, 246, 227, 0.075) 0.9px, transparent 1.3px),
+    radial-gradient(rgba(255, 246, 227, 0.045) 0.9px, transparent 1.3px);
+}
+
+/* ---------- 4. Traits : tout ce qui est cerné passe en indigo clair ---------- */
+:root[data-theme="dark"] :where(
+  .btn, .icon-btn, .stamp, .hero, .hero-tab, .diff-dots i, .level-card, .level-card .thumb, .size-pill,
+  .custom-item, .custom-item .thumb, .view-switch,
+  .view-switch button[aria-pressed='true'], .sw, .sw-track, .sw-track i, .topbar, .timer, .dossier-head .meta,
+  .status, .legend, .legend-chip, .card, .victim-tag, .card .placed-tag, .toolbar, .tool, .tool .count,
+  .settings-pop, dialog.modal, .modal-kicker, .suspect, .win-reveal, .win-stats div,
+  .win-record, .tuto-dots i, .notice,
+  .ed-btn, .ed-input, .ed-select, .ed-chip, .ed-panel, .ed-tabs, .ed-tab, .ed-diag, .ed-room.on, .ed-brush,
+  .ed-floor, .ed-floor-sw, .ed-palbtn, .ed-badge, .ed-card, .ed-rost, .ed-chip-btn, .ed-chip-n, .ed-fixed,
+  .ed-clue, .ed-dialog, .ed-toast.on
+) { border-color: var(--edge); }
+/* pseudo-éléments (interdits dans :where) */
+:root[data-theme="dark"] .level-card.has-save .sub::after,
+:root[data-theme="dark"] .status[data-tone]::before,
+:root[data-theme="dark"] .legend > summary::after,
+:root[data-theme="dark"] .card li::before,
+:root[data-theme="dark"] .card.wrong::after,
+:root[data-theme="dark"] .pick.placed::after,
+:root[data-theme="dark"] .suspect.nope::after { border-color: var(--edge); }
+/* onglets de l'éditeur : séparateurs posés en !important sur grand écran */
+@media (min-width: 900px) {
+  :root[data-theme="dark"] .ed-root .ed-tab { border-right-color: var(--edge) !important; }
+}
+
+/* ---------- 5. Texte bleu nuit sur les aplats vifs ---------- */
+:root[data-theme="dark"] :where(
+  .btn--primary, .btn--accent, .icon-btn[aria-expanded='true'], .stamp:not(.stamp--culprit), .hero-tab, .size-pill, .view-switch button[aria-pressed='true'],
+  .card.placed .placed-tag, .tool[aria-pressed='true'], .tool--validate:not(:disabled), .tool .count,
+  .modal-kicker, .win-record,
+  .ed-btn[aria-pressed='true'], .ed-primary:not(:disabled), .ed-chip:not(.ed-pend), .ed-tab[aria-selected='true'],
+  .ed-floor[aria-pressed='true'], .ed-palbtn[aria-pressed='true'], .ed-rost[aria-pressed='true'],
+  .ed-chip-btn[aria-pressed='true'], .ed-badge.occ, .ed-badge.blk
+) { color: var(--on-vivid); }
+:root[data-theme="dark"] .level-card.has-save .sub::after,
+:root[data-theme="dark"] .status[data-tone]::before,
+:root[data-theme="dark"] .card li::before,
+:root[data-theme="dark"] .card.wrong::after,
+:root[data-theme="dark"] .pick.placed::after,
+:root[data-theme="dark"] .suspect.nope::after { color: var(--on-vivid); }
+:root[data-theme="dark"] .ed-rost[aria-pressed='true'] .ed-rost-s { color: #3A3D6B; }
+:root[data-theme="dark"] .ed-palbtn[aria-pressed='true'] .ed-badge { border-color: var(--on-vivid); }
+:root[data-theme="dark"] .ed-chip-btn[aria-pressed='true'] .ed-chip-n { color: var(--ink); }
+
+/* ---------- 6. Boutons, en-têtes, barres ---------- */
+:root[data-theme="dark"] .btn--ghost:hover { --btn-bg: rgba(255, 246, 227, 0.1); }
+:root[data-theme="dark"] .topbar { background: var(--raise); }
+:root[data-theme="dark"] .toolbar { background: var(--raise); box-shadow: 0 -4px 0 rgba(8, 9, 24, 0.5); }
+:root[data-theme="dark"] .tool[aria-pressed='true'],
+:root[data-theme="dark"] .ed-btn[aria-pressed='true'] { box-shadow: inset 0 3px 0 rgba(31, 33, 71, 0.3); }
+:root[data-theme="dark"] .tool:disabled,
+:root[data-theme="dark"] .btn:disabled,
+:root[data-theme="dark"] .ed-btn:disabled { opacity: 0.55; }
+:root[data-theme="dark"] .switch input,
+:root[data-theme="dark"] .ed-radio input,
+:root[data-theme="dark"] .ed-check input { accent-color: var(--sun); }
+:root[data-theme="dark"] .sw[aria-checked='true'] .sw-track i { background: var(--ink); border-color: var(--on-vivid); }
+
+/* ---------- 7. Accueil ---------- */
+:root[data-theme="dark"] .hero { box-shadow: inset 0 -8px 0 var(--band); }
+:root[data-theme="dark"] .hero::before { opacity: 0.5; }
+:root[data-theme="dark"] .section-head h2 {
+  background: linear-gradient(transparent 58%, color-mix(in srgb, var(--tone) 42%, var(--night)) 58%,
+    color-mix(in srgb, var(--tone) 42%, var(--night)) 92%, transparent 92%);
+}
+:root[data-theme="dark"] [data-home-view='compact'] .level-card:hover { background: var(--tint-hover); }
+:root[data-theme="dark"] .all-solved { border-color: var(--edge-soft); }
+
+/* ---------- 8. Bulle d'état ---------- */
+:root[data-theme="dark"] .status[data-tone='error'] { background: var(--tint-bad); }
+:root[data-theme="dark"] .status[data-tone='ok'] { background: var(--tint-ok); }
+:root[data-theme="dark"] .status[data-tone='hint'] { background: var(--tint-hint); }
+@media (max-width: 899.98px) {
+  :root[data-theme="dark"] .status { box-shadow: inset 0 -3px 0 var(--band), 0 3px 0 rgba(5, 6, 18, 0.6); }
+}
+
+/* ---------- 9. Légende ---------- */
+:root[data-theme="dark"] .legend:not([open]) > summary::after { background-color: var(--sun); }
+:root[data-theme="dark"] .legend-chip { background: var(--paper-2); }
+:root[data-theme="dark"] .legend-chip:hover { background: var(--tint-hover); }
+:root[data-theme="dark"] .legend-thumb { background: #F2E6CC; box-shadow: 0 0 0 2px var(--edge); }
+:root[data-theme="dark"] .legend-count { background: var(--ink); color: var(--on-vivid); }
+
+/* ---------- 10. Fiches de témoignage ---------- */
+:root[data-theme="dark"] .card {
+  --band-c: color-mix(in srgb, var(--pc, #8A90D8) 48%, var(--night));
+  background: color-mix(in srgb, var(--pc, #8A90D8) 20%, var(--raise));
+}
+:root[data-theme="dark"] .card-letter { -webkit-text-stroke-color: var(--night); }
+:root[data-theme="dark"] .card li::before { background: var(--paper-2); opacity: 0.85; }
+:root[data-theme="dark"] .card li[data-state]::before { opacity: 1; }
+:root[data-theme="dark"] .card li[data-state='true']::before { background: var(--mint); }
+:root[data-theme="dark"] .card li[data-state='false']::before { background: var(--coral); }
+:root[data-theme="dark"] .card li.culprit { background: rgba(255, 107, 94, 0.18); }
+:root[data-theme="dark"] .card .placed-tag { background: var(--paper-2); }
+:root[data-theme="dark"] .card.placed .placed-tag { background: var(--mint); }
+:root[data-theme="dark"] .card[aria-pressed='true'] {
+  box-shadow: inset 0 -6px 0 var(--band-c), 0 0 0 4px var(--sun), 0 0 0 7px var(--night);
+}
+:root[data-theme="dark"] .card.victim {
+  box-shadow: inset 0 0 0 4px var(--victim), inset 0 -10px 0 var(--band-c);
+}
+:root[data-theme="dark"] .card.victim[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 4px var(--victim), inset 0 -10px 0 var(--band-c), 0 0 0 4px var(--sun), 0 0 0 7px var(--night);
+}
+/* personnage posé : décor gris ardoise, trait estompé */
+:root[data-theme="dark"] .card.placed {
+  --band-c: #1E1F2D;
+  background: #2D2E3F; border-color: var(--edge-soft);
+}
+:root[data-theme="dark"] .card.placed .card-face { opacity: 0.55; }
+:root[data-theme="dark"] .card.placed .card-letter { opacity: 0.4; }
+:root[data-theme="dark"] .card.placed.wrong { background: #432836; border-color: var(--edge); }
+/* en erreur : anneau corail + pastille « À revoir » */
+:root[data-theme="dark"] .card.wrong,
+:root[data-theme="dark"] .card.wrong[aria-pressed='true'] {
+  box-shadow: inset 0 -6px 0 var(--band-c), 0 0 0 4px var(--coral), 0 0 0 7px var(--night);
+}
+:root[data-theme="dark"] .card.victim.wrong {
+  box-shadow: inset 0 0 0 4px var(--victim), inset 0 -10px 0 var(--band-c), 0 0 0 4px var(--coral), 0 0 0 7px var(--night);
+}
+
+/* ---------- 11. Fenêtres ---------- */
+:root[data-theme="dark"] dialog.modal,
+:root[data-theme="dark"] .ed-dialog { background: var(--raise); box-shadow: inset 0 -7px 0 var(--band), 0 0 0 1px rgba(255, 246, 227, 0.06); }
+:root[data-theme="dark"] dialog.modal::backdrop,
+:root[data-theme="dark"] .ed-dialog::backdrop { background: rgba(6, 7, 20, 0.72); }
+:root[data-theme="dark"] .settings-pop { background: var(--paper-3); }
+:root[data-theme="dark"] .suspect,
+:root[data-theme="dark"] .win-reveal {
+  background: color-mix(in srgb, var(--pc, #8A90D8) 22%, var(--raise));
+  box-shadow: inset 0 -5px 0 color-mix(in srgb, var(--pc, #8A90D8) 48%, var(--night));
+}
+:root[data-theme="dark"] .suspect.nope { box-shadow: none; }
+/* schémas du tutoriel : îlot clair cerné d'un liseré */
+:root[data-theme="dark"] .mini { box-shadow: 0 0 0 3px #C9CCF4; }
+
+/* ---------- 12. Éditeur ---------- */
+:root[data-theme="dark"] .ed-tabs { background: var(--paper-2); }
+:root[data-theme="dark"] .ed-tab[aria-selected='true'] { box-shadow: inset 0 -5px 0 var(--on-vivid); }
+:root[data-theme="dark"] .ed-input,
+:root[data-theme="dark"] .ed-select { background: var(--paper-2); }
+:root[data-theme="dark"] .ed-input::placeholder { color: #9C95B2; opacity: 1; }
+:root[data-theme="dark"] .ed-input[aria-invalid='true'] { border-color: var(--bad-ink); background: var(--tint-bad); }
+:root[data-theme="dark"] .ed-room.on { background: var(--tint-hint); }
+:root[data-theme="dark"] .ed-brush[aria-pressed='true'] { box-shadow: 0 0 0 3px var(--sun), 0 0 0 5.5px var(--night); }
+:root[data-theme="dark"] .ed-palimg { box-shadow: 0 0 0 2px var(--edge); }
+:root[data-theme="dark"] .ed-av svg { box-shadow: 0 0 0 3px var(--edge); }
+:root[data-theme="dark"] .ed-card.victim { box-shadow: inset 0 0 0 4px var(--victim), inset 0 -9px 0 var(--band); }
+:root[data-theme="dark"] .ed-rost.bad,
+:root[data-theme="dark"] .ed-fixed,
+:root[data-theme="dark"] .ed-toast-err.on { background: var(--tint-bad); }
+:root[data-theme="dark"] .ed-toast-ok.on { background: var(--tint-ok); }
+:root[data-theme="dark"] .ed-note-warn { color: #FFD27A; }
+:root[data-theme="dark"] .ed-pend { background: var(--paper-2); }
+:root[data-theme="dark"] .ed-chip-n { background: var(--paper-2); }
+:root[data-theme="dark"] .ed-floor,
+:root[data-theme="dark"] .ed-palbtn,
+:root[data-theme="dark"] .ed-card,
+:root[data-theme="dark"] .ed-rost,
+:root[data-theme="dark"] .ed-chip-btn,
+:root[data-theme="dark"] .ed-clue { background: var(--paper-2); }
+:root[data-theme="dark"] .ed-floor[aria-pressed='true'],
+:root[data-theme="dark"] .ed-palbtn[aria-pressed='true'],
+:root[data-theme="dark"] .ed-rost[aria-pressed='true'],
+:root[data-theme="dark"] .ed-chip-btn[aria-pressed='true'] { background: var(--sun); }
+:root[data-theme="dark"] .ed-card .ed-card { background: var(--paper-3); }
