@@ -59,6 +59,7 @@ export const ICONS = {
   hint: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/><path d="M10.5 7.5v3.5M10.5 13.6v.1"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"/></svg>',
   pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 013 3L8 18.5z"/><path d="M13.5 7l3 3"/></svg>',
+  legend: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="6.5" r="1.8"/><circle cx="5.5" cy="12" r="1.8"/><circle cx="5.5" cy="17.5" r="1.8"/><path d="M10.5 6.5H20M10.5 12H20M10.5 17.5H20"/></svg>',
   help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.6 2.6 0 115 1c-.8 1-2.5 1.4-2.5 3"/><path d="M12 17.2v.1"/></svg>',
 };
 
@@ -196,6 +197,7 @@ export function mountGame(root, opts = {}) {
       <div class="title"><h1>${esc(level.title || 'Enquête')}</h1>
         <span class="sub">${esc([diff, `${n}×${n}`, `${people.length} personnes`].filter(Boolean).join(' · '))}</span></div>
       <span class="timer" role="timer" aria-label="Temps écoulé">0:00</span>
+      <button type="button" class="icon-btn" data-act="legend" aria-label="Légende du plan" hidden>${ICONS.legend}</button>
       <button type="button" class="icon-btn" data-act="settings" aria-label="Réglages" aria-expanded="false">${ICONS.gear}</button>
     </header>
     <main class="game-main">
@@ -227,6 +229,7 @@ export function mountGame(root, opts = {}) {
   const $ = (sel) => screen.querySelector(sel);
   const timerEl = $('.timer');
   const statusEl = $('.status');
+  const wide = window.matchMedia('(min-width: 900px)');
   const cardsEl = $('.cards');
   const pickerEl = $('.picker');
   const metaEl = $('.dossier-head .meta');
@@ -238,8 +241,12 @@ export function mountGame(root, opts = {}) {
   board.el.classList.add('board--play');
 
   // légende des objets (construite une seule fois : le rendu ne la touche pas)
+  // Grand écran : panneau repliable dans la colonne de droite. Téléphone : fenêtre ouverte par le bouton d'en-tête.
+  let legendModal = null;
+  const closeLegendModal = () => { if (legendModal) { legendModal.close(); legendModal = null; } };
   (function buildLegend() {
     const det = $('[data-legend]');
+    const legendBtn = $('[data-act="legend"]');
     const seen = new Map();
     const objs = (level.objects || []).filter((o) => OBJECTS[o.type]);
     objs.slice().sort((a, b) => (a.r - b.r) || (a.c - b.c)).forEach((o) => {
@@ -258,22 +265,49 @@ export function mountGame(root, opts = {}) {
           + `<span class="legend-name">${esc(cap(o.n))}</span>${k > 1 ? `<span class="legend-count">×${k}</span>` : ''}</button></li>`;
       }).join('')}</ul></div>`;
     };
-    $('.legend-body').innerHTML = group(true, 'On peut s\'y placer') + group(false, 'Bloque la case');
+    const groupsHTML = group(true, 'On peut s\'y placer') + group(false, 'Bloque la case');
+    $('.legend-body').innerHTML = groupsHTML;
     det.hidden = false;
     det.open = settings.legendOpen !== false;
     det.addEventListener('toggle', () => {
+      if (!wide.matches) return; // l'état mémorisé ne suit que le panneau grand écran
       if (det.open !== (settings.legendOpen !== false)) settings = saveSettings({ legendOpen: det.open });
     });
     let flashTimer = null;
-    det.addEventListener('click', (e) => {
-      const b = e.target.closest('.legend-chip');
-      if (!b) return;
+    const flashType = (type) => {
       board.el.querySelectorAll('.board-object.flash').forEach((x) => x.classList.remove('flash'));
-      const hits = board.el.querySelectorAll(`.board-object[data-type="${b.dataset.type}"]`);
+      const hits = board.el.querySelectorAll(`.board-object[data-type="${type}"]`);
       void board.el.offsetWidth;
       hits.forEach((x) => x.classList.add('flash'));
       clearTimeout(flashTimer);
       flashTimer = setTimeout(() => hits.forEach((x) => x.classList.remove('flash')), 1500);
+    };
+    det.addEventListener('click', (e) => {
+      const b = e.target.closest('.legend-chip');
+      if (b) flashType(b.dataset.type);
+    });
+    // téléphone : bouton d'en-tête → fenêtre
+    const syncBtn = () => { legendBtn.hidden = wide.matches; if (wide.matches) closeLegendModal(); };
+    syncBtn();
+    wide.addEventListener('change', syncBtn);
+    legendBtn.addEventListener('click', () => {
+      if (legendModal) return;
+      legendModal = openModal((body, close) => {
+        body.innerHTML = `<h2>Légende du plan</h2><div class="legend-body">${groupsHTML}</div>
+          <div class="modal-actions"><button type="button" class="btn btn--ghost btn--small" data-close>Fermer</button></div>`;
+        body.addEventListener('click', (e) => {
+          if (e.target.closest('[data-close]')) { close(); return; }
+          const b = e.target.closest('.legend-chip');
+          if (!b) return;
+          close();
+          const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          $('.board-wrap').scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+          flashType(b.dataset.type);
+        });
+      }, { label: 'Légende du plan', className: 'legend-modal' });
+      const m = legendModal;
+      const poll = () => { if (m.closed) { if (legendModal === m) legendModal = null; } else setTimeout(poll, 250); };
+      poll();
     });
   })();
 
@@ -331,10 +365,38 @@ export function mountGame(root, opts = {}) {
       selected, history: history.slice(-80), at: Date.now(),
     });
   }
-  function setStatus(text, tone = '') {
+  // `kind` : 'idle' = consigne d'attente (affichée seulement sur grand écran) ;
+  // 'long' = message à lire plus longtemps (bulle ~5 s au lieu de ~3 s sur téléphone).
+  let statusLast = { text: '', tone: '', kind: '' };
+  let statusTimer = null;
+  let statusClear = null;
+  function paintStatus(text, tone) {
     statusEl.textContent = text;
     if (tone) statusEl.dataset.tone = tone; else delete statusEl.dataset.tone;
   }
+  function hideBubble() {
+    clearTimeout(statusTimer);
+    clearTimeout(statusClear);
+    statusEl.classList.remove('is-on');
+    statusClear = setTimeout(() => { if (!statusEl.classList.contains('is-on')) paintStatus('', ''); }, 400);
+  }
+  function setStatus(text, tone = '', kind = '') {
+    statusLast = { text, tone, kind };
+    if (wide.matches) { paintStatus(text, tone); return; }
+    if (kind === 'idle') { hideBubble(); return; }
+    clearTimeout(statusTimer);
+    clearTimeout(statusClear);
+    paintStatus(text, tone);
+    void statusEl.offsetWidth;
+    statusEl.classList.add('is-on');
+    statusTimer = setTimeout(hideBubble, kind === 'long' ? 5000 : 3000);
+  }
+  wide.addEventListener('change', () => {
+    clearTimeout(statusTimer);
+    clearTimeout(statusClear);
+    statusEl.classList.remove('is-on');
+    if (wide.matches) paintStatus(statusLast.text, statusLast.tone); else paintStatus('', '');
+  });
   const roomName = (r, c) => {
     const k = level.roomMap[r] && level.roomMap[r][c];
     return (roomsByKey[k] && roomsByKey[k].name) || '';
@@ -434,7 +496,7 @@ export function mountGame(root, opts = {}) {
     if (announce) {
       const p = byId[id];
       const pl = st.placements[id];
-      setStatus(pl ? `${p.name} est sélectionné${fem(p, '', 'e')} (${where(pl[0], pl[1])}).` : `${p.name} est sélectionné${fem(p, '', 'e')}. Appui long sur une case pour l'y poser.`);
+      setStatus(pl ? `${p.name} est sélectionné${fem(p, '', 'e')} (${where(pl[0], pl[1])}).` : `${p.name} est sélectionné${fem(p, '', 'e')}. Appui long sur une case pour l'y poser.`, '', 'idle');
     }
   }
 
@@ -578,17 +640,17 @@ export function mountGame(root, opts = {}) {
       selected = p.id;
       render();
       save();
-      setStatus(`Indice : ${p.name} n’est pas à sa place.${misplaced.length > 1 ? ' Et ce n’est pas la seule erreur.' : ''}`, 'hint');
+      setStatus(`Indice : ${p.name} n’est pas à sa place.${misplaced.length > 1 ? ' Et ce n’est pas la seule erreur.' : ''}`, 'hint', 'long');
       return;
     }
     let target = selected && !st.placements[selected] ? selected : null;
     if (!target) { const f = people.find((p) => !st.placements[p.id]); target = f ? f.id : null; }
-    if (!target) { setStatus('Tout le monde est déjà à sa place : il ne reste qu’à valider !', 'ok'); return; }
+    if (!target) { setStatus('Tout le monde est déjà à sa place : il ne reste qu’à valider !', 'ok', 'long'); return; }
     const [r, c] = sol[target];
     st.hints++;
     placeAt(r, c, target, { silent: true });
     const p = byId[target];
-    setStatus(`Indice : ${p.name} se trouvait ${where(r, c)}.`, 'hint');
+    setStatus(`Indice : ${p.name} se trouvait ${where(r, c)}.`, 'hint', 'long');
   }
 
   function validate() {
@@ -621,7 +683,7 @@ export function mountGame(root, opts = {}) {
     if (names.length) parts.push(`${names.length > 1 ? 'Ces témoignages ne collent pas' : 'Ce témoignage ne colle pas'} : ${names.join(', ')}.`);
     if (ev.victimOk === false) parts.push('La victime doit être seule avec une seule autre personne dans sa pièce.');
     if (!parts.length) parts.push('Quelque chose cloche dans ce plan.');
-    setStatus(`Pas encore… ${parts.join(' ')}`, 'error');
+    setStatus(`Pas encore… ${parts.join(' ')}`, 'error', 'long');
     const first = [...wrong.keys()][0];
     if (first && cardEls[first]) cardEls[first].scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
@@ -924,7 +986,7 @@ export function mountGame(root, opts = {}) {
   } else {
     setStatus(settings.oneTap
       ? 'Choisissez un personnage, puis touchez une case pour l’y poser. Appui long : note au crayon.'
-      : 'Choisissez un personnage. Toucher une case = note au crayon ; appui long = poser.');
+      : 'Choisissez un personnage. Toucher une case = note au crayon ; appui long = poser.', '', 'idle');
     if (level.intro) {
       phase = 'intro';
       render();
@@ -948,6 +1010,9 @@ export function mountGame(root, opts = {}) {
       clearInterval(timer);
       cancelPress();
       closePop();
+      closeLegendModal();
+      clearTimeout(statusTimer);
+      clearTimeout(statusClear);
       if (modal) { try { modal.close(); } catch { /* rien */ } modal = null; }
       document.removeEventListener('pointerdown', onDocDown);
       document.removeEventListener('keydown', onDocKey);

@@ -116,6 +116,8 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.12; l
 .icon-btn:active { transform: translateY(1px); box-shadow: inset 0 -2px 0 var(--band); }
 .icon-btn[aria-expanded='true'] { background: var(--sun); box-shadow: inset 0 3px 0 rgba(31, 33, 71, 0.16); }
 .icon-btn svg { width: 22px; height: 22px; stroke-width: 2.6; }
+.icon-btn[hidden] { display: none; }
+.icon-btn:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
 
 /* pastille (« Résolu », « Coupable »…) */
 .stamp {
@@ -867,10 +869,39 @@ dialog.modal[open] { animation: pop 0.2s ease-out; }
   .card-letter { font-size: 2.15rem; -webkit-text-stroke-width: 5px; }
 }
 
+/* ---------- téléphone : bulle d'état éphémère + légende en fenêtre ---------- */
+.legend-modal .modal-body { padding-top: 20px; }
+.legend-modal .legend-body { padding: 0; }
+.legend-modal .legend-group ul { padding: 0; font-weight: inherit; }
+.legend-modal .legend-group li { margin: 0; }
+.legend-modal .legend-group + .legend-group { margin-top: 10px; }
+@media (max-width: 899.98px) {
+  .legend { display: none; }
+  .topbar { gap: 6px; padding: 6px 8px; }
+  .status {
+    position: fixed; z-index: 35; left: 50%;
+    bottom: calc(var(--toolbar-h) + env(safe-area-inset-bottom) + 10px);
+    width: max-content; max-width: min(340px, calc(100vw - 32px)); min-height: 0; margin: 0;
+    padding: 0.4em 0.8em; border-radius: 16px; font-size: 0.88rem; line-height: 1.3;
+    pointer-events: none; opacity: 0; transform: translate(-50%, 6px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    box-shadow: inset 0 -3px 0 var(--band), 0 3px 0 rgba(31, 33, 71, 0.25);
+  }
+  .status:empty { display: none; }
+  .status.is-on { opacity: 1; transform: translate(-50%, 0); }
+  .status[data-tone]::before { width: 20px; height: 20px; font-size: 0.75rem; border-width: 2px; }
+}
+@media (min-width: 900px) {
+  .icon-btn[data-act='legend'] { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .board-object.flash { animation: none; }
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition: none !important; }
   .press-ring circle { animation: none; stroke-dashoffset: 125; }
   .tool.holding .hold { animation: none; width: 50%; }
   .level-card:hover, .card:hover, .suspect:hover { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 899.98px) {
+  .status, .status.is-on { transition: none; transform: translate(-50%, 0); }
 }
