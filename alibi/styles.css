@@ -521,11 +521,12 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.12; l
 .cell-layer .token.just-placed { animation: drop 0.28s ease-out; }
 /* sur le plan, la pastille « Victime » descend sur le portrait pour ne pas croiser le nom de la pièce */
 .cell-layer .token-tag { top: 2%; z-index: 1; }
+/* Croix « case impossible » : grandes et franches, bleu nuit, qu'elles soient posées à la main
+   ou ajoutées d'office sur la ligne et la colonne d'un personnage placé. */
 .mark-x {
-  position: absolute; inset: 29%;
-  color: var(--ink); opacity: 0.3;
+  position: absolute; inset: 15%;
+  color: var(--ink); opacity: 1;
 }
-.mark-x.manual { inset: 15%; opacity: 1; }
 .mark-x svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .notes {
   position: absolute; inset: 7%;
