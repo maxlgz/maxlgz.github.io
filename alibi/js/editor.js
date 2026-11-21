@@ -4,6 +4,8 @@ import {
   OBJECTS, CLUE_TYPES, FLOORS, prepare, canPlace, clueHTML, personCluesHTML,
   checkClue, solve, generateClues, validateLevel,
 } from './engine.js';
+// Espace de noms : lit sans erreur les exports qui n'existent pas encore (OBJECT_SIZES, nouveau moteur).
+import * as ENGINE from './engine.js';
 import { objectSVG, floorCSS, avatarSVG, LOOK_OPTIONS } from './art.js';
 import { createBoard, tokenHTML } from './board.js';
 
@@ -28,7 +30,17 @@ const SIZES = {
   sofa: [[2, 1], [1, 2]], bench: [[2, 1], [1, 2]], bed: [[1, 1], [1, 2]], rug: [[1, 1], [2, 1], [1, 2], [2, 2]],
   boat: [[1, 1], [2, 1]], car: [[2, 1]], stage: [[1, 1], [2, 1], [1, 2], [2, 2], [3, 1], [3, 2]],
 };
-const sizesOf = (t) => SIZES[t] || [[1, 1]];
+// Tailles autorisées : celles du moteur quand il les exporte (absent = 1×1 seul), sinon la table ci-dessus.
+const sizesOf = (t) => {
+  const table = ENGINE.OBJECT_SIZES && typeof ENGINE.OBJECT_SIZES === 'object' ? ENGINE.OBJECT_SIZES : SIZES;
+  const list = table[t];
+  return Array.isArray(list) && list.length ? list : [[1, 1]];
+};
+// Dimensions : lignes 4 à 12, colonnes 4 à 9 ; personnages = min(lignes, colonnes).
+const ROWS_MIN = 4, ROWS_MAX = 12, COLS_MIN = 4, COLS_MAX = 9;
+const clampInt = (v, lo, hi, d) => { const n = Number(v) | 0; return n ? Math.min(hi, Math.max(lo, n)) : d; };
+const SQUARE_SIZES = [5, 6, 7, 8, 9];
+const FORMATS = [['Bus', 4, 9], ['Avion', 6, 9], ['Bateau', 9, 6], ['Fusée', 12, 5]];
 const NAME_POOL = [
   ['Agathe', 'f'], ['Bruno', 'm'], ['Clara', 'f'], ['Damien', 'm'], ['Emma', 'f'], ['Félix', 'm'], ['Gaëlle', 'f'],
   ['Hugo', 'm'], ['Inès', 'f'], ['Jules', 'm'], ['Karim', 'm'], ['Léa', 'f'], ['Marc', 'm'], ['Nora', 'f'],
@@ -79,7 +91,7 @@ function defaultState() {
     return { id: initialOf(n), name: n, gender: g, look: randomLook(), clues: [], ...(n === 'Victor' ? { victim: true } : {}) };
   });
   return {
-    id: null, title: 'Nouvelle enquête', intro: '', difficulty: 1, size: 6,
+    id: null, title: 'Nouvelle enquête', intro: '', difficulty: 1, rows: 6, cols: 6,
     rooms: [{ key: 'a', name: 'Salon', floor: 'wood' }, { key: 'b', name: 'Jardin', floor: 'grass' }],
     grid,
     objects: [
@@ -91,10 +103,11 @@ function defaultState() {
 }
 
 function fromRaw(raw) {
-  const size = Math.min(9, Math.max(5, Number(raw.size) | 0 || 6));
+  const rows = clampInt(raw.rows ?? raw.size, ROWS_MIN, ROWS_MAX, 6);
+  const cols = clampInt(raw.cols ?? raw.size, COLS_MIN, COLS_MAX, 6);
   const rooms = (Array.isArray(raw.rooms) ? raw.rooms : []).map((r) => ({ key: String(r.key || 'a')[0], name: String(r.name || ''), floor: r.floor || 'wood' }));
   if (!rooms.length) rooms.push({ key: 'a', name: 'Pièce', floor: 'wood' });
-  const grid = Array.from({ length: size }, (_, r) => Array.from({ length: size }, (_, c) => {
+  const grid = Array.from({ length: rows }, (_, r) => Array.from({ length: cols }, (_, c) => {
     const ch = String((raw.roomMap || [])[r] || '')[c];
     return rooms.some((x) => x.key === ch) ? ch : rooms[0].key;
   }));
@@ -106,12 +119,12 @@ function fromRaw(raw) {
   const ids = new Set(people.map((p) => p.id));
   const solution = {};
   Object.entries(raw.solution || {}).forEach(([id, rc]) => {
-    if (ids.has(id) && Array.isArray(rc) && rc[0] >= 0 && rc[0] < size && rc[1] >= 0 && rc[1] < size) solution[id] = [rc[0] | 0, rc[1] | 0];
+    if (ids.has(id) && Array.isArray(rc) && rc[0] >= 0 && rc[0] < rows && rc[1] >= 0 && rc[1] < cols) solution[id] = [rc[0] | 0, rc[1] | 0];
   });
   return {
     id: typeof raw.id === 'string' && raw.id.startsWith('perso-') ? raw.id : null,
     title: String(raw.title || ''), intro: String(raw.intro || ''), difficulty: Math.min(3, Math.max(1, Number(raw.difficulty) | 0 || 1)),
-    size, rooms, grid, objects, people, solution,
+    rows, cols, rooms, grid, objects, people, solution,
   };
 }
 
@@ -151,6 +164,8 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
 
   /* ---- sortie du niveau ---- */
   const placedList = () => S.people.filter((p) => S.solution[p.id]);
+  const count = () => Math.min(S.rows, S.cols);
+  const dimLabel = (r = S.rows, c = S.cols) => `${r}×${c}`;
   function solutionInfo() {
     const rows = {}; const cols = {}; const conflicts = []; const bad = new Set();
     const placed = placedList();
@@ -164,12 +179,14 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
       const [r, c] = S.solution[p.id];
       if (S.prep && !canPlace(S.prep, r, c)) { conflicts.push(`${p.name} est sur une case bloquée`); bad.add(p.id); }
     });
-    return { placed, complete: placed.length === S.size, conflicts, bad, ok: placed.length === S.size && !conflicts.length };
+    return { placed, complete: placed.length === count(), conflicts, bad, ok: placed.length === count() && !conflicts.length };
   }
 
   function toRaw({ forCheck = false, noClues = false } = {}) {
     const o = {
-      id: S.id || 'perso-brouillon', title: S.title.trim() || 'Sans titre', difficulty: S.difficulty, size: S.size,
+      id: S.id || 'perso-brouillon', title: S.title.trim() || 'Sans titre', difficulty: S.difficulty,
+      // Carré : `size` comme avant ; rectangle : `rows` et `cols`, sans `size`.
+      ...(S.rows === S.cols ? { size: S.rows } : { rows: S.rows, cols: S.cols }),
       rooms: S.rooms.map((r) => ({ key: r.key, name: r.name, floor: r.floor })),
       roomMap: S.grid.map((r) => r.join('')),
       objects: S.objects.map((b) => (b.w > 1 || b.h > 1 ? { type: b.type, r: b.r, c: b.c, w: b.w, h: b.h } : { type: b.type, r: b.r, c: b.c })),
@@ -272,9 +289,11 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
     S.prep = safe(() => prepare(raw), null);
     board = createBoard(S.prep || raw);
     host.replaceChildren(board.el);
+    host.style.setProperty('--rows', String(S.rows));
+    host.style.setProperty('--cols', String(S.cols));
     const info = solutionInfo();
-    for (let r = 0; r < S.size; r += 1) {
-      for (let c = 0; c < S.size; c += 1) {
+    for (let r = 0; r < S.rows; r += 1) {
+      for (let c = 0; c < S.cols; c += 1) {
         const cell = board.cells[r][c];
         const p = personAt(r, c);
         const layer = cell.querySelector('.cell-layer');
@@ -313,7 +332,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
   }
   function placeObject(r, c) {
     const { type, w, h } = S.objTool;
-    if (r + h > S.size || c + w > S.size) { say('Cet objet sortirait de la grille.', 'err'); return; }
+    if (r + h > S.rows || c + w > S.cols) { say('Cet objet sortirait de la grille.', 'err'); return; }
     for (let i = r; i < r + h; i += 1) for (let j = c; j < c + w; j += 1) {
       if (objectsAt(i, j).length) { say('Cet objet chevaucherait un autre objet.', 'err'); return; }
     }
@@ -386,7 +405,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
     const v = safe(() => validateLevel(raw), { errors: ['Validation indisponible.'], warnings: [] });
     const d = { status: 'invalid', errors: v.errors || [], warnings: [...(v.warnings || [])], found: null, differs: false };
     const info = solutionInfo();
-    if (!info.complete) d.warnings.push(`Solution posée : ${info.placed.length}/${S.size} personnages.`);
+    if (!info.complete) d.warnings.push(`Solution posée : ${info.placed.length}/${count()} personnages.`);
     info.conflicts.forEach((c) => d.warnings.push(`Conflit : ${c}`));
     if (info.ok) {
       const vr = S.people.find((p) => p.victim);
@@ -445,9 +464,18 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
       <label class="ed-field"><span>Texte d’introduction</span><textarea class="ed-input" data-f="intro" rows="3" maxlength="300">${esc(S.intro)}</textarea></label>
       <div class="ed-field"><span>Difficulté</span>
         <div class="ed-seg" role="group" aria-label="Difficulté">${[[1, 'Facile'], [2, 'Moyen'], [3, 'Difficile']].map(([v, l]) => `<button type="button" class="ed-btn" data-act="diff" data-v="${v}" aria-pressed="${S.difficulty === v}">${v} · ${l}</button>`).join('')}</div></div>
-      <div class="ed-field"><span>Taille de la grille</span>
-        <div class="ed-seg" role="group" aria-label="Taille">${[5, 6, 7, 8, 9].map((n) => `<button type="button" class="ed-btn" data-act="size" data-v="${n}" aria-pressed="${S.size === n}">${n}×${n}</button>`).join('')}</div>
-        <small class="ed-small-note">Le nombre de personnages suit la taille : ${S.size} personnes.</small></div>`;
+      <div class="ed-field"><span>Dimensions du plan</span>
+        <div class="ed-dims">
+          ${[['rows', 'Lignes', S.rows, ROWS_MIN, ROWS_MAX], ['cols', 'Colonnes', S.cols, COLS_MIN, COLS_MAX]].map(([k, l, v, lo, hi]) => `<div class="ed-step ed-dim"><span class="ed-step-l">${l}</span>
+            <button type="button" class="ed-btn ed-icon" data-act="dim" data-k="${k}" data-d="-1" aria-label="${l} : une de moins"${v <= lo ? ' disabled' : ''}>−</button>
+            <output class="ed-step-v" aria-label="${l}">${v}</output>
+            <button type="button" class="ed-btn ed-icon" data-act="dim" data-k="${k}" data-d="1" aria-label="${l} : une de plus"${v >= hi ? ' disabled' : ''}>+</button></div>`).join('')}
+        </div>
+        <span class="ed-sub-l">Carré</span>
+        <div class="ed-seg ed-seg-wrap" role="group" aria-label="Plans carrés">${SQUARE_SIZES.map((n) => `<button type="button" class="ed-btn" data-act="size" data-v="${n}" aria-pressed="${S.rows === n && S.cols === n}">${n}×${n}</button>`).join('')}</div>
+        <span class="ed-sub-l">Plan allongé</span>
+        <div class="ed-seg ed-seg-wrap" role="group" aria-label="Plans allongés">${FORMATS.map(([l, r, c]) => `<button type="button" class="ed-btn" data-act="dims" data-r="${r}" data-c="${c}" aria-pressed="${S.rows === r && S.cols === c}">${l} ${dimLabel(r, c)}</button>`).join('')}</div>
+        <small class="ed-small-note">Plan ${dimLabel()} (${S.rows} ligne${S.rows > 1 ? 's' : ''} × ${S.cols} colonne${S.cols > 1 ? 's' : ''}) : ${count()} personnages, un par ${S.rows <= S.cols ? 'ligne' : 'colonne'}${S.rows !== S.cols ? ` ; ${Math.abs(S.rows - S.cols)} ${S.rows > S.cols ? 'ligne' : 'colonne'}${Math.abs(S.rows - S.cols) > 1 ? 's' : ''} reste${Math.abs(S.rows - S.cols) > 1 ? 'nt' : ''} vide${Math.abs(S.rows - S.cols) > 1 ? 's' : ''}` : ''}. Au plus une personne par ligne et par colonne.</small></div>`;
   }
 
   function tabRooms() {
@@ -514,11 +542,11 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
         }).join('')}</div>
         <div class="ed-row"><button type="button" class="ed-btn" data-act="unplace" aria-pressed="${S.unplace}">Gomme</button>
           <button type="button" class="ed-btn" data-act="clearsol"${info.placed.length ? '' : ' disabled'}>Tout retirer</button></div>
-        <p class="ed-lead">${info.placed.length}/${S.size} placés.</p>
+        <p class="ed-lead">${info.placed.length}/${count()} placés.</p>
         ${info.conflicts.length ? `<ul class="ed-msgs ed-msgs-err">${info.conflicts.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}`;
     }
     return `${sub}
-      <p class="ed-lead">${S.size} personnages, dont une victime. L’identifiant est l’initiale du prénom : elles doivent toutes être différentes.</p>
+      <p class="ed-lead">${count()} personnages, dont une victime. L’identifiant est l’initiale du prénom : elles doivent toutes être différentes.</p>
       ${S.people.map((p, i) => `
         <section class="ed-card${p.victim ? ' victim' : ''}">
           <div class="ed-card-head">
@@ -556,7 +584,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
         const val = cl.of ? cl.of[kind] : '';
         const valSel = kind === 'who' ? selOpts(others(p), val) : objOptions(kind === 'on', val);
         return fs('Direction', 'dir', selOpts(DIRS, cl.dir))
-          + fs('Écart exact', 'exact', selOpts([['', 'Quelconque'], ...Array.from({ length: S.size - 1 }, (_, n) => [n + 1, `exactement ${n + 1}`])], cl.exact ?? ''))
+          + fs('Écart exact', 'exact', selOpts([['', 'Quelconque'], ...Array.from({ length: Math.max(S.rows, S.cols) - 1 }, (_, n) => [n + 1, `exactement ${n + 1}`])], cl.exact ?? ''))
           + fs('Cible', 'ofkind', selOpts([['who', 'Une personne'], ['obj', 'Un objet'], ['on', 'Quelqu’un sur un objet']], kind))
           + fs(kind === 'who' ? 'Personne' : 'Objet', 'ofval', valSel);
       }
@@ -638,31 +666,33 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
   const nextRoomKey = () => 'abcdefghijklmnopqrstuvwxyz'.split('').find((k) => !S.rooms.some((r) => r.key === k));
   const refsId = (cl, ids) => ids.has(cl.who) || (cl.of && ids.has(cl.of.who));
 
-  async function setSize(n) {
-    const old = S.size;
-    if (n === old) return;
-    const lostObjs = S.objects.filter((o) => o.r + o.h > n || o.c + o.w > n);
-    const dropped = n < old ? S.people.slice(n) : [];
+  async function setDims(nr, nc) {
+    nr = clampInt(nr, ROWS_MIN, ROWS_MAX, S.rows);
+    nc = clampInt(nc, COLS_MIN, COLS_MAX, S.cols);
+    const oldR = S.rows, oldC = S.cols;
+    if (nr === oldR && nc === oldC) return;
+    const n = Math.min(nr, nc);
+    const lostObjs = S.objects.filter((o) => o.r + o.h > nr || o.c + o.w > nc);
+    const dropped = n < S.people.length ? S.people.slice(n) : [];
     const dropIds = new Set(dropped.map((p) => p.id));
-    const lostSol = Object.entries(S.solution).filter(([id, [r, c]]) => dropIds.has(id) || r >= n || c >= n).length;
+    const lostSol = Object.entries(S.solution).filter(([id, [r, c]]) => dropIds.has(id) || r >= nr || c >= nc).length;
     const parts = [];
     if (lostObjs.length) parts.push(`${lostObjs.length} objet${lostObjs.length > 1 ? 's' : ''}`);
     if (dropped.length) parts.push(`${dropped.length} personnage${dropped.length > 1 ? 's' : ''} (${dropped.map((p) => p.name).join(', ')})`);
     if (lostSol) parts.push(`${lostSol} position${lostSol > 1 ? 's' : ''} de la solution`);
-    if (parts.length && !(await ask(`Passer en ${n}×${n} supprimera : ${parts.join(', ')}. Continuer ?`, { ok: 'Réduire la grille' }))) return;
-    if (n < old) {
-      S.grid = S.grid.slice(0, n).map((r) => r.slice(0, n));
-      S.objects = S.objects.filter((o) => !lostObjs.includes(o));
+    if (parts.length && !(await ask(`Passer en ${dimLabel(nr, nc)} supprimera : ${parts.join(', ')}. Continuer ?`, { ok: 'Réduire la grille' }))) return;
+    // Grille : on garde ce qui tient ; les nouvelles cases prolongent la dernière colonne / ligne.
+    S.grid = S.grid.slice(0, nr).map((row) => (nc <= row.length ? row.slice(0, nc) : [...row, ...Array(nc - row.length).fill(row[row.length - 1])]));
+    while (S.grid.length < nr) S.grid.push([...S.grid[S.grid.length - 1]]);
+    S.objects = S.objects.filter((o) => !lostObjs.includes(o));
+    if (dropped.length) {
       S.people = S.people.slice(0, n);
       if (!S.people.some((p) => p.victim)) S.people[0].victim = true;
       S.people.forEach((p) => { p.clues = p.clues.filter((cl) => !refsId(cl, dropIds)); });
-      Object.keys(S.solution).forEach((id) => { const [r, c] = S.solution[id]; if (dropIds.has(id) || r >= n || c >= n) delete S.solution[id]; });
-    } else {
-      S.grid = S.grid.map((row) => [...row, ...Array(n - old).fill(row[old - 1])]);
-      for (let r = old; r < n; r += 1) S.grid.push([...S.grid[old - 1]]);
-      while (S.people.length < n) S.people.push(newPersonFor(S.people));
     }
-    S.size = n;
+    Object.keys(S.solution).forEach((id) => { const [r, c] = S.solution[id]; if (dropIds.has(id) || r >= nr || c >= nc) delete S.solution[id]; });
+    while (S.people.length < n) S.people.push(newPersonFor(S.people));
+    S.rows = nr; S.cols = nc;
     if (!S.people.some((p) => p.id === S.who)) S.who = S.people[0].id;
     if (!S.people.some((p) => p.id === S.clueWho)) S.clueWho = S.people[0].id;
     changed();
@@ -777,7 +807,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
     const probe = clone(o);
     probe.id = S.id || 'perso-brouillon';
     const st = safe(() => fromRaw(probe), null);
-    const complete = st && Object.keys(st.solution).length === st.size;
+    const complete = st && Object.keys(st.solution).length === Math.min(st.rows, st.cols);
     if (!complete) delete probe.solution;
     const v = safe(() => validateLevel(probe), { errors: ['Validation impossible.'] });
     if (v.errors.length) { S.fileMsgs = v.errors.map((m) => `Import refusé : ${m}`); renderPanel(); return; }
@@ -794,7 +824,9 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
   const ACT = {
     tab: (b) => { S.tab = b.dataset.t; renderPanel(); },
     diff: (b) => { S.difficulty = +b.dataset.v; changed(); },
-    size: (b) => setSize(+b.dataset.v),
+    size: (b) => setDims(+b.dataset.v, +b.dataset.v),
+    dims: (b) => setDims(+b.dataset.r, +b.dataset.c),
+    dim: (b) => setDims(S.rows + (b.dataset.k === 'rows' ? +b.dataset.d : 0), S.cols + (b.dataset.k === 'cols' ? +b.dataset.d : 0)),
     brush: (b) => { S.brush = b.dataset.k; renderPanel(); },
     radd: () => {
       const key = nextRoomKey();

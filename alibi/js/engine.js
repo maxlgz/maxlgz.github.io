@@ -44,18 +44,73 @@ export const OBJECTS = {
   car:       { occ: true, g: 'f', n: 'voiture',   pl: 'voitures',   on: 'dans' },
   tent:      { occ: true, g: 'f', n: 'tente',     pl: 'tentes',     on: 'sous' },
   stage:     { occ: true, g: 'f', n: 'estrade',   pl: 'estrades',   on: 'sur' },
+
+  // Lot A — voyage et véhicules
+  // Occupables
+  seat:      { occ: true, g: 'm', n: 'siège',     pl: 'sièges',     on: 'assis sur' },
+  bunk:      { occ: true, g: 'f', n: 'couchette', pl: 'couchettes', on: 'allongé sur' },
+  stretcher: { occ: true, g: 'm', n: 'brancard',  pl: 'brancards',  on: 'allongé sur' },
+  bike:      { occ: true, g: 'm', n: 'vélo',      pl: 'vélos',      on: 'sur' },
+  tractor:   { occ: true, g: 'm', n: 'tracteur',  pl: 'tracteurs',  on: 'sur' },
+  sled:      { occ: true, g: 'f', n: 'luge',      pl: 'luges',      on: 'sur' },
+  // Bloquants
+  suitcase:  { occ: false, g: 'f', n: 'valise',       pl: 'valises' },
+  trolley:   { occ: false, g: 'm', n: 'chariot',      pl: 'chariots' },
+  helm:      { occ: false, g: 'm', n: 'gouvernail',   pl: 'gouvernails' },
+  buoy:      { occ: false, g: 'f', n: 'bouée',        pl: 'bouées' },
+  anchor:    { occ: false, g: 'f', n: 'ancre',        pl: 'ancres' },
+  console:   { occ: false, g: 'm', n: 'pupitre',      pl: 'pupitres' },
+  locker:    { occ: false, g: 'm', n: 'casier',       pl: 'casiers' },
+  ladder:    { occ: false, g: 'f', n: 'échelle',      pl: 'échelles' },
+  robot:     { occ: false, g: 'm', n: 'robot',        pl: 'robots' },
+  antenna:   { occ: false, g: 'f', n: 'antenne',      pl: 'antennes' },
+  fridge:    { occ: false, g: 'm', n: 'frigo',        pl: 'frigos' },
+  sink:      { occ: false, g: 'm', n: 'lavabo',       pl: 'lavabos' },
+  vending:   { occ: false, g: 'm', n: 'distributeur', pl: 'distributeurs' },
+
+  // Lot B — lieux et aventures
+  // Occupables
+  throne:    { occ: true, g: 'm', n: 'trône',      pl: 'trônes',      on: 'assis sur' },
+  swing:     { occ: true, g: 'f', n: 'balançoire', pl: 'balançoires', on: 'assis sur' },
+  towel:     { occ: true, g: 'f', n: 'serviette',  pl: 'serviettes',  on: 'allongé sur' },
+  parasol:   { occ: true, g: 'm', n: 'parasol',    pl: 'parasols',    on: 'sous' },
+  horse:     { occ: true, g: 'm', n: 'cheval',     pl: 'chevaux',     on: 'sur' },
+  cushion:   { occ: true, g: 'm', n: 'coussin',    pl: 'coussins',    on: 'assis sur' },
+  // Bloquants
+  cactus:     { occ: false, g: 'm', n: 'cactus',            pl: 'cactus' },
+  campfire:   { occ: false, g: 'm', n: 'feu de camp',       pl: 'feux de camp' },
+  palm:       { occ: false, g: 'm', n: 'palmier',           pl: 'palmiers' },
+  chest:      { occ: false, g: 'm', n: 'coffre',            pl: 'coffres' },
+  cannon:     { occ: false, g: 'm', n: 'canon',             pl: 'canons' },
+  pillar:     { occ: false, g: 'm', n: 'pilier',            pl: 'piliers' },
+  cauldron:   { occ: false, g: 'm', n: 'chaudron',          pl: 'chaudrons' },
+  blackboard: { occ: false, g: 'm', n: 'tableau',           pl: 'tableaux' },
+  globe:      { occ: false, g: 'm', n: 'globe',             pl: 'globes' },
+  tv:         { occ: false, g: 'f', n: 'télévision',        pl: 'télévisions' },
+  snowman:    { occ: false, g: 'm', n: 'bonhomme de neige', pl: 'bonshommes de neige' },
+  hay:        { occ: false, g: 'f', n: 'botte de foin',     pl: 'bottes de foin' },
+  billiard:   { occ: false, g: 'm', n: 'billard',           pl: 'billards' },
 };
 
-// Tailles conseillées (w×h, orientation libre) — sert uniquement aux avertissements.
-const OBJECT_SIZES = {
-  sofa: [[2, 1]], bench: [[2, 1]], bed: [[1, 1], [1, 2]], rug: [[1, 1], [1, 2], [2, 2]],
-  boat: [[1, 1], [2, 1]], car: [[2, 1]], stage: [[1, 1], [1, 2], [1, 3], [2, 2], [2, 3]],
+// Tailles autorisées [w, h] par type (orientations listées) ; type absent = 1×1 seul.
+// validateLevel n'en tire que des avertissements, sans tenir compte de l'orientation.
+export const OBJECT_SIZES = {
+  sofa: [[2, 1], [1, 2]], bench: [[2, 1], [1, 2]], bed: [[1, 1], [1, 2]],
+  rug: [[1, 1], [2, 1], [1, 2], [2, 2]],
+  boat: [[1, 1], [2, 1], [1, 2]], car: [[2, 1]],
+  stage: [[1, 1], [2, 1], [1, 2], [2, 2], [3, 1], [1, 3], [3, 2], [2, 3]],
   chair: [[1, 1]], armchair: [[1, 1]], stool: [[1, 1]], deckchair: [[1, 1]], hammock: [[1, 1]],
-  bathtub: [[1, 1], [2, 1]], tent: [[1, 1]],
+  bathtub: [[1, 1], [2, 1], [1, 2]], tent: [[1, 1]],
+  // Lot A
+  bunk: [[1, 1], [2, 1], [1, 2]], stretcher: [[1, 1], [2, 1], [1, 2]], tractor: [[1, 1], [2, 1], [1, 2]],
+  console: [[1, 1], [2, 1], [1, 2]],
+  // Lot B
+  towel: [[1, 1], [1, 2], [2, 1]], blackboard: [[1, 1], [2, 1], [1, 2]], billiard: [[2, 1], [1, 2]],
 };
 
 export const FLOORS = ['grass', 'wood', 'parquet', 'tile', 'stone', 'carpet', 'sand', 'snow',
-  'concrete', 'deck', 'marble', 'gravel'];
+  'concrete', 'deck', 'marble', 'gravel',
+  'metal', 'water', 'tatami', 'checker', 'dirt', 'ice', 'moon', 'brick', 'cobble'];
 
 export const CLUE_TYPES = [
   { t: 'room',         label: 'Dans la pièce',                 fields: ['room'], negatable: true },
@@ -82,10 +137,26 @@ function clone(x) {
 }
 const posInt = (v, d) => (Number.isInteger(v) && v > 0 ? v : d);
 
+// Dimensions d'un niveau (brut ou préparé) : carré `size`, ou rectangle `rows` × `cols`.
+function dimsOf(raw) {
+  if (!raw || typeof raw !== 'object') return { rows: 0, cols: 0, count: 0 };
+  if (raw[PREP]) { const x = raw[PREP]; return { rows: x.H, cols: x.W, count: x.count }; }
+  let rows = 0, cols = 0;
+  if (Number.isInteger(raw.size) && raw.size > 0) rows = cols = raw.size;
+  else if (Number.isInteger(raw.rows) && raw.rows > 0 && Number.isInteger(raw.cols) && raw.cols > 0) { rows = raw.rows; cols = raw.cols; }
+  return { rows, cols, count: Math.min(rows, cols) };
+}
+
+export function dims(level) {
+  return dimsOf(level);
+}
+
 export function prepare(raw) {
   if (raw && raw[PREP]) return raw;
   const lvl = clone(raw || {});
-  const N = Number.isInteger(lvl.size) && lvl.size > 0 ? lvl.size : 0;
+  const { rows: H, cols: W, count } = dimsOf(lvl);
+  lvl.rows = H; lvl.cols = W; lvl.count = count;
+  if (H > 0 && H === W) lvl.size = H; else delete lvl.size;
   lvl.rooms = Array.isArray(lvl.rooms) ? lvl.rooms : [];
   lvl.roomMap = Array.isArray(lvl.roomMap) ? lvl.roomMap.map(s => String(s)) : [];
   lvl.objects = (Array.isArray(lvl.objects) ? lvl.objects : [])
@@ -100,23 +171,23 @@ export function prepare(raw) {
       roomIndex.set(String(rm.key), roomKeys.length); roomKeys.push(String(rm.key));
     }
   }
-  const NN = N * N;
+  const NN = H * W;
   const cellRoom = new Int16Array(NN).fill(-1);
   const cellObj = new Int16Array(NN).fill(-1);
   const cellType = new Array(NN).fill(null);
   const blocked = new Uint8Array(NN);
   const cells = [];
-  for (let r = 0; r < N; r++) {
+  for (let r = 0; r < H; r++) {
     const row = [];
     const line = lvl.roomMap[r] || '';
-    for (let c = 0; c < N; c++) {
+    for (let c = 0; c < W; c++) {
       const ch = c < line.length ? line[c] : null;
       let ri = -1;
       if (ch != null && ch !== ' ' && ch !== '.') {
         if (!roomIndex.has(ch)) { roomIndex.set(ch, roomKeys.length); roomKeys.push(ch); }
         ri = roomIndex.get(ch);
       }
-      cellRoom[r * N + c] = ri;
+      cellRoom[r * W + c] = ri;
       row.push({ room: ri >= 0 ? roomKeys[ri] : null, objIndex: null, objType: null, blocked: false });
     }
     cells.push(row);
@@ -134,21 +205,21 @@ export function prepare(raw) {
     if (!Number.isInteger(o.r) || !Number.isInteger(o.c)) return;
     for (let r = o.r; r < o.r + o.h; r++) {
       for (let c = o.c; c < o.c + o.w; c++) {
-        if (r < 0 || c < 0 || r >= N || c >= N) continue;
+        if (r < 0 || c < 0 || r >= H || c >= W) continue;
         const cell = cells[r][c];
         if (cell.objIndex != null) continue; // chevauchement : le premier objet l'emporte
         cell.objIndex = k; cell.objType = type; cell.blocked = !occ;
-        const i = r * N + c;
+        const i = r * W + c;
         cellObj[i] = k; cellType[i] = type; blocked[i] = occ ? 0 : 1;
       }
     }
   });
   const adj = [];
   for (let i = 0; i < NN; i++) {
-    const r = (i / N) | 0, c = i % N, a = [];
+    const r = (i / W) | 0, c = i % W, a = [];
     const push = (rr, cc) => {
-      if (rr < 0 || cc < 0 || rr >= N || cc >= N) return;
-      const j = rr * N + cc;
+      if (rr < 0 || cc < 0 || rr >= H || cc >= W) return;
+      const j = rr * W + cc;
       if (cellRoom[j] === cellRoom[i] && cellRoom[i] >= 0) a.push(j);
     };
     push(r - 1, c); push(r + 1, c); push(r, c - 1); push(r, c + 1);
@@ -159,7 +230,7 @@ export function prepare(raw) {
   let victim = lvl.people.findIndex(p => p && p.victim);
   lvl.cells = cells;
   const ctx = {
-    N, NN, n: lvl.people.length, cellRoom, cellObj, cellType, blocked, adj, boxes, typeCount, typeBoxes,
+    H, W, count, NN, n: lvl.people.length, cellRoom, cellObj, cellType, blocked, adj, boxes, typeCount, typeBoxes,
     roomIndex, roomKeys, R: roomKeys.length, pidx, people: lvl.people, victim, lvl,
   };
   Object.defineProperty(lvl, PREP, { value: ctx, enumerable: false });
@@ -170,8 +241,8 @@ const ctxOf = level => prepare(level)[PREP];
 
 export function canPlace(level, r, c) {
   const ctx = ctxOf(level);
-  if (!Number.isInteger(r) || !Number.isInteger(c) || r < 0 || c < 0 || r >= ctx.N || c >= ctx.N) return false;
-  return !ctx.blocked[r * ctx.N + c];
+  if (!Number.isInteger(r) || !Number.isInteger(c) || r < 0 || c < 0 || r >= ctx.H || c >= ctx.W) return false;
+  return !ctx.blocked[r * ctx.W + c];
 }
 
 /* ------------------------------------------------------------------ */
@@ -192,7 +263,7 @@ function dirBox(dir, k, r, c, b) {
 // (avant négation) ; `not` est appliqué par l'appelant (base !== not).
 function compileClue(ctx, p, clue) {
   const not = !!(clue && clue.not);
-  const { N, cellRoom, cellType, cellObj, adj } = ctx;
+  const { H, W, cellRoom, cellType, cellObj, adj } = ctx;
   const K = (v) => ({ kind: 'const', v, not });
   if (!clue || !CLUE_T.has(clue.t)) return K(false);
   switch (clue.t) {
@@ -213,11 +284,11 @@ function compileClue(ctx, p, clue) {
       };
     }
     case 'sameRow': case 'sameCol': {
-      const t = clue.obj, has = new Uint8Array(N);
-      for (let i = 0; i < ctx.NN; i++) if (cellType[i] === t) has[clue.t === 'sameRow' ? (i / N) | 0 : i % N] = 1;
+      const t = clue.obj, has = new Uint8Array(clue.t === 'sameRow' ? H : W);
+      for (let i = 0; i < ctx.NN; i++) if (cellType[i] === t) has[clue.t === 'sameRow' ? (i / W) | 0 : i % W] = 1;
       return clue.t === 'sameRow'
-        ? { kind: 'unary', not, f: i => has[(i / N) | 0] === 1 }
-        : { kind: 'unary', not, f: i => has[i % N] === 1 };
+        ? { kind: 'unary', not, f: i => has[(i / W) | 0] === 1 }
+        : { kind: 'unary', not, f: i => has[i % W] === 1 };
     }
     case 'with': case 'besidePerson': {
       const q = ctx.pidx.get(String(clue.who));
@@ -234,7 +305,7 @@ function compileClue(ctx, p, clue) {
       if (!DIRS.includes(dir) || !clue.of) return K(false);
       const k = typeof clue.exact === 'number' ? clue.exact : null;
       const of = clue.of;
-      const cellTest = (i, j) => dirBox(dir, k, (i / N) | 0, i % N, { r0: (j / N) | 0, r1: (j / N) | 0, c0: j % N, c1: j % N });
+      const cellTest = (i, j) => dirBox(dir, k, (i / W) | 0, i % W, { r0: (j / W) | 0, r1: (j / W) | 0, c0: j % W, c1: j % W });
       if (of.who != null) {
         const q = ctx.pidx.get(String(of.who));
         if (q == null) return K(false);
@@ -243,7 +314,7 @@ function compileClue(ctx, p, clue) {
       }
       if (of.obj != null) {
         const bs = ctx.typeBoxes[of.obj] || [];
-        return { kind: 'unary', not, f: i => { const r = (i / N) | 0, c = i % N; for (const b of bs) if (dirBox(dir, k, r, c, b)) return true; return false; } };
+        return { kind: 'unary', not, f: i => { const r = (i / W) | 0, c = i % W; for (const b of bs) if (dirBox(dir, k, r, c, b)) return true; return false; } };
       }
       if (of.on != null) return { kind: 'dirOn', not, type: of.on, test: cellTest };
       return K(false);
@@ -258,7 +329,7 @@ function readPlacements(ctx, placements) {
   ctx.people.forEach((p, i) => {
     const v = placements[p.id];
     if (Array.isArray(v) && Number.isInteger(v[0]) && Number.isInteger(v[1])
-      && v[0] >= 0 && v[1] >= 0 && v[0] < ctx.N && v[1] < ctx.N) pos[i] = v[0] * ctx.N + v[1];
+      && v[0] >= 0 && v[1] >= 0 && v[0] < ctx.H && v[1] < ctx.W) pos[i] = v[0] * ctx.W + v[1];
   });
   return pos;
 }
@@ -330,17 +401,22 @@ function murdererIdx(ctx, pos) {
 export function evaluate(level, placements) {
   const L = prepare(level), ctx = L[PREP];
   const pos = readPlacements(ctx, placements);
-  const { N, n } = ctx;
-  const complete = n > 0 && Array.from(pos).every(x => x >= 0);
-  const rowCnt = new Array(N).fill(0), colCnt = new Array(N).fill(0);
+  const { H, W, n } = ctx;
+  // Complet quand tout le monde est posé (soit `count` personnes sur un niveau valide).
+  let placed = 0;
+  for (let p = 0; p < n; p++) if (pos[p] >= 0) placed++;
+  const complete = n > 0 && placed === n;
+  const rowCnt = new Array(H).fill(0), colCnt = new Array(W).fill(0);
   const blockedIds = [];
   for (let p = 0; p < n; p++) {
     if (pos[p] < 0) continue;
-    rowCnt[(pos[p] / N) | 0]++; colCnt[pos[p] % N]++;
+    rowCnt[(pos[p] / W) | 0]++; colCnt[pos[p] % W]++;
     if (ctx.blocked[pos[p]]) blockedIds.push(ctx.people[p].id);
   }
+  // Chaque ligne et chaque colonne : au plus une personne.
   const rows = [], cols = [];
-  for (let i = 0; i < N; i++) { if (rowCnt[i] > 1) rows.push(i); if (colCnt[i] > 1) cols.push(i); }
+  for (let i = 0; i < H; i++) if (rowCnt[i] > 1) rows.push(i);
+  for (let i = 0; i < W; i++) if (colCnt[i] > 1) cols.push(i);
   const lines = { ok: rows.length === 0 && cols.length === 0, rows, cols };
   let victimOk = null;
   const v = ctx.victim;
@@ -396,9 +472,9 @@ function compileSet(ctx, cluesByIdx) {
 }
 
 function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
-  const { N, NN, n, cellRoom, cellType, blocked } = ctx;
+  const { H, W, NN, n, cellRoom, cellType, blocked } = ctx;
   const out = [];
-  if (n === 0 || n > N || comp.impossible || max <= 0) return out;
+  if (n === 0 || n > Math.min(H, W) || comp.impossible || max <= 0) return out;
   const R = ctx.R + 1;
   const roomOf = new Int16Array(NN);
   for (let i = 0; i < NN; i++) roomOf[i] = cellRoom[i] + 1;
@@ -423,10 +499,10 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
       for (const b of bin[p]) {
         const od = domains[b.o];
         const kept = domains[p].filter(i => {
-          const r = (i / N) | 0, c = i % N;
+          const r = (i / W) | 0, c = i % W;
           for (let y = 0; y < od.length; y++) {
             const j = od[y];
-            if ((j / N | 0) !== r && j % N !== c && b.t(i, j)) return true;
+            if ((j / W | 0) !== r && j % W !== c && b.t(i, j)) return true;
           }
           return false;
         });
@@ -442,8 +518,15 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
   const roomCount = new Int8Array(R);
   const aloner = new Int8Array(R);
   let rowUsed = 0, colUsed = 0;
-  const full = (1 << N) - 1;
-  const exactLines = n === N;
+  const fullRows = (1 << H) - 1, fullCols = (1 << W) - 1;
+  // Au plus une personne par ligne et par colonne. Une dimension qui compte exactement `n` lignes
+  // est entièrement couverte (sur un carré complet : les deux) : on élague alors par couplages.
+  const rowsExact = n === H, colsExact = n === W;
+  const exactLines = rowsExact || colsExact;
+  // Dimension « primaire » du couplage lignes ↔ colonnes : les lignes si elles sont toutes couvertes.
+  const primRows = rowsExact;
+  const NP = primRows ? H : W;
+  const NL = Math.max(H, W);
   const bufA = [], bufB = [];
   for (let d = 0; d <= n; d++) { bufA.push(new Int16Array(NN)); bufB.push(new Int16Array(NN)); }
   // Personnes qui exigent une autre personne dans leur pièce (victime, « pas seul »).
@@ -472,9 +555,9 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
   }
   const roomMark = new Int32Array(R);
   const rcAdj = [], rcFree = [];
-  for (let d = 0; d <= n; d++) { rcAdj.push(new Int32Array(N)); rcFree.push(new Int32Array(N)); }
-  const pRows = new Int32Array(Math.max(n, N)), pCols = new Int32Array(Math.max(n, N));
-  const matchOf = new Int8Array(N);
+  for (let d = 0; d <= n; d++) { rcAdj.push(new Int32Array(NP)); rcFree.push(new Int32Array(NP)); }
+  const pRows = new Int32Array(Math.max(n, NL)), pCols = new Int32Array(Math.max(n, NL));
+  const matchOf = new Int8Array(NL);
   // Couplage parfait (Kuhn) : chaque élément gauche g reçoit un bit distinct de adjM[g].
   function matching(adjM, m, stopOnFail) {
     matchOf.fill(-1);
@@ -502,7 +585,7 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
 
   function feasible(p, i) {
     if (forbid[p * NN + i]) return false;
-    const r = (i / N) | 0, c = i % N;
+    const r = (i / W) | 0, c = i % W;
     if ((rowUsed >> r) & 1 || (colUsed >> c) & 1) return false;
     const room = roomOf[i];
     if (aloner[room] > 0) return false;
@@ -526,7 +609,7 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
           const j = tg[y];
           const occ = occupant[j];
           if (occ >= 0) { found = occ !== p; continue; }
-          const rj = (j / N) | 0, cj = j % N;
+          const rj = (j / W) | 0, cj = j % W;
           if ((rowUsed >> rj) & 1 || (colUsed >> cj) & 1 || rj === r || cj === c) continue;
           for (const q of f.sitters) if (pos[q] < 0 && inDom[q][j]) { found = true; break; }
         }
@@ -554,12 +637,12 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
     return true;
   }
   function place(p, i) {
-    pos[p] = i; occupant[i] = p; rowUsed |= 1 << ((i / N) | 0); colUsed |= 1 << (i % N);
+    pos[p] = i; occupant[i] = p; rowUsed |= 1 << ((i / W) | 0); colUsed |= 1 << (i % W);
     const room = roomOf[i]; roomCount[room]++; if (alonePos[p]) aloner[room]++;
   }
   function unplace(p) {
     const i = pos[p]; pos[p] = -1; occupant[i] = -1;
-    rowUsed &= ~(1 << ((i / N) | 0)); colUsed &= ~(1 << (i % N));
+    rowUsed &= ~(1 << ((i / W) | 0)); colUsed &= ~(1 << (i % W));
     const room = roomOf[i]; roomCount[room]--; if (alonePos[p]) aloner[room]--;
   }
   let nodes = 0;
@@ -609,9 +692,10 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
         const i = d[x];
         if (feasible(p, i)) {
           scratch[cnt++] = i;
-          const r = (i / N) | 0, c = i % N;
-          pr |= 1 << r; pc |= 1 << c; rc[r] |= 1 << c;
-          if (roomOf[i] !== vRoomNow) rcF[r] |= 1 << c;
+          const r = (i / W) | 0, c = i % W;
+          pr |= 1 << r; pc |= 1 << c;
+          if (primRows) { rc[r] |= 1 << c; if (roomOf[i] !== vRoomNow) rcF[r] |= 1 << c; }
+          else { rc[c] |= 1 << r; if (roomOf[i] !== vRoomNow) rcF[c] |= 1 << r; }
           if (missing) { const rm = roomOf[i]; if (roomMark[rm] === stamp) { roomMark[rm] = -stamp; missing--; } }
         }
       }
@@ -622,17 +706,21 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
     }
     if (missing > 0) return;
     if (exactLines) {
-      if ((rowsCov | rowUsed) !== full || (colsCov | colUsed) !== full) return;
-      // couplages : personnes ↔ lignes, personnes ↔ colonnes, lignes ↔ colonnes (cases encore utilisables)
+      // la (ou les) dimension(s) de taille n doi(ven)t être entièrement couverte(s)
+      if (rowsExact && (rowsCov | rowUsed) !== fullRows) return;
+      if (colsExact && (colsCov | colUsed) !== fullCols) return;
+      // couplages : personnes ↔ lignes, personnes ↔ colonnes, et lignes libres de la dimension
+      // couverte ↔ lignes de l'autre dimension (cases encore utilisables)
       if (k > 1 && (!matchAll(pRows, k) || !matchAll(pCols, k))) return;
       if (k > 1) {
+        const used = primRows ? rowUsed : colUsed;
         let m = 0;
-        for (let r = 0; r < N; r++) if (!((rowUsed >> r) & 1)) pRows[m++] = rc[r];
+        for (let r = 0; r < NP; r++) if (!((used >> r) & 1)) pRows[m++] = rc[r];
         if (!matchAll(pRows, m)) return;
         // la pièce de la victime n'accueille plus que (2 - occupants) personnes
         if (vRoomNow >= 0) {
           m = 0;
-          for (let r = 0; r < N; r++) if (!((rowUsed >> r) & 1)) pRows[m++] = rcF[r];
+          for (let r = 0; r < NP; r++) if (!((used >> r) & 1)) pRows[m++] = rcF[r];
           if (maxMatch(pRows, m) < m - (2 - roomCount[vRoomNow])) return;
         }
       }
@@ -666,7 +754,7 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity) {
 
 function posToPlacements(ctx, pos) {
   const o = {};
-  ctx.people.forEach((p, i) => { o[p.id] = [(pos[i] / ctx.N) | 0, pos[i] % ctx.N]; });
+  ctx.people.forEach((p, i) => { o[p.id] = [(pos[i] / ctx.W) | 0, pos[i] % ctx.W]; });
   return o;
 }
 
@@ -862,9 +950,9 @@ const WEIGHTS = {
 };
 
 function enumerateCandidates(ctx, pos, p) {
-  const { N, NN, n, cellRoom, cellType, blocked } = ctx;
+  const { W, NN, n, cellRoom, cellType, blocked } = ctx;
   const victim = ctx.victim;
-  const ip = pos[p], r = (ip / N) | 0, c = ip % N;
+  const ip = pos[p], r = (ip / W) | 0, c = ip % W;
   const unblocked = [];
   for (let i = 0; i < NN; i++) if (!blocked[i]) unblocked.push(i);
   const out = [];
@@ -923,7 +1011,7 @@ function enumerateCandidates(ctx, pos, p) {
   for (let q = 0; q < n; q++) {
     if (q === p) continue;
     const who = ctx.people[q].id;
-    const rq = (pos[q] / N) | 0, cq = pos[q] % N;
+    const rq = (pos[q] / W) | 0, cq = pos[q] % W;
     const pair = p < q ? `${p}|${q}` : `${q}|${p}`;
     const axisSym = d => (d === 'N' || d === 'S' ? 'NS' : 'EW');
     for (const d of DIRS) {
@@ -955,7 +1043,7 @@ function enumerateCandidates(ctx, pos, p) {
       add({ t: 'dir', dir: d, of: { on: t }, not: true }, 'dirOn');
     }
     for (const q of sitters) {
-      const rq = (pos[q] / N) | 0, cq = pos[q] % N;
+      const rq = (pos[q] / W) | 0, cq = pos[q] % W;
       const dr = rq - r, dc = c - cq;
       if (dr !== 0 && Math.abs(dr) <= 3) add({ t: 'dir', dir: dr > 0 ? 'N' : 'S', of: { on: t }, exact: Math.abs(dr) }, 'dirOn');
       if (dc !== 0 && Math.abs(dc) <= 3) add({ t: 'dir', dir: dc > 0 ? 'E' : 'W', of: { on: t }, exact: Math.abs(dc) }, 'dirOn');
@@ -968,19 +1056,25 @@ function enumerateCandidates(ctx, pos, p) {
   return out;
 }
 
+let RECT_ATTEMPTS = 40, RECT_CAP3_FROM = 99, RECT_DYNAMIC = true;
+export function __tune(o) { ({ RECT_ATTEMPTS = RECT_ATTEMPTS, RECT_CAP3_FROM = RECT_CAP3_FROM, RECT_DYNAMIC = RECT_DYNAMIC } = o); }
 export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}) {
   const raw = clone(level && level[PREP] ? stripPrep(level) : (level || {}));
   (raw.people || []).forEach(p => { p.clues = []; });
   const L = prepare(raw), ctx = L[PREP];
-  const { n, N } = ctx;
-  if (n === 0 || n !== N || ctx.victim < 0) return null;
+  const { n, count } = ctx;
+  if (n === 0 || n !== count || ctx.victim < 0) return null;
   const pos = readPlacements(ctx, solution);
   if (Array.from(pos).some(x => x < 0)) return null;
   const rows = new Set(), cols = new Set();
   for (let p = 0; p < n; p++) {
     if (ctx.blocked[pos[p]]) return null;
-    rows.add((pos[p] / N) | 0); cols.add(pos[p] % N);
+    rows.add((pos[p] / ctx.W) | 0); cols.add(pos[p] % ctx.W);
   }
+  // Un plan rectangulaire laisse plus de liberté : un suspect peut y recevoir un 3e indice si nécessaire.
+  const rect = ctx.H !== ctx.W;
+  const maxCap = rect ? 3 : 2;
+  const attempts = rect ? RECT_ATTEMPTS : 30;
   if (rows.size !== n || cols.size !== n) return null;
   const vRoom = ctx.cellRoom[pos[ctx.victim]];
   let cntV = 0;
@@ -1008,16 +1102,18 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
     return solveCore(ctx, comp, 2);
   };
 
-  for (let attempt = 0; attempt < 30; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     const rng = mulberry32(hashSeed(`${seed}#${attempt}`));
     strict = attempt < 8;
     robust = attempt >= 18;
+    // au plus 2 indices par suspect ; 3 sur un plan rectangulaire, seulement quand on est bloqué à 2
+    let cap = rect && attempt >= RECT_CAP3_FROM ? maxCap : 2;
     const chosen = Array.from({ length: n }, () => []);
     const usedSym = new Set();
     const usedCat = {};
     const acceptable = (p, cand) => {
       const list = chosen[p];
-      if (list.length >= 2) return false;
+      if (list.length >= cap) return false;
       for (const c of list) {
         if (c === cand) return false;
         if (c.clue.t === cand.clue.t) return false;
@@ -1062,7 +1158,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
     // 1) ajouter, tant qu'il reste plusieurs solutions, des indices qui en éliminent un maximum
     //    (échantillon aléatoire de solutions alternatives), pondérés selon la difficulté.
     let ok = false;
-    for (let iter = 0; iter < 2 * n + 4; iter++) {
+    for (let iter = 0, iterMax = (rect ? 3 : 2) * n + 4; iter < iterMax; iter++) {
       const comp = compileSet(ctx, chosen.map(list => list.map(c => c.clue)));
       const exact = solveCore(ctx, comp, 2);
       if (exact.length === 1) { ok = true; break; }
@@ -1072,7 +1168,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
       if (!alts.length) alts = exact.filter(x => !samePos(x));
       const opts = [];
       for (const p of suspects) {
-        if (chosen[p].length >= 2) continue;
+        if (chosen[p].length >= cap) continue;
         let moved = false;
         for (const a of alts) if (a[p] !== pos[p]) { moved = true; break; }
         for (const c of cands[p]) {
@@ -1086,7 +1182,10 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
         }
       }
       const o = pick(opts);
-      if (!o) break;
+      if (!o) {
+        if (cap < maxCap && rect && RECT_DYNAMIC) { cap = maxCap; continue; }
+        break;
+      }
       take(o.p, o.c);
     }
     if (ok) {
@@ -1133,8 +1232,23 @@ export function validateLevel(raw) {
   if (typeof raw.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(raw.id)) E('Identifiant (id) manquant ou invalide : utilisez un slug en minuscules (lettres, chiffres, tirets).');
   if (typeof raw.title !== 'string' || !raw.title.trim()) E('Titre manquant.');
   if (![1, 2, 3].includes(raw.difficulty)) Wn('Difficulté absente ou hors de 1 à 3.');
-  const N = raw.size;
-  if (!Number.isInteger(N) || N < 5 || N > 9) { E('La taille (size) doit être un entier entre 5 et 9.'); return { errors, warnings }; }
+  // Dimensions : carré `size` (5 à 9) ou rectangle `rows` × `cols` (4 à 12 lignes, 4 à 9 colonnes).
+  let H, W;
+  const hasRC = raw.rows != null || raw.cols != null;
+  if (raw.size != null || !hasRC) {
+    const N = raw.size;
+    if (!Number.isInteger(N) || N < 5 || N > 9) { E('La taille (size) doit être un entier entre 5 et 9.'); return { errors, warnings }; }
+    if (hasRC && (raw.rows !== N || raw.cols !== N)) { E('Indiquez soit la taille (size) d\'un plan carré, soit ses lignes (rows) et colonnes (cols), mais pas des valeurs contradictoires.'); return { errors, warnings }; }
+    H = W = N;
+  } else {
+    let bad = false;
+    if (!Number.isInteger(raw.rows) || raw.rows < 4 || raw.rows > 12) { E('Le nombre de lignes (rows) doit être un entier entre 4 et 12.'); bad = true; }
+    if (!Number.isInteger(raw.cols) || raw.cols < 4 || raw.cols > 9) { E('Le nombre de colonnes (cols) doit être un entier entre 4 et 9.'); bad = true; }
+    if (bad) return { errors, warnings };
+    H = raw.rows; W = raw.cols;
+  }
+  const count = Math.min(H, W);
+  const rect = H !== W;
 
   // Pièces
   const rooms = Array.isArray(raw.rooms) ? raw.rooms : [];
@@ -1148,25 +1262,25 @@ export function validateLevel(raw) {
     if (rm.floor != null && !FLOORS.includes(rm.floor)) Wn(`Pièce « ${rm.key} » : sol inconnu « ${rm.floor} ».`);
   });
   const map = raw.roomMap;
-  let mapOk = Array.isArray(map) && map.length === N;
-  if (!mapOk) E(`La carte des pièces (roomMap) doit contenir ${N} lignes.`);
+  let mapOk = Array.isArray(map) && map.length === H;
+  if (!mapOk) E(`La carte des pièces (roomMap) doit contenir ${H} lignes.`);
   else {
     map.forEach((line, r) => {
-      if (typeof line !== 'string' || line.length !== N) { E(`roomMap, ligne ${r + 1} : ${N} caractères attendus.`); mapOk = false; return; }
+      if (typeof line !== 'string' || line.length !== W) { E(`roomMap, ligne ${r + 1} : ${W} caractères attendus.`); mapOk = false; return; }
       for (const ch of line) if (!keys.has(ch)) { E(`roomMap, ligne ${r + 1} : pièce inconnue « ${ch} ».`); mapOk = false; break; }
     });
   }
   if (mapOk) {
     for (const k of keys) {
       const cells = [];
-      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (map[r][c] === k) cells.push([r, c]);
+      for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (map[r][c] === k) cells.push([r, c]);
       if (!cells.length) { Wn(`La pièce « ${k} » n'apparaît pas sur la carte.`); continue; }
       const seen = new Set([cells[0].join()]), stack = [cells[0]];
       while (stack.length) {
         const [r, c] = stack.pop();
         for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const rr = r + dr, cc = c + dc;
-          if (rr < 0 || cc < 0 || rr >= N || cc >= N || map[rr][cc] !== k || seen.has(`${rr},${cc}`)) continue;
+          if (rr < 0 || cc < 0 || rr >= H || cc >= W || map[rr][cc] !== k || seen.has(`${rr},${cc}`)) continue;
           seen.add(`${rr},${cc}`); stack.push([rr, cc]);
         }
       }
@@ -1176,7 +1290,7 @@ export function validateLevel(raw) {
 
   // Objets
   const objects = Array.isArray(raw.objects) ? raw.objects : [];
-  const occ = Array.from({ length: N }, () => new Array(N).fill(-1));
+  const occ = Array.from({ length: H }, () => new Array(W).fill(-1));
   const typesPresent = new Set();
   objects.forEach((o, k) => {
     const label = `Objet n° ${k + 1}${o && o.type ? ` (${o.type})` : ''}`;
@@ -1185,7 +1299,7 @@ export function validateLevel(raw) {
     const w = o.w == null ? 1 : o.w, h = o.h == null ? 1 : o.h;
     if (!Number.isInteger(o.r) || !Number.isInteger(o.c)) { E(`${label} : position (r, c) invalide.`); return; }
     if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1) { E(`${label} : dimensions invalides.`); return; }
-    if (o.r < 0 || o.c < 0 || o.r + h > N || o.c + w > N) { E(`${label} : sort de la grille.`); return; }
+    if (o.r < 0 || o.c < 0 || o.r + h > H || o.c + w > W) { E(`${label} : sort de la grille.`); return; }
     const sizes = OBJECT_SIZES[o.type];
     if (sizes && !sizes.some(([a, b]) => (a === w && b === h) || (a === h && b === w))) Wn(`${label} : taille ${w}×${h} inhabituelle pour cet objet.`);
     const roomsHit = new Set();
@@ -1199,7 +1313,7 @@ export function validateLevel(raw) {
 
   // Personnes
   const people = Array.isArray(raw.people) ? raw.people : [];
-  if (people.length !== N) E(`Il faut exactement ${N} personnes (actuellement ${people.length}).`);
+  if (people.length !== count) E(`Il faut exactement ${count} personnes (actuellement ${people.length})${rect ? ` : autant que la plus petite dimension du plan (${H}×${W})` : ''}.`);
   const ids = new Set();
   let victims = 0;
   people.forEach((p, i) => {
@@ -1220,7 +1334,8 @@ export function validateLevel(raw) {
     const clues = p.clues == null ? [] : p.clues;
     if (!Array.isArray(clues)) { E(`${label} : clues doit être un tableau.`); return; }
     if (p.victim) { if (clues.length) Wn(`${label} (victime) : les indices de la victime sont inhabituels.`); }
-    else if (clues.length < 1 || clues.length > 2) Wn(`${label} : un suspect devrait avoir 1 ou 2 indices (actuellement ${clues.length}).`);
+    else if (!rect && (clues.length < 1 || clues.length > 2)) Wn(`${label} : un suspect devrait avoir 1 ou 2 indices (actuellement ${clues.length}).`);
+    else if (rect && (clues.length < 1 || clues.length > 3)) Wn(`${label} : un suspect devrait avoir de 1 à 3 indices (actuellement ${clues.length}).`);
     clues.forEach((cl, j) => {
       const L = `${label}, indice ${j + 1}`;
       if (!cl || !CLUE_T.has(cl.t)) { E(`${L} : type d'indice inconnu.`); return; }
@@ -1244,7 +1359,8 @@ export function validateLevel(raw) {
         case 'alone': break;
         case 'dir': {
           if (!DIRS.includes(cl.dir)) E(`${L} : direction invalide (N, S, E ou W).`);
-          if (cl.exact != null && (!Number.isInteger(cl.exact) || cl.exact < 1 || cl.exact >= N)) E(`${L} : écart exact invalide.`);
+          const span = cl.dir === 'E' || cl.dir === 'W' ? W : H;
+          if (cl.exact != null && (!Number.isInteger(cl.exact) || cl.exact < 1 || cl.exact >= span)) E(`${L} : écart exact invalide.`);
           const of = cl.of;
           const n = of ? ['who', 'obj', 'on'].filter(k => of[k] != null).length : 0;
           if (n !== 1) { E(`${L} : la cible (of) doit avoir exactement un champ parmi who, obj, on.`); break; }
@@ -1262,7 +1378,7 @@ export function validateLevel(raw) {
     if (typeof raw.solution !== 'object') E('solution doit être un objet { id: [r, c] }.');
     else for (const [id, v] of Object.entries(raw.solution)) {
       if (!ids.has(id)) E(`solution : personne inconnue « ${id} ».`);
-      if (!Array.isArray(v) || !Number.isInteger(v[0]) || !Number.isInteger(v[1]) || v[0] < 0 || v[1] < 0 || v[0] >= N || v[1] >= N) E(`solution : position invalide pour « ${id} ».`);
+      if (!Array.isArray(v) || !Number.isInteger(v[0]) || !Number.isInteger(v[1]) || v[0] < 0 || v[1] < 0 || v[0] >= H || v[1] >= W) E(`solution : position invalide pour « ${id} ».`);
       else if (occ[v[0]][v[1]] >= 0 && objects[occ[v[0]][v[1]]] && OBJECTS[objects[occ[v[0]][v[1]]].type] && !OBJECTS[objects[occ[v[0]][v[1]]].type].occ) E(`solution : « ${id} » est sur une case bloquée.`);
     }
   }

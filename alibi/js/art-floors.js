@@ -271,6 +271,182 @@ const FLOORS = {
       return s;
     },
   },
+
+  // ---------------------------------------------------------------- extension « plus d'univers »
+
+  // Tôle : plaque gris acier bleuté, larmes en chevrons, rangées de rivets le long des joints.
+  metal: {
+    c: '#C9D3DF', base: '#CCD5E1',
+    svg() {
+      const J = '#8D9AB0';
+      let s = `<path d='M0 0 H100 M0 100 H100 M0 0 V100 M100 0 V100' stroke='${J}' stroke-width='3.4'/>`;
+      s += `<path d='M4 3.6 H96' stroke='#E4EAF2' stroke-width='2.2' stroke-linecap='round'/>`;
+      // tôle larmée : petits traits obliques alternés
+      let d = '';
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+        const x = 21 + i * 19.3, y = 21 + j * 19.3, up = (i + j) % 2 === 0;
+        d += up ? `M${r1(x - 3.4)} ${r1(y + 3.4)} L${r1(x + 3.4)} ${r1(y - 3.4)} ` : `M${r1(x - 3.4)} ${r1(y - 3.4)} L${r1(x + 3.4)} ${r1(y + 3.4)} `;
+      }
+      s += `<path d='${d.trim()}' stroke='#A7B3C5' stroke-width='3' stroke-linecap='round'/>`;
+      // rivets
+      const rivet = (x, y) => `<circle cx='${x}' cy='${y}' r='2.8' fill='#DDE4EE' stroke='${J}' stroke-width='1.6'/><circle cx='${r1(x - 0.8)}' cy='${r1(y - 0.8)}' r='0.9' fill='#FFFFFF'/>`;
+      for (const t of [10, 30, 50, 70, 90]) s += rivet(t, 8) + rivet(t, 92);
+      for (const t of [30, 50, 70]) s += rivet(8, t) + rivet(92, t);
+      return s;
+    },
+  },
+
+  // Eau : bleu lagon, vaguelettes en arcs décalés et crêtes d'écume.
+  water: {
+    c: '#AEE6EF', base: '#B3E8F1',
+    svg() {
+      let s = `<path d='M0 0 H100 V22 Q75 30 50 22 T0 22 Z M0 50 Q25 58 50 50 T100 50 V72 Q75 80 50 72 T0 72 Z' fill='#A5E1EC'/>`;
+      const ripple = (x, y) => `<path d='M${r1(x - 13)} ${y} Q${r1(x - 6.5)} ${r1(y - 6)} ${x} ${y} Q${r1(x + 6.5)} ${r1(y - 6)} ${r1(x + 13)} ${y}' stroke='#5DBFD0' stroke-width='2.8' fill='none' stroke-linecap='round'/>` +
+        `<path d='M${r1(x - 9.5)} ${r1(y - 5.4)} Q${r1(x - 6.5)} ${r1(y - 7.2)} ${r1(x - 3.5)} ${r1(y - 5.4)}' stroke='#EFFCFE' stroke-width='2.4' fill='none' stroke-linecap='round'/>`;
+      for (const [x, y] of [[22, 16], [72, 16], [47, 41], [97, 41], [22, 66], [72, 66], [47, 91], [97, 91]]) {
+        s += wrap(x, y, 14, ripple);
+      }
+      for (const [x, y] of [[8, 30], [60, 56], [36, 80], [86, 4]]) {
+        s += wrap(x, y, 2, (X, Y) => `<circle cx='${X}' cy='${Y}' r='1.6' fill='#E6FAFD'/>`);
+      }
+      return s;
+    },
+  },
+
+  // Tatami : nattes vert paille en « moulinet » (période 3 × 3 demi-nattes), bordures vert foncé.
+  tatami: {
+    c: '#DCE7AE', base: '#DDE8B0',
+    svg() {
+      const u = 100 / 3;
+      // [x, y, w, h] en unités ; horizontal si w > h
+      const mats = [[0, 0, 2, 1], [2, 0, 1, 2], [1, 2, 2, 1], [0, 1, 1, 2], [1, 1, 1, 1]];
+      let s = '';
+      mats.forEach(([x, y, w, h], k) => {
+        const X = r1(x * u), Y = r1(y * u), W = r1(w * u), H = r1(h * u);
+        const horiz = w > h;
+        s += `<rect x='${X}' y='${Y}' width='${W}' height='${H}' fill='${k % 2 ? '#D6E3A6' : '#DDE8B0'}'/>`;
+        // tissage : traits fins perpendiculaires à la longueur
+        let d = '';
+        if (horiz) for (let t = X + 6; t < X + W - 3; t += 6.6) d += `M${r1(t)} ${r1(Y + 6)} V${r1(Y + H - 6)} `;
+        else for (let t = Y + 6; t < Y + H - 3; t += 6.6) d += `M${r1(X + 6)} ${r1(t)} H${r1(X + W - 6)} `;
+        s += `<path d='${d.trim()}' stroke='#CAD99A' stroke-width='1.3'/>`;
+        // liserés (heri) sur les grands côtés
+        if (k < 4) {
+          s += horiz
+            ? `<rect x='${X}' y='${Y}' width='${W}' height='4' fill='#A9C27A'/><rect x='${X}' y='${r1(Y + H - 4)}' width='${W}' height='4' fill='#A9C27A'/>`
+            : `<rect x='${X}' y='${Y}' width='4' height='${H}' fill='#A9C27A'/><rect x='${r1(X + W - 4)}' y='${Y}' width='4' height='${H}' fill='#A9C27A'/>`;
+        }
+        s += `<rect x='${X}' y='${Y}' width='${W}' height='${H}' fill='none' stroke='#8FA962' stroke-width='1.6'/>`;
+      });
+      return s;
+    },
+  },
+
+  // Damier : grands carreaux crème et lavande ardoise (2 × 2 par case), liseré doux.
+  checker: {
+    c: '#E3E2EE', base: '#FFF8EC',
+    svg() {
+      let s = `<rect x='50' y='0' width='50' height='50' fill='#C3C8E6'/><rect x='0' y='50' width='50' height='50' fill='#C3C8E6'/>`;
+      s += `<path d='M0 0 H100 M0 50 H100 M0 100 H100 M0 0 V100 M50 0 V100 M100 0 V100' stroke='#ABB1D6' stroke-width='1.6'/>`;
+      s += `<path d='M6 9 L13 4 M56 59 L63 54' stroke='#FFFFFF' stroke-width='2.4' stroke-linecap='round'/>`;
+      s += `<path d='M56 9 L63 4 M6 59 L13 54' stroke='#D9DCF0' stroke-width='2.4' stroke-linecap='round'/>`;
+      return s;
+    },
+  },
+
+  // Terre battue : ocre, plaques tassées, petits cailloux cernés, grains.
+  dirt: {
+    c: '#E4C59C', base: '#E7CAA2',
+    svg() {
+      let s = '';
+      for (const p of scatter(73, 5, 34)) {
+        const rx = 13 + p.k * 7, ry = 7 + p.k2 * 4;
+        s += wrap(p.x, p.y, rx + 1, (X, Y) => `<ellipse cx='${X}' cy='${Y}' rx='${r1(rx)}' ry='${r1(ry)}' fill='#DDBB90'/>`);
+      }
+      for (const p of scatter(29, 7, 26)) {
+        const rx = 3 + p.k * 2.2, ry = 2.4 + p.k2 * 1.4;
+        s += wrap(p.x, p.y, rx + 2, (X, Y) =>
+          `<ellipse cx='${X}' cy='${Y}' rx='${r1(rx)}' ry='${r1(ry)}' fill='${p.k2 > 0.5 ? '#F3E3C9' : '#D9C2A0'}' stroke='#AE855A' stroke-width='1.7'/>`);
+      }
+      for (const p of scatter(61, 12, 12)) {
+        s += wrap(p.x, p.y, 2, (X, Y) => `<circle cx='${X}' cy='${Y}' r='${r1(0.9 + p.k * 0.8)}' fill='#C29C6E'/>`);
+      }
+      s += `<path d='M58 30 L64 34 L63 40 M20 70 L27 72' stroke='#C29C6E' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' fill='none'/>`;
+      return s;
+    },
+  },
+
+  // Glace : bleu pervenche pâle, facettes, fêlures étoilées et reflets obliques.
+  ice: {
+    c: '#DCE7F8', base: '#E1EAF9',
+    svg() {
+      const J = '#9FB5DF';
+      let s = `<path d='M0 0 H44 L30 38 L0 30 Z M100 30 L74 52 L86 100 H100 Z M0 30 V100 H20 L36 64 Z' fill='#D5E1F6'/>`;
+      s += `<path d='M56 58 L46 48 M56 58 L70 50 M56 58 L60 72 M56 58 L44 66 M46 48 L42 38 M70 50 L80 46 M60 72 L56 80' stroke='${J}' stroke-width='2' stroke-linecap='round' fill='none'/>`;
+      s += `<path d='M14 14 L22 20 L20 27' stroke='${J}' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' fill='none'/>`;
+      s += `<path d='M66 10 L80 24 M72 8 L82 18 M10 78 L22 90' stroke='#FAFCFF' stroke-width='2.8' stroke-linecap='round'/>`;
+      s += `<path d='M0 0 H100 M0 100 H100 M0 0 V100 M100 0 V100' stroke='#C3D2EE' stroke-width='1.6'/>`;
+      return s;
+    },
+  },
+
+  // Sol lunaire : gris perle, cratères ronds (bord clair, creux ombré), poussière.
+  moon: {
+    c: '#E5E4EA', base: '#E8E7EC',
+    svg() {
+      const crater = (r) => (X, Y) =>
+        `<circle cx='${X}' cy='${Y}' r='${r}' fill='#D2D1DB' stroke='#A9A8B8' stroke-width='2'/>` +
+        `<path d='M${r1(X - r * 0.7)} ${r1(Y + r * 0.55)} A${r} ${r} 0 0 0 ${r1(X + r * 0.75)} ${r1(Y + r * 0.5)}' stroke='#F6F6F9' stroke-width='2' fill='none' stroke-linecap='round'/>` +
+        `<circle cx='${r1(X - r * 0.2)}' cy='${r1(Y - r * 0.25)}' r='${r1(r * 0.55)}' fill='#C8C7D3'/>`;
+      let s = '';
+      for (const [x, y, r] of [[28, 30, 11], [76, 70, 8.5], [78, 18, 5], [22, 80, 5.5], [55, 50, 3.6]]) s += wrap(x, y, r + 2, crater(r));
+      for (const p of scatter(37, 12, 12)) {
+        s += wrap(p.x, p.y, 2, (X, Y) => `<circle cx='${X}' cy='${Y}' r='${r1(0.9 + p.k * 0.9)}' fill='${p.k2 > 0.5 ? '#C6C5D1' : '#F7F7FA'}'/>`);
+      }
+      return s;
+    },
+  },
+
+  // Brique : terre cuite en appareil décalé, joints de mortier clair.
+  brick: {
+    c: '#EDB29A', base: '#F5DFD1',
+    svg() {
+      let s = '';
+      for (let j = 0; j < 4; j++) {
+        const off = j % 2 ? 25 : 0;
+        for (let i = 0; i < 2; i++) {
+          const fill = (i + j) % 3 === 1 ? '#E9A68B' : '#EEB098';
+          const cx = off + i * 50 + 25, cy = j * 25 + 12.5;
+          s += wrap(cx, cy, 26, (X, Y) =>
+            `<rect x='${r1(X - 23.4)}' y='${r1(Y - 10.9)}' width='46.8' height='21.8' rx='2.6' fill='${fill}' stroke='#CF8467' stroke-width='1.6'/>` +
+            `<path d='M${r1(X - 18)} ${r1(Y - 6.4)} H${r1(X - 8)}' stroke='#F6CDBC' stroke-width='2.2' stroke-linecap='round'/>`);
+        }
+      }
+      return s;
+    },
+  },
+
+  // Pavés : petits blocs bombés gris mauve, en rangs décalés.
+  cobble: {
+    c: '#D6CAD1', base: '#C3B4BE',
+    svg() {
+      const R = rng(83);
+      let s = '';
+      const u = 100 / 3;
+      for (let j = 0; j < 3; j++) {
+        // décalage d'une demi-case une rangée sur deux (rangée 3 → raccord par période verticale de 3 rangs)
+        const off = [0, u / 2, u / 4][j];
+        for (let i = 0; i < 3; i++) {
+          const w = 27.4 + R() * 2.4, h = 26.6 + R() * 2.2, k = R();
+          const fill = k > 0.6 ? '#DED3D9' : k > 0.3 ? '#D7CBD2' : '#E5DCE1';
+          s += wrap(off + i * u + u / 2, j * u + u / 2, 18, (X, Y) =>
+            `<rect x='${r1(X - w / 2)}' y='${r1(Y - h / 2)}' width='${r1(w)}' height='${r1(h)}' rx='10' fill='${fill}' stroke='#A897A2' stroke-width='1.8'/>` +
+            `<path d='M${r1(X - w / 2 + 5)} ${r1(Y - 2)} Q${r1(X - w / 2 + 6)} ${r1(Y - h / 2 + 5)} ${r1(X - 1)} ${r1(Y - h / 2 + 4.4)}' stroke='#F4EFF2' stroke-width='2.4' fill='none' stroke-linecap='round'/>`);
+        }
+      }
+      return s;
+    },
+  },
 };
 
 const FALLBACK = '#F3EBDC';
