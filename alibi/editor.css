@@ -190,3 +190,7 @@ textarea.ed-input{resize:vertical}
 .ed-twist-bad::before{content:"!";background:var(--coral)}
 .ed-twist-pend::before{content:"…";background:var(--paper-2)}
 .ed-twist-bad{color:var(--bad-ink)}
+/* Ambiance sonore : liste et bouton d'écoute côte à côte */
+.ed-amb{display:flex;gap:8px;align-items:stretch;min-width:0}
+.ed-amb .ed-select{flex:1 1 auto;min-width:0}
+.ed-amb-play{flex:0 0 auto;min-width:6.5em}

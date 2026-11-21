@@ -13,6 +13,7 @@
 //  8.   Valider, puis désigner Lison.
 export const GUIDE_LEVEL = {
   id: 'guide-guinguette', title: 'La guinguette', difficulty: 1, size: 5,
+  ambience: 'river',
   intro: 'Bal du samedi soir au bord de l’eau. Barnabé, l’accordéoniste, ne jouera plus la dernière valse.',
   rooms: [
     { key: 'a', name: 'Salle de bal', floor: 'parquet' },

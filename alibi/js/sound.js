@@ -53,6 +53,9 @@ function ensure() {
   return ctx;
 }
 
+/** Contexte audio partagé (ambiances) : créé au premier geste, null avant ou si l'API manque. */
+export function audioContext() { try { return ensure(); } catch { return null; } }
+
 // Déverrouillage au premier geste de l'utilisateur.
 if (typeof document !== 'undefined') {
   const unlock = () => {

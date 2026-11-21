@@ -2,6 +2,7 @@
 export const LEVELS = [
   {
     id: "peniche", title: "La péniche", difficulty: 1, size: 5,
+    ambience: "river",
     intro: "Le capitaine Gaspard a été victime d'un crime à bord de sa péniche, La Belle Escale, amarrée pour la soirée. Un seul de ses invités s'est retrouvé seul avec lui.",
     rooms: [
       {"key":"a","name":"Cabine","floor":"wood"},
@@ -32,6 +33,7 @@ export const LEVELS = [
   },
   {
     id: "refuge", title: "Le refuge", difficulty: 1, size: 5,
+    ambience: "wind",
     intro: "Une tempête de neige bloque le refuge du Mont-Brisé, et le gardien Hector n'est plus en état de servir la soupe. Cinq personnes sont coincées là-haut, et l'une d'elles sait exactement ce qui s'est passé.",
     rooms: [
       {"key":"a","name":"Dortoir","floor":"wood"},
@@ -63,6 +65,7 @@ export const LEVELS = [
   },
   {
     id: "librairie", title: "La librairie", difficulty: 1, size: 6,
+    ambience: "rooms",
     intro: "Octave, le libraire de la rue des Peupliers, ne rangera plus ses rayons : l'inventaire du soir a mal tourné. Six personnes traînaient encore dans la boutique à la fermeture.",
     rooms: [
       {"key":"a","name":"Rayons","g":"p","floor":"parquet"},
@@ -100,6 +103,7 @@ export const LEVELS = [
   },
   {
     id: "boulangerie", title: "La boulangerie", difficulty: 1, size: 5,
+    ambience: "kitchen",
     intro: "Armand, le boulanger de la rue des Tilleuls, n'a pas vu lever le pain de ce matin : on l'a retrouvé dans son fournil avant l'ouverture. Cinq clients et employés traînaient encore dans la boutique.",
     rooms: [
       {"key":"a","name":"Fournil","g":"m","floor":"tile"},
@@ -130,6 +134,7 @@ export const LEVELS = [
   },
   {
     id: "camping", title: "Le camping", difficulty: 1, size: 5,
+    ambience: "birds",
     intro: "Au camping des Mouettes, le gérant Valentin n'a pas distribué les clés des emplacements ce soir. Il gît près de l'accueil, et chacun des campeurs jure n'avoir rien vu.",
     rooms: [
       {"key":"a","name":"Clairière","floor":"grass"},
@@ -162,6 +167,7 @@ export const LEVELS = [
   },
   {
     id: "gare", title: "La petite gare", difficulty: 1, size: 6,
+    ambience: "hall",
     intro: "Le dernier omnibus est parti sans Lucien, le chef de gare de Val-Fleuri, qui ne sifflera plus aucun départ. Six voyageurs attendaient sur place quand le calme est retombé.",
     rooms: [
       {"key":"a","name":"Quai","floor":"concrete"},
@@ -196,6 +202,7 @@ export const LEVELS = [
   },
   {
     id: "serre", title: "La serre botanique", difficulty: 1, size: 6,
+    ambience: "birds",
     intro: "Flora, la jardinière en chef de la serre municipale, a été retrouvée parmi ses orchidées avant l'ouverture au public. Six visiteurs et collègues se trouvaient encore dans les allées.",
     rooms: [
       {"key":"a","name":"Palmarium","g":"m","floor":"tile"},
@@ -229,6 +236,7 @@ export const LEVELS = [
   },
   {
     id: "marche", title: "Le marché couvert", difficulty: 1, size: 5,
+    ambience: "kitchen",
     intro: "Marcel, le doyen des commerçants du marché couvert, n'a pas replié son étal ce soir : on l'a retrouvé près des cageots, alors que la halle se vidait. Cinq habitués traînaient encore entre les allées.",
     rooms: [
       {"key":"a","name":"Étals","g":"p","floor":"stone"},
@@ -260,6 +268,7 @@ export const LEVELS = [
   },
   {
     id: "ecole", title: "L'école de musique", difficulty: 1, size: 5,
+    ambience: "music",
     intro: "Clément, le directeur de l'école de musique, n'a pas dirigé la répétition générale : on l'a retrouvé là où l'on range les partitions. Cinq élèves et professeurs étaient encore sur place.",
     rooms: [
       {"key":"a","name":"Auditorium","g":"m","floor":"carpet"},
@@ -292,6 +301,7 @@ export const LEVELS = [
   },
   {
     id: "ferme", title: "La ferme", difficulty: 1, size: 5,
+    ambience: "birds",
     intro: "À la ferme des Trois Chênes, Joachim n'a pas rentré les bêtes ce soir : on l'a retrouvé près de la vieille bascule, au crépuscule. Cinq voisins donnaient un coup de main aux alentours.",
     rooms: [
       {"key":"a","name":"Grange","g":"f","floor":"wood"},
@@ -324,6 +334,7 @@ export const LEVELS = [
   },
   {
     id: "piscine", title: "La piscine", difficulty: 1, size: 6,
+    ambience: "pool",
     intro: "Ernest, le maître-nageur de la piscine municipale, n'a pas sifflé la fin de la baignade : on l'a retrouvé au sec, loin du grand bain. Six habitués s'attardaient encore après la fermeture.",
     rooms: [
       {"key":"a","name":"Bassin","g":"m","floor":"tile"},
@@ -357,6 +368,7 @@ export const LEVELS = [
   },
   {
     id: "coiffure", title: "Le salon de coiffure", difficulty: 1, size: 6,
+    ambience: "kitchen",
     intro: "Gisèle, la patronne du salon de coiffure de la place du Marché, n'a pas fait sa dernière mise en plis : on l'a retrouvée juste après la fermeture. Six clients et employés patientaient encore sous les casques.",
     rooms: [
       {"key":"a","name":"Salon","g":"m","floor":"tile"},
@@ -390,6 +402,7 @@ export const LEVELS = [
   },
   {
     id: "aeroport", title: "L'aéroport", difficulty: 1, rows: 5, cols: 9,
+    ambience: "hall",
     intro: "Le commandant Bertrand n'a jamais rejoint son vol de 22 h : on l'a retrouvé dans le terminal, juste avant l'embarquement. Quatre voyageurs et employés traînaient encore dans les parages.",
     rooms: [
       {"key":"h","name":"Hall","g":"m","floor":"marble"},
@@ -425,6 +438,7 @@ export const LEVELS = [
   },
   {
     id: "phare", title: "Le phare", difficulty: 2, size: 6,
+    ambience: "sea",
     intro: "Au phare de la Pointe-Grise, le gardien Fabien n'a pas rallumé la lanterne ce soir, et pour cause : un crime vient d'être commis. Six personnes passaient la soirée sur le rocher.",
     rooms: [
       {"key":"a","name":"Lanterne","g":"f","floor":"marble"},
@@ -464,6 +478,7 @@ export const LEVELS = [
   },
   {
     id: "vignoble", title: "Le vignoble", difficulty: 2, size: 6,
+    ambience: "birds",
     intro: "C'est le jour des vendanges au domaine des Trois-Coteaux, et Désiré, le maître de chai, ne goûtera plus jamais son propre millésime. Parmi les six convives, un seul était seul avec lui.",
     rooms: [
       {"key":"a","name":"Chai","floor":"stone"},
@@ -501,6 +516,7 @@ export const LEVELS = [
   },
   {
     id: "chapiteau", title: "Le chapiteau", difficulty: 2, size: 7,
+    ambience: "hall",
     intro: "Sous le chapiteau du cirque Mirabelle, le directeur Orlando a manqué son numéro de clôture : un mauvais coup lui a coupé la parole. Sept artistes et employés étaient à portée de piste.",
     rooms: [
       {"key":"a","name":"Piste","floor":"sand"},
@@ -541,6 +557,7 @@ export const LEVELS = [
   },
   {
     id: "observatoire", title: "L'observatoire", difficulty: 2, size: 7,
+    ambience: "night",
     intro: "À l'observatoire du Mont-Clair, la nuit des étoiles filantes a tourné court : l'astronome Léopold ne verra jamais la prochaine comète. Sept personnes avaient les yeux levés vers le ciel.",
     rooms: [
       {"key":"a","name":"Coupole","g":"f","floor":"marble"},
@@ -581,6 +598,7 @@ export const LEVELS = [
   },
   {
     id: "lune", title: "La base lunaire", difficulty: 2, rows: 6, cols: 9,
+    ambience: "space",
     intro: "À la base Sélène, le commandant Wilfried n'est pas venu au rapport de la nuit lunaire : on l'a retrouvé à l'écart de ses équipiers. Six membres de l'équipage étaient encore éveillés.",
     rooms: [
       {"key":"v","name":"Module","g":"m","floor":"carpet"},
@@ -619,6 +637,7 @@ export const LEVELS = [
   },
   {
     id: "bateau", title: "Le trois-mâts", difficulty: 2, rows: 9, cols: 6,
+    ambience: "sea",
     intro: "Le capitaine Barnabé n'a pas sonné la cloche du quart : on l'a retrouvé à bord de son trois-mâts, mouillé pour la nuit dans la baie. Six marins et passagers veillaient encore, à bord ou tout près.",
     rooms: [
       {"key":"f","name":"Flots","g":"p","floor":"water"},
@@ -656,6 +675,7 @@ export const LEVELS = [
   },
   {
     id: "musee", title: "Le musée", difficulty: 3, size: 7,
+    ambience: "rooms",
     intro: "Le soir du vernissage au musée Bellerive, le conservateur Edgar a quitté le cocktail pour ne plus jamais revenir. Sept visiteurs traînaient encore dans les salles.",
     rooms: [
       {"key":"a","name":"Hall","floor":"marble"},
@@ -696,6 +716,7 @@ export const LEVELS = [
   },
   {
     id: "station", title: "La station polaire", difficulty: 3, size: 8,
+    ambience: "wind",
     intro: "À la station Aurore-7, la cheffe Sigrid n'a pas répondu à l'appel du matin : le blizzard a soufflé toute la nuit et personne n'a pu quitter la base. Huit personnes se partageaient les couloirs.",
     rooms: [
       {"key":"a","name":"Dortoir","floor":"carpet"},
@@ -737,6 +758,7 @@ export const LEVELS = [
   },
   {
     id: "opera", title: "L'opéra", difficulty: 3, size: 8,
+    ambience: "music",
     intro: "Le rideau tombe sur la première du Barbier de l'Ombre, mais le directeur Hugues ne viendra pas saluer : on l'a retrouvé loin des projecteurs. Huit personnes étaient encore dans la maison.",
     rooms: [
       {"key":"a","name":"Scène","floor":"wood"},
@@ -778,6 +800,7 @@ export const LEVELS = [
   },
   {
     id: "manoir", title: "Le manoir", difficulty: 3, size: 8,
+    ambience: "fire",
     intro: "Au manoir de Belle-Rive, la châtelaine Eugénie avait réuni la famille pour lire son testament. Elle n'a jamais fini sa phrase, et huit personnes se trouvaient alors dans la demeure.",
     rooms: [
       {"key":"a","name":"Grand salon","floor":"parquet"},
@@ -819,6 +842,7 @@ export const LEVELS = [
   },
   {
     id: "grand-hotel", title: "Le Grand Hôtel", difficulty: 3, size: 9,
+    ambience: "rooms",
     intro: "Au Grand Hôtel du Large, le directeur Fernand n'a pas fait sa tournée du soir, et pour cause : un crime a été commis entre deux services. Neuf clients et employés étaient éparpillés dans l'établissement.",
     rooms: [
       {"key":"a","name":"Hall","floor":"marble"},
@@ -861,6 +885,7 @@ export const LEVELS = [
   },
   {
     id: "saloon", title: "Le saloon", difficulty: 2, size: 6, twist: { liar: true },
+    ambience: "saloon",
     intro: "Le barman Rufus n'a jamais servi sa dernière tournée : on l'a retrouvé au saloon du Silver Spur, entre deux parties de cartes. Cinq clients et employés traînaient encore là ce soir-là.",
     rooms: [
       {"key":"s","name":"Saloon","g":"m","floor":"wood"},
@@ -897,6 +922,7 @@ export const LEVELS = [
   },
   {
     id: "chateau", title: "Le château", difficulty: 3, size: 7, twist: { liar: true },
+    ambience: "fire",
     intro: "Le roi Dagobert n'a pas présidé son banquet : on l'a retrouvé au château de Haute-Roche, juste avant que sonne minuit. Six courtisans et gardes se trouvaient alors entre ses murs.",
     rooms: [
       {"key":"k","name":"Cuisines","g":"p","floor":"brick"},
@@ -935,6 +961,7 @@ export const LEVELS = [
   },
   {
     id: "cuisine", title: "Les cuisines du palace", difficulty: 2, size: 6, twist: { weapon: true },
+    ambience: "kitchen",
     intro: "Le chef Gaston n'a pas goûté sa propre sauce : on l'a retrouvé dans les cuisines du palace des Cimes, juste avant le coup de feu du soir. Cinq cuisiniers et plongeurs étaient encore à leur poste.",
     rooms: [
       {"key":"r","name":"Réserve","g":"f","floor":"tile"},
@@ -972,6 +999,7 @@ export const LEVELS = [
   },
   {
     id: "plage", title: "La plage des Flamants", difficulty: 3, rows: 6, cols: 9, twist: { liar: true, weapon: true },
+    ambience: "sea",
     intro: "Le maître-nageur Hippolyte n'est pas remonté de sa dernière ronde : on l'a retrouvé sur la plage des Flamants, son parasol encore ouvert. Cinq estivants traînaient dans les parages.",
     rooms: [
       {"key":"g","name":"Jardin","g":"m","floor":"grass"},
