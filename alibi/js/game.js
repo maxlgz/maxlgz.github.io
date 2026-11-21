@@ -196,12 +196,12 @@ export function mountGame(root, opts = {}) {
         <div class="board-wrap"></div>
         <div class="picker" role="group" aria-label="Choisir un personnage"></div>
         <p class="status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="game-side" aria-label="Dossier">
         <details class="legend" data-legend hidden>
           <summary>Légende du plan</summary>
           <div class="legend-body"></div>
         </details>
-      </section>
-      <section class="game-side" aria-label="Dossier">
         <div class="cards-scroll">
           <div class="dossier-head"><h2>Témoignages</h2><span class="meta"></span></div>
           <div class="cards"></div>
@@ -246,7 +246,7 @@ export function mountGame(root, opts = {}) {
       if (!items.length) return '';
       return `<div class="legend-group${occ ? '' : ' legend-group--block'}"><h3>${title}</h3><ul>${items.map(([t, k]) => {
         const o = OBJECTS[t];
-        return `<li><button type="button" class="legend-chip" data-type="${esc(t)}" aria-label="Montrer ${k > 1 ? `les ${esc(o.pl)}` : (o.g === 'f' ? `la ${esc(o.n)}` : `le ${esc(o.n)}`)} sur le plan">`
+        return `<li><button type="button" class="legend-chip" data-type="${esc(t)}" aria-label="Montrer ${k > 1 ? `les ${esc(o.pl)}` : (/^[aeiouyéèêâî]/i.test(o.n) ? `l’${esc(o.n)}` : o.g === 'f' ? `la ${esc(o.n)}` : `le ${esc(o.n)}`)} sur le plan">`
           + `<span class="legend-thumb" aria-hidden="true">${objectSVG(t, { w: 1, h: 1 })}</span>`
           + `<span class="legend-name">${esc(cap(o.n))}</span>${k > 1 ? `<span class="legend-count">×${k}</span>` : ''}</button></li>`;
       }).join('')}</ul></div>`;

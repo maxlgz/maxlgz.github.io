@@ -607,6 +607,8 @@ dialog.modal[open] { animation: pop 0.18s ease-out; }
   }
   .game-board-col { position: sticky; top: 72px; }
   .board-wrap { width: min(100%, calc(100vh - 210px)); margin: 0 auto; }
+  /* La légende coiffe la colonne de droite, au-dessus des témoignages. */
+  .legend { flex: none; margin: 0 6px 10px 2px; max-height: 38vh; overflow-y: auto; }
   .game-side {
     display: flex; flex-direction: column;
     max-height: calc(100vh - 92px); position: sticky; top: 72px;
