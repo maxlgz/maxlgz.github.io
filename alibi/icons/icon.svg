@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Alibi">
+  <!-- Fond plein cadre : iOS et Android arrondissent eux-mêmes les coins. -->
+  <rect width="512" height="512" fill="#FFC83D"/>
+  <!-- Trame de points, en bas à droite -->
+  <g fill="#F2A900">
+    <circle cx="372" cy="436" r="7"/><circle cx="404" cy="436" r="8"/><circle cx="436" cy="436" r="9"/><circle cx="468" cy="436" r="10"/>
+    <circle cx="388" cy="466" r="8"/><circle cx="420" cy="466" r="9"/><circle cx="452" cy="466" r="10"/><circle cx="484" cy="466" r="11"/>
+    <circle cx="404" cy="496" r="9"/><circle cx="436" cy="496" r="10"/><circle cx="468" cy="496" r="11"/>
+    <circle cx="452" cy="406" r="7"/><circle cx="484" cy="406" r="8"/><circle cx="468" cy="376" r="6"/>
+    <circle cx="44" cy="40" r="9"/><circle cx="76" cy="40" r="7"/><circle cx="28" cy="70" r="8"/><circle cx="60" cy="70" r="6"/><circle cx="44" cy="100" r="5"/>
+  </g>
+  <!-- Manche de la loupe -->
+  <path d="M318 318 L404 404" fill="none" stroke="#1F2147" stroke-width="78" stroke-linecap="round"/>
+  <path d="M330 330 L404 404" fill="none" stroke="#FF6B5E" stroke-width="46" stroke-linecap="round"/>
+  <path d="M350 372 L392 414" fill="none" stroke="#D9463B" stroke-width="14" stroke-linecap="round"/>
+  <!-- Verre de la loupe -->
+  <circle cx="218" cy="218" r="150" fill="#1F2147"/>
+  <circle cx="218" cy="218" r="122" fill="#D3ECFF"/>
+  <!-- Le suspect, vu dans la loupe -->
+  <clipPath id="alibi-lens"><circle cx="218" cy="218" r="122"/></clipPath>
+  <g clip-path="url(#alibi-lens)">
+    <!-- buste -->
+    <path d="M110 372 C110 314 160 296 218 296 C276 296 326 314 326 372 Z" fill="#B58CFF" stroke="#1F2147" stroke-width="14" stroke-linejoin="round"/>
+    <!-- tête -->
+    <ellipse cx="218" cy="222" rx="82" ry="86" fill="#FFD9B8" stroke="#1F2147" stroke-width="14"/>
+    <path d="M150 262 C168 296 268 296 286 262 C272 286 164 286 150 262 Z" fill="#F2B98C"/>
+    <!-- chapeau -->
+    <path d="M118 176 C150 150 286 150 318 176 C322 190 114 190 118 176 Z" fill="#1F2147"/>
+    <path d="M152 170 C150 108 182 84 218 84 C254 84 286 108 284 170 Z" fill="#4FCFA3" stroke="#1F2147" stroke-width="14" stroke-linejoin="round"/>
+    <path d="M154 148 L282 148 L283 170 L153 170 Z" fill="#1F2147"/>
+    <!-- yeux -->
+    <circle cx="186" cy="226" r="24" fill="#FFFFFF" stroke="#1F2147" stroke-width="10"/>
+    <circle cx="250" cy="226" r="24" fill="#FFFFFF" stroke="#1F2147" stroke-width="10"/>
+    <circle cx="192" cy="230" r="11" fill="#1F2147"/><circle cx="256" cy="230" r="11" fill="#1F2147"/>
+    <circle cx="196" cy="225" r="4" fill="#FFFFFF"/><circle cx="260" cy="225" r="4" fill="#FFFFFF"/>
+    <!-- sourcils : l'un levé, l'air de rien -->
+    <path d="M162 198 L204 190" fill="none" stroke="#1F2147" stroke-width="11" stroke-linecap="round"/>
+    <path d="M232 182 L276 192" fill="none" stroke="#1F2147" stroke-width="11" stroke-linecap="round"/>
+    <!-- joues et bouche -->
+    <circle cx="160" cy="262" r="13" fill="#FF8FA8"/><circle cx="276" cy="262" r="13" fill="#FF8FA8"/>
+    <path d="M200 274 C210 284 228 284 240 272" fill="none" stroke="#1F2147" stroke-width="10" stroke-linecap="round"/>
+  </g>
+  <!-- reflet du verre -->
+  <path d="M128 176 C140 138 172 114 204 108" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" opacity="0.9"/>
+  <circle cx="122" cy="210" r="8" fill="#FFFFFF" opacity="0.9"/>
+</svg>
