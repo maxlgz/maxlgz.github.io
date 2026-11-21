@@ -395,7 +395,7 @@ function compileSet(ctx, cluesByIdx) {
   return { unary, bin, alonePos, aloneNeg, finals, impossible };
 }
 
-function solveCore(ctx, comp, max) {
+function solveCore(ctx, comp, max, rng = null) {
   const { N, NN, n, cellRoom, cellType, blocked } = ctx;
   const out = [];
   if (n === 0 || n > N || comp.impossible || max <= 0) return out;
@@ -435,7 +435,46 @@ function solveCore(ctx, comp, max) {
     return { ...f, sitters };
   });
   for (const f of posFinals) if (!f.sitters.length) return out;
+  const inDom = domains.map(d => { const m = new Uint8Array(NN); for (const i of d) m[i] = 1; return m; });
+  const occupant = new Int16Array(NN).fill(-1);
+  const typeCells = {};
+  for (const f of posFinals) {
+    if (!typeCells[f.cc.type]) { typeCells[f.cc.type] = []; for (let j = 0; j < NN; j++) if (cellType[j] === f.cc.type) typeCells[f.cc.type].push(j); }
+    f.targets = new Array(NN);
+  }
+  function targetsOf(f, i) {
+    let t = f.targets[i];
+    if (!t) { t = f.targets[i] = typeCells[f.cc.type].filter(j => j !== i && f.cc.test(i, j)); }
+    return t;
+  }
   const roomMark = new Int32Array(R);
+  const rcAdj = [], rcFree = [];
+  for (let d = 0; d <= n; d++) { rcAdj.push(new Int32Array(N)); rcFree.push(new Int32Array(N)); }
+  const pRows = new Int32Array(Math.max(n, N)), pCols = new Int32Array(Math.max(n, N));
+  const matchOf = new Int8Array(N);
+  // Couplage parfait (Kuhn) : chaque élément gauche g reçoit un bit distinct de adjM[g].
+  function matching(adjM, m, stopOnFail) {
+    matchOf.fill(-1);
+    let size = 0;
+    for (let g = 0; g < m; g++) {
+      let seen = 0;
+      const tryG = (x) => {
+        let a = adjM[x] & ~seen;
+        while (a) {
+          const bit = a & -a; a ^= bit;
+          seen |= bit;
+          const b = 31 - Math.clz32(bit);
+          if (matchOf[b] < 0 || tryG(matchOf[b])) { matchOf[b] = x; return true; }
+        }
+        return false;
+      };
+      if (tryG(g)) size++;
+      else if (stopOnFail) return -1;
+    }
+    return size;
+  }
+  const matchAll = (adjM, m) => matching(adjM, m, true) === m;
+  const maxMatch = (adjM, m) => matching(adjM, m, false);
   let markStamp = 0;
 
   function feasible(p, i) {
@@ -452,6 +491,23 @@ function solveCore(ctx, comp, max) {
     for (let x = 0; x < bs.length; x++) {
       const o = pos[bs[x].o];
       if (o >= 0 && !bs[x].t(i, o)) return false;
+    }
+    for (let x = 0; x < posFinals.length; x++) {
+      const f = posFinals[x];
+      if (f.p === p) {
+        // il doit rester une case-cible (objet du bon type, bien orientée) occupée ou occupable
+        const tg = targetsOf(f, i);
+        let found = false;
+        for (let y = 0; y < tg.length && !found; y++) {
+          const j = tg[y];
+          const occ = occupant[j];
+          if (occ >= 0) { found = occ !== p; continue; }
+          const rj = (j / N) | 0, cj = j % N;
+          if ((rowUsed >> rj) & 1 || (colUsed >> cj) & 1 || rj === r || cj === c) continue;
+          for (const q of f.sitters) if (pos[q] < 0 && inDom[q][j]) { found = true; break; }
+        }
+        if (!found) return false;
+      }
     }
     for (let x = 0; x < negFinals.length; x++) {
       const { p: s, cc } = negFinals[x];
@@ -477,21 +533,30 @@ function solveCore(ctx, comp, max) {
     for (let x = 0; x < posFinals.length; x++) {
       const { p, cc, sitters } = posFinals[x];
       if (pos[p] < 0) continue;
-      let open = false, found = false;
+      let found = false;
       for (const q of sitters) {
-        if (pos[q] < 0) { open = true; continue; }
+        if (pos[q] < 0) {
+          // un « assis » non placé peut-il encore convenir ?
+          const d = domains[q];
+          for (let y = 0; y < d.length; y++) {
+            const j = d[y];
+            if (cellType[j] === cc.type && cc.test(pos[p], j) && feasible(q, j)) { found = true; break; }
+          }
+          if (found) break;
+          continue;
+        }
         if (cellType[pos[q]] === cc.type && cc.test(pos[p], pos[q])) { found = true; break; }
       }
-      if (!found && !open) return false;
+      if (!found) return false;
     }
     return true;
   }
   function place(p, i) {
-    pos[p] = i; rowUsed |= 1 << ((i / N) | 0); colUsed |= 1 << (i % N);
+    pos[p] = i; occupant[i] = p; rowUsed |= 1 << ((i / N) | 0); colUsed |= 1 << (i % N);
     const room = roomOf[i]; roomCount[room]++; if (alonePos[p]) aloner[room]++;
   }
   function unplace(p) {
-    const i = pos[p]; pos[p] = -1;
+    const i = pos[p]; pos[p] = -1; occupant[i] = -1;
     rowUsed &= ~(1 << ((i / N) | 0)); colUsed &= ~(1 << (i % N));
     const room = roomOf[i]; roomCount[room]--; if (alonePos[p]) aloner[room]--;
   }
@@ -511,24 +576,47 @@ function solveCore(ctx, comp, max) {
       if (roomCount[rm] === 1 && roomMark[rm] !== stamp) { roomMark[rm] = stamp; missing++; }
     }
     let best = -1, bestCount = 1e9, bestBuf = bufA[depth], scratch = bufB[depth];
-    let rowsCov = 0, colsCov = 0;
+    let rowsCov = 0, colsCov = 0, k = 0;
+    const rc = rcAdj[depth], rcF = rcFree[depth];
+    rc.fill(0); rcF.fill(0);
+    const vRoomNow = victim >= 0 && pos[victim] >= 0 ? roomOf[pos[victim]] : -1;
     for (let p = 0; p < n; p++) {
       if (pos[p] >= 0) continue;
       const d = domains[p];
-      let cnt = 0;
+      let cnt = 0, pr = 0, pc = 0;
       for (let x = 0; x < d.length; x++) {
         const i = d[x];
         if (feasible(p, i)) {
           scratch[cnt++] = i;
-          rowsCov |= 1 << ((i / N) | 0); colsCov |= 1 << (i % N);
+          const r = (i / N) | 0, c = i % N;
+          pr |= 1 << r; pc |= 1 << c; rc[r] |= 1 << c;
+          if (roomOf[i] !== vRoomNow) rcF[r] |= 1 << c;
           if (missing) { const rm = roomOf[i]; if (roomMark[rm] === stamp) { roomMark[rm] = -stamp; missing--; } }
         }
       }
       if (cnt === 0) return;
+      rowsCov |= pr; colsCov |= pc;
+      pRows[k] = pr; pCols[k] = pc; k++;
       if (cnt < bestCount) { bestCount = cnt; best = p; const t = bestBuf; bestBuf = scratch; scratch = t; }
     }
     if (missing > 0) return;
-    if (exactLines && ((rowsCov | rowUsed) !== full || (colsCov | colUsed) !== full)) return;
+    if (exactLines) {
+      if ((rowsCov | rowUsed) !== full || (colsCov | colUsed) !== full) return;
+      // couplages : personnes ↔ lignes, personnes ↔ colonnes, lignes ↔ colonnes (cases encore utilisables)
+      if (k > 1 && (!matchAll(pRows, k) || !matchAll(pCols, k))) return;
+      if (k > 1) {
+        let m = 0;
+        for (let r = 0; r < N; r++) if (!((rowUsed >> r) & 1)) pRows[m++] = rc[r];
+        if (!matchAll(pRows, m)) return;
+        // la pièce de la victime n'accueille plus que (2 - occupants) personnes
+        if (vRoomNow >= 0) {
+          m = 0;
+          for (let r = 0; r < N; r++) if (!((rowUsed >> r) & 1)) pRows[m++] = rcF[r];
+          if (maxMatch(pRows, m) < m - (2 - roomCount[vRoomNow])) return;
+        }
+      }
+    }
+    if (rng) for (let x = bestCount - 1; x > 0; x--) { const y = Math.floor(rng() * (x + 1)); const t = bestBuf[x]; bestBuf[x] = bestBuf[y]; bestBuf[y] = t; }
     for (let x = 0; x < bestCount; x++) {
       place(best, bestBuf[x]);
       dfs(depth + 1);
@@ -732,9 +820,9 @@ function mulberry32(a) {
 }
 
 const WEIGHTS = {
-  1: { room: 6, on: 6, beside: 6, with: 1.2, besidePerson: 0.8, alone: 1, dir: 0.15, dirExact: 0.04, dirOn: 0.03, same: 0.2, neg: 0.15 },
-  2: { room: 3, on: 3, beside: 3, with: 3, besidePerson: 3, alone: 2, dir: 1.2, dirExact: 0.6, dirOn: 0.5, same: 1, neg: 0.7 },
-  3: { room: 1.2, on: 1.2, beside: 2, with: 2, besidePerson: 2, alone: 1.5, dir: 3.5, dirExact: 3, dirOn: 2.5, same: 3, neg: 1.3 },
+  1: { room: 6, on: 6, beside: 6, with: 1.5, besidePerson: 1, alone: 1, dir: 0.12, dirExact: 0.03, dirOn: 0.02, same: 0.25, neg: 0.15 },
+  2: { room: 3, on: 3, beside: 3, with: 3, besidePerson: 3, alone: 2, dir: 1, dirExact: 0.35, dirOn: 0.3, same: 1, neg: 0.7 },
+  3: { room: 1.2, on: 1.2, beside: 2, with: 2, besidePerson: 2, alone: 1.5, dir: 3.5, dirExact: 2, dirOn: 2.5, same: 3, neg: 1.3 },
 };
 
 function enumerateCandidates(ctx, pos, p) {
@@ -920,62 +1008,44 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1 } = {}
       if (cand.sym) usedSym.add(cand.sym);
       usedCat[cand.cat] = (usedCat[cand.cat] || 0) + 1;
     };
-    // 1) un indice par suspect
-    const order = suspects.slice();
-    for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-    for (const p of order) {
-      const opts = cands[p].filter(c => acceptable(p, c)).map(c => ({ p, c, w: weightOf(c) * variety(c) * (0.15 + c.sel) }));
-      const o = pick(opts);
-      if (o) take(p, o.c);
-    }
-    // 2) ajouter des indices qui éliminent une solution alternative
+    // 1) ajouter, tant qu'il reste plusieurs solutions, des indices qui en éliminent un maximum
+    //    (échantillon aléatoire de solutions alternatives), pondérés selon la difficulté.
     let ok = false;
-    for (let iter = 0; iter < 4 * n + 10; iter++) {
-      if (suspects.some(p => chosen[p].length === 0)) {
-        // un suspect sans indice : on le force
-        const p = suspects.find(q => chosen[q].length === 0);
-        const opts = cands[p].filter(c => acceptable(p, c)).map(c => ({ p, c, w: weightOf(c) }));
-        const o = pick(opts);
-        if (!o) break;
-        take(p, o.c);
-        continue;
-      }
-      const sols = solveCore(ctx, compileSet(ctx, chosen.map(list => list.map(c => c.clue))), 12);
+    for (let iter = 0; iter < 2 * n + 4; iter++) {
+      const sols = solveCore(ctx, compileSet(ctx, chosen.map(list => list.map(c => c.clue))), 40, rng);
       if (sols.length === 1) { ok = true; break; }
       if (sols.length === 0) break;
       const alts = sols.filter(x => !samePos(x));
       const opts = [];
       for (const p of suspects) {
         if (chosen[p].length >= 2) continue;
-        let moved = 0;
-        for (const a of alts) if (a[p] !== pos[p]) moved++;
-        if (!moved) continue;
+        let moved = false;
+        for (const a of alts) if (a[p] !== pos[p]) { moved = true; break; }
         for (const c of cands[p]) {
+          if (c.set && !moved) continue;
           if (!acceptable(p, c)) continue;
           let elim = 0;
           for (const a of alts) if (evalCompiled(ctx, p, c.cc, a) === false) elim++;
           if (!elim) continue;
-          opts.push({ p, c, w: weightOf(c) * variety(c) * (0.2 + elim / alts.length) ** 2 });
-        }
-      }
-      if (!opts.length) {
-        // indices relationnels possibles même pour une personne bien placée
-        for (const p of suspects) {
-          if (chosen[p].length >= 2) continue;
-          for (const c of cands[p]) {
-            if (!acceptable(p, c) || c.set) continue;
-            let elim = 0;
-            for (const a of alts) if (evalCompiled(ctx, p, c.cc, a) === false) elim++;
-            if (elim) opts.push({ p, c, w: weightOf(c) * (elim / alts.length) });
-          }
+          const frac = elim / alts.length;
+          opts.push({ p, c, w: weightOf(c) * variety(c) * frac * frac * (chosen[p].length ? 1 : 1.5) });
         }
       }
       const o = pick(opts);
       if (!o) break;
       take(o.p, o.c);
     }
+    if (ok) {
+      // 2) chaque suspect doit avoir au moins un indice
+      for (const p of suspects) {
+        if (chosen[p].length) continue;
+        const o = pick(cands[p].filter(c => acceptable(p, c)).map(c => ({ p, c, w: weightOf(c) * variety(c) * (0.15 + c.sel) })));
+        if (!o) { ok = false; break; }
+        take(p, o.c);
+      }
+    }
     if (!ok) continue;
-    // 3) retirer les indices superflus
+    // 3) retirer les indices superflus (un suspect garde au moins un indice)
     const all = [];
     for (const p of suspects) for (const c of chosen[p]) all.push({ p, c });
     for (let i = all.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [all[i], all[j]] = [all[j], all[i]]; }

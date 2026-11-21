@@ -40,7 +40,8 @@ body {
 }
 
 button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+a, [role='button'] { -webkit-tap-highlight-color: transparent; }
 :focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
 a { color: var(--teal); }
 h1, h2, h3 { font-family: var(--serif); font-weight: 700; line-height: 1.15; }
@@ -177,6 +178,10 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 700; line-height: 1.15; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.room-label.wrap {
+  white-space: normal; overflow-wrap: anywhere; letter-spacing: 0.06em;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+}
 .cell-layer {
   position: absolute; inset: 0; z-index: 3; pointer-events: none;
   display: grid; place-items: center;
@@ -298,7 +303,7 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 700; line-height: 1.15; }
 .topbar h1 {
   margin: 0; font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.topbar .title .sub { display: block; font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft); letter-spacing: 0.08em; text-transform: uppercase; }
+.topbar .title .sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft); letter-spacing: 0.08em; text-transform: uppercase; }
 .timer {
   font-family: var(--mono); font-weight: 700; font-size: 0.95rem;
   padding: 0.25em 0.55em; border: 2px solid var(--ink); border-radius: 6px; background: var(--paper-3);

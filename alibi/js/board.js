@@ -92,30 +92,37 @@ export function createBoard(rawLevel) {
   const labelLayer = document.createElement('div');
   labelLayer.className = 'board-labels';
   labelLayer.setAttribute('aria-hidden', 'true');
-  const done = new Set();
-  // Pour chaque pièce : première case (ordre de lecture) sans objet, sinon la première.
-  const candidates = new Map();
+  // Pour chaque pièce : la rangée horizontale de cases assez longue pour le nom, la plus haute
+  // possible ; à défaut la plus longue. On préfère démarrer sur une case sans objet.
+  const runs = new Map();
   for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
+    let c = 0;
+    while (c < n) {
       const key = roomKeyAt(level, r, c);
-      if (!rooms.has(key)) continue;
-      const info = (level.cells[r] && level.cells[r][c]) || {};
-      const cur = candidates.get(key);
-      if (!cur) candidates.set(key, { r, c, free: info.objIndex == null });
-      else if (!cur.free && info.objIndex == null) candidates.set(key, { r, c, free: true });
+      let len = 1;
+      while (c + len < n && roomKeyAt(level, r, c + len) === key) len++;
+      if (rooms.has(key)) {
+        const info = (level.cells[r] && level.cells[r][c]) || {};
+        if (!runs.has(key)) runs.set(key, []);
+        runs.get(key).push({ r, c, len, free: info.objIndex == null });
+      }
+      c += len;
     }
   }
-  for (const [key, pos] of candidates) {
-    if (done.has(key)) continue;
-    done.add(key);
-    let run = 1;
-    while (pos.c + run < n && roomKeyAt(level, pos.r, pos.c + run) === key) run++;
+  for (const [key, list] of runs) {
+    const name = String(rooms.get(key).name || '');
+    const need = Math.min(n, Math.ceil(name.length * 0.14 + 0.2));
+    let best = null, bestScore = -Infinity;
+    for (const run of list) {
+      const score = Math.min(run.len, need) * 100 - run.r * 3 + (run.free ? 1 : 0);
+      if (score > bestScore) { bestScore = score; best = run; }
+    }
     const lab = document.createElement('div');
-    lab.className = 'room-label';
-    lab.textContent = rooms.get(key).name;
-    lab.style.left = `${(pos.c / n) * 100}%`;
-    lab.style.top = `${(pos.r / n) * 100}%`;
-    lab.style.maxWidth = `${(run / n) * 100}%`;
+    lab.className = 'room-label' + (best.len < need ? ' wrap' : '');
+    lab.textContent = name;
+    lab.style.left = `${(best.c / n) * 100}%`;
+    lab.style.top = `${(best.r / n) * 100}%`;
+    lab.style.maxWidth = `${(best.len / n) * 100}%`;
     labelLayer.appendChild(lab);
   }
   el.appendChild(labelLayer);
