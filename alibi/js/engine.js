@@ -471,7 +471,7 @@ function compileSet(ctx, cluesByIdx) {
   return { unary, bin, alonePos, aloneNeg, finals, impossible };
 }
 
-function solveCore(ctx, comp, max, rng = null, budget = Infinity, prio = false) {
+function solveCore(ctx, comp, max, rng = null, budget = Infinity, prio = 0) {
   const { H, W, NN, n, cellRoom, cellType, blocked } = ctx;
   const out = [];
   out.done = true; // recherche menée à terme (faux si le budget de nœuds est épuisé)
@@ -711,8 +711,11 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity, prio = false) 
       rowsCov |= pr; colsCov |= pc;
       if (roomCap) { pMask[k] = pm; pIdx[k] = p; }
       pRows[k] = pr; pCols[k] = pc; k++;
-      // ordre « prioritaire » : la victime et les personnes seules d'abord (effets globaux sur les pièces)
-      const eff = prio && (alonePos[p] || p === victim) ? cnt / 1000 : cnt;
+      // ordres de branchement (plan rectangulaire) : 1 = la victime et les personnes seules d'abord
+      // (effets globaux sur les pièces) ; 2 = domaine / nombre de contraintes avec des personnes non placées
+      let eff = cnt;
+      if (prio === 1) { if (alonePos[p] || p === victim) eff = cnt / 1000; }
+      else if (prio === 2) { let deg = 1; const bs = bin[p]; for (let x = 0; x < bs.length; x++) if (pos[bs[x].o] < 0) deg++; eff = cnt / deg; }
       if (eff < bestCount) { bestCount = eff; best = p; const t = bestBuf; bestBuf = scratch; scratch = t; bestCnt = cnt; }
     }
     if (missing > 0) return;
@@ -792,19 +795,15 @@ function solveCore(ctx, comp, max, rng = null, budget = Infinity, prio = false) 
 
 // Recherche exacte (au plus `max` solutions). Carré : une seule recherche (comportement historique).
 // Rectangle : la liberté des lignes non couvertes rend certaines recherches très inégales selon
-// l'ordre de branchement ; on alterne deux ordres avec des budgets croissants (toute solution
+// l'ordre de branchement ; on alterne trois ordres avec des budgets croissants (toute solution
 // trouvée est valide ; la première recherche menée à terme donne la réponse exacte).
 // `limit` (rectangle seulement) borne le budget : au-delà, le résultat porte done = false.
 function solveExact(ctx, comp, max, limit = Infinity) {
   if (ctx.H === ctx.W) return solveCore(ctx, comp, max);
   const seen = new Map();
-  for (let b = 3000, round = 0; ; b *= 4, round++) {
-    for (let v = 0; v < 4; v++) {
-      // ordres : le plus contraint d'abord, la victime et les personnes seules d'abord, puis les
-      // mêmes avec un ordre des cases mélangé (déterministe) pour couper les longues traînes
-      const prio = (v & 1) === 1;
-      const rng = v >= 2 ? mulberry32(hashSeed(`solve#${round}#${v}`)) : null;
-      const res = solveCore(ctx, comp, max, rng, b, prio);
+  for (let b = 3000; ; b *= 4) {
+    for (const prio of [0, 1, 2]) {
+      const res = solveCore(ctx, comp, max, null, b, prio);
       if (res.done) return res;
       for (const sol of res) { const key = sol.join(','); if (!seen.has(key)) seen.set(key, sol); }
       if (seen.size >= max) return Array.from(seen.values()).slice(0, max);
