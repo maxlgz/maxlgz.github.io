@@ -8,6 +8,7 @@ import {
 import * as ENGINE from './engine.js';
 import { objectSVG, floorCSS, avatarSVG, LOOK_OPTIONS } from './art.js';
 import { createBoard, tokenHTML } from './board.js';
+import { AMBIENCES, ambienceFromFloors, listen as listenAmbience, stop as stopAmbience, isListening, isAmbience } from './ambience.js';
 
 /* ------------------------------------------------------------------ utilitaires */
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -97,7 +98,7 @@ function defaultState() {
     return { id: initialOf(n), name: n, gender: g, look: randomLook(), clues: [], ...(n === 'Victor' ? { victim: true } : {}) };
   });
   return {
-    id: null, title: 'Nouvelle enquête', intro: '', difficulty: 1, rows: 6, cols: 6,
+    id: null, title: 'Nouvelle enquête', intro: '', ambience: '', difficulty: 1, rows: 6, cols: 6,
     rooms: [{ key: 'a', name: 'Salon', floor: 'wood' }, { key: 'b', name: 'Jardin', floor: 'grass' }],
     grid,
     objects: [
@@ -131,7 +132,7 @@ function fromRaw(raw) {
   });
   return {
     id: typeof raw.id === 'string' && raw.id.startsWith('perso-') ? raw.id : null,
-    title: String(raw.title || ''), intro: String(raw.intro || ''), difficulty: Math.min(3, Math.max(1, Number(raw.difficulty) | 0 || 1)),
+    title: String(raw.title || ''), intro: String(raw.intro || ''), ambience: isAmbience(raw.ambience) ? raw.ambience : '', difficulty: Math.min(3, Math.max(1, Number(raw.difficulty) | 0 || 1)),
     rows, cols, rooms, grid, objects, people, solution, twist: twistFrom(raw.twist),
   };
 }
@@ -204,6 +205,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
       })),
     };
     if (S.intro.trim()) o.intro = S.intro.trim();
+    if (S.ambience) o.ambience = S.ambience;
     if (S.twist && (S.twist.liar || S.twist.weapon)) {
       o.twist = {};
       if (S.twist.liar) o.twist.liar = true;
@@ -490,10 +492,42 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
   }
   const selOpts = (list, cur) => list.map(([v, l]) => `<option value="${esc(v)}"${String(v) === String(cur) ? ' selected' : ''}>${esc(l)}</option>`).join('');
 
+  // Ambiance sonore : choix explicite, ou automatique d'après les sols des pièces.
+  const autoAmbience = () => ambienceFromFloors({ rooms: S.rooms });
+  const ambienceLabel = (id) => (AMBIENCES.find((a) => a.id === id) || { label: id }).label;
+  function ambienceField() {
+    const on = isListening();
+    return `<div class="ed-field"><span id="ed-amb-l">Ambiance sonore</span>
+        <div class="ed-amb">
+          <select class="ed-select" data-f="ambience" aria-labelledby="ed-amb-l">
+            <option value=""${S.ambience ? '' : ' selected'}>Automatique (d’après les sols)</option>
+            ${AMBIENCES.map((a) => `<option value="${a.id}"${S.ambience === a.id ? ' selected' : ''}>${esc(a.label)}</option>`).join('')}
+          </select>
+          <button type="button" class="ed-btn ed-amb-play" data-act="listen" aria-pressed="${on}">${on ? 'Arrêter' : 'Écouter'}</button>
+        </div>
+        <small class="ed-small-note">${S.ambience ? 'Fond sonore joué pendant l’enquête (si le réglage « Ambiance » est activé).' : `Automatique : « ${esc(ambienceLabel(autoAmbience()))} » pour ces sols.`}</small></div>`;
+  }
+  function listenButton(on) {
+    const b = panel.querySelector('[data-act="listen"]');
+    if (!b) return;
+    b.textContent = on ? 'Arrêter' : 'Écouter';
+    b.setAttribute('aria-pressed', String(on));
+  }
+  function toggleListen() {
+    if (isListening()) { stopAmbience(); return; }
+    const id = S.ambience || autoAmbience();
+    if (id === 'none') { say('Silence : cette enquête n’a pas d’ambiance sonore.'); return; }
+    if (listenAmbience(id, { seconds: 6, onEnd: () => { if (!destroyed) listenButton(false); } })) {
+      listenButton(true);
+      say(`Écoute : ${ambienceLabel(id)} (6 secondes).`);
+    }
+  }
+
   function tabGeneral() {
     return `
       <label class="ed-field"><span>Titre</span><input class="ed-input" data-f="title" maxlength="60" value="${esc(S.title)}" autocomplete="off"></label>
       <label class="ed-field"><span>Texte d’introduction</span><textarea class="ed-input" data-f="intro" rows="3" maxlength="300">${esc(S.intro)}</textarea></label>
+      ${ambienceField()}
       <div class="ed-field"><span>Variantes</span>
         <div class="ed-twists">${TWISTS.map(([k, l, h]) => `<label class="ed-switch"><input type="checkbox" role="switch" data-f="twist" data-k="${k}"${S.twist && S.twist[k] ? ' checked' : ''}>
           <span class="ed-switch-track" aria-hidden="true"><i></i></span><span class="ed-switch-text"><b>${l}</b><small>${h}</small></span></label>`).join('')}</div>
@@ -905,7 +939,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
     cadd: (b) => { const p = S.people[+b.dataset.p]; p.clues.push(defaultClue('room', p)); changed(); },
     cdel: (b) => { S.people[+b.dataset.p].clues.splice(+b.dataset.i, 1); changed(); },
     cgen: generate,
-    save, test, quit, newlvl: newLevel, export: exportJson,
+    save, test, quit, newlvl: newLevel, export: exportJson, listen: toggleListen,
     download: () => { S.jsonText = download(); renderPanel(); },
     import: () => importText(panel.querySelector('.ed-json').value),
   };
@@ -938,6 +972,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
     const t = e.target;
     const f = t.dataset && t.dataset.f;
     if (!f) return;
+    if (f === 'ambience') { if (isChange) { if (isListening()) stopAmbience(); S.ambience = isAmbience(t.value) ? t.value : ''; changed(); } return; }
     if (f === 'title') { S.title = t.value; changed({ panel: false }); } else if (f === 'intro') { S.intro = t.value; changed({ panel: false }); } else if (f === 'json') S.jsonText = t.value;
     else if (f === 'rname') { S.rooms[+t.dataset.i].name = t.value; changed({ panel: false }); } else if (f === 'pname') nameField(t, isChange);
     else if (f === 'twist') { if (isChange) { S.twist = { ...(S.twist || {}), [t.dataset.k]: t.checked }; changed(); } }
@@ -1004,6 +1039,7 @@ export function mountEditor(root, { level = null, onTest, onExit } = {}) {
   return {
     destroy() {
       destroyed = true;
+      if (isListening()) stopAmbience();
       timers.forEach((t) => clearTimeout(t));
       timers.clear();
       el.remove();

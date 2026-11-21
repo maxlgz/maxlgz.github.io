@@ -4,6 +4,7 @@ import { objectSVG } from './art.js';
 import { createBoard, tokenHTML } from './board.js';
 import { colorOf } from './palette.js';
 import { play, setEnabled as setSoundEnabled } from './sound.js';
+import { start as startAmbience, stop as stopAmbience, setEnabled as setAmbienceEnabled, duck as duckAmbience, ambienceOf } from './ambience.js';
 
 /* ------------------------------------------------------------------ */
 /* Utilitaires partagés (aussi utilisés par main.js)                   */
@@ -1104,6 +1105,8 @@ export function mountGame(root, opts = {}) {
     try { extra = onSolved ? onSolved(result) : null; } catch (err) { console.warn(err); }
     const m = byId[murdererId];
     const liarP = liarId ? byId[liarId] : null;
+    // L'ambiance passe en sourdine : la fanfare reste au premier plan.
+    duckAmbience(true);
     play('win');
     setStatus(`Affaire classée : ${m.name} était ${fem(m, 'le meurtrier', 'la meurtrière')}.${liarP ? ` ${liarP.name} mentait.` : ''}`, 'ok');
     if (guide) { emit('won', { id: murdererId, ...result }); return; }
@@ -1357,7 +1360,9 @@ export function mountGame(root, opts = {}) {
       <label class="switch"><input type="checkbox" role="switch" data-set="oneTap" ${settings.oneTap ? 'checked' : ''}>
         <span>Pose en un toucher<small>Toucher une case pose le personnage ; l’appui long ajoute une note.</small></span></label>
       <label class="switch"><input type="checkbox" role="switch" data-set="sound" ${settings.sound !== false ? 'checked' : ''}>
-        <span>Sons<small>Petits bruitages pendant l’enquête.</small></span></label>
+        <span>Sons<small>Effets : pose, croix, erreur, victoire…</small></span></label>
+      <label class="switch"><input type="checkbox" role="switch" data-set="ambience" ${settings.ambience !== false ? 'checked' : ''}>
+        <span>Ambiance<small>Fond sonore du lieu : vagues, vent, oiseaux…</small></span></label>
       <label class="switch"><input type="checkbox" role="switch" data-set="theme" ${dark ? 'checked' : ''}>
         <span>Mode sombre<small>Fond sombre, plus reposant le soir.</small></span></label>
       ${onHelp ? `<button type="button" class="btn btn--small" data-pop="help">${ICONS.help} Comment jouer</button>` : ''}
@@ -1374,6 +1379,13 @@ export function mountGame(root, opts = {}) {
         if (inp.checked) { setSoundEnabled(true); play('toggle'); } else { play('toggle'); setSoundEnabled(false); }
         settings = saveSettings({ sound: inp.checked });
         setStatus(inp.checked ? 'Sons activés.' : 'Sons coupés.');
+        return;
+      }
+      if (k === 'ambience') {
+        play('toggle');
+        setAmbienceEnabled(inp.checked);
+        settings = saveSettings({ ambience: inp.checked });
+        setStatus(inp.checked ? 'Ambiance activée.' : 'Ambiance coupée.');
         return;
       }
       play('toggle');
@@ -1426,6 +1438,8 @@ export function mountGame(root, opts = {}) {
   }, 1000);
 
   // ---------- démarrage ----------
+  // Ambiance du lieu (au premier geste si le contexte audio n'est pas encore autorisé).
+  startAmbience(ambienceOf(raw));
   if (guide) {
     guide.attach({
       screen, board, level, people, byId, cardEls, pickEls, tools, topbar, statusEl,
@@ -1476,6 +1490,7 @@ export function mountGame(root, opts = {}) {
       if (destroyed) return;
       save();
       destroyed = true;
+      stopAmbience();
       clearInterval(timer);
       cancelPress();
       closePop(true);

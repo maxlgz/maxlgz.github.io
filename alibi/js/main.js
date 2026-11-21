@@ -9,6 +9,7 @@ import {
 } from './game.js';
 import { CLUE_TYPES } from './engine.js';
 import { play, setEnabled as setSoundEnabled } from './sound.js';
+import { setEnabled as setAmbienceEnabled } from './ambience.js';
 import { GUIDE_LEVEL } from './guide-level.js';
 import { createGuide } from './guide.js';
 
@@ -309,7 +310,8 @@ function openHomeSettings() {
       <div class="set-group"><h3>Thème</h3>${switchHTML('theme', 'Mode sombre', 'Fond sombre, plus reposant le soir.', st.theme === 'dark')}</div>
       <div class="set-group"><h3>Liste</h3>${switchHTML('hideSolved', 'Masquer les énigmes résolues', 'Les énigmes déjà résolues disparaissent de la liste.', !!st.hideSolved)}</div>
       <div class="set-group"><h3>En jeu</h3>${switchHTML('oneTap', 'Pose en un toucher', 'Toucher une case pose le personnage ; l’appui long ajoute une note.', !!st.oneTap)}
-        ${switchHTML('sound', 'Sons', 'Petits bruitages pendant l’enquête.', st.sound !== false)}</div>
+        ${switchHTML('sound', 'Sons', 'Effets : pose, croix, erreur, victoire…', st.sound !== false)}
+        ${switchHTML('ambience', 'Ambiance', 'Fond sonore du lieu : vagues, vent, oiseaux…', st.ambience !== false)}</div>
       <div class="modal-actions"><button type="button" class="btn btn--primary" data-close autofocus>Fermer</button></div>`;
     body.addEventListener('click', (e) => {
       if (e.target.closest('[data-close]')) { close(); back(); return; }
@@ -332,7 +334,8 @@ function openHomeSettings() {
         return;
       }
       play('toggle');
-      if (key === 'theme') { saveSettings({ theme: on ? 'dark' : 'light' }); applyTheme(on ? 'dark' : 'light'); }
+      if (key === 'ambience') { setAmbienceEnabled(on); saveSettings({ ambience: on }); }
+      else if (key === 'theme') { saveSettings({ theme: on ? 'dark' : 'light' }); applyTheme(on ? 'dark' : 'light'); }
       else if (key === 'hideSolved') { saveSettings({ hideSolved: on }); if (document.querySelector('.home')) renderHome(); }
       else saveSettings({ [key]: on });
     });
