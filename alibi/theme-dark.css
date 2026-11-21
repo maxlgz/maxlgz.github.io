@@ -233,3 +233,12 @@
 :root[data-theme="dark"] .ed-rost[aria-pressed='true'],
 :root[data-theme="dark"] .ed-chip-btn[aria-pressed='true'] { background: var(--sun); }
 :root[data-theme="dark"] .ed-card .ed-card { background: var(--paper-3); }
+
+/* ---------- 13. Enquête guidée ---------- */
+:root[data-theme="dark"] :where(.guide-bubble, .guide-arrow, .guide-step, .guide-remind, .guide-note) { border-color: var(--edge); }
+:root[data-theme="dark"] .guide-bubble { background: var(--raise); box-shadow: inset 0 -5px 0 var(--band), 0 4px 0 rgba(5, 6, 18, 0.6); }
+:root[data-theme="dark"] .guide-arrow { background: var(--raise); }
+:root[data-theme="dark"] .guide-step { color: var(--on-vivid); }
+:root[data-theme="dark"] .guide-remind { background: var(--tint-hint); }
+:root[data-theme="dark"] .guide-ring { box-shadow: 0 0 0 3px #0C0D20, inset 0 0 0 2px #0C0D20; }
+:root[data-theme="dark"] .guide-note { background: var(--paper-2); }
