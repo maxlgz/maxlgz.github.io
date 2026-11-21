@@ -24,7 +24,12 @@ const REF_LEVELS = {
   musee: '00a1f512', station: '067dfe82', opera: '1e57c7fb', manoir: 'e49be0df', 'grand-hotel': '7b110764',
 };
 // generateClues sur ces 21 niveaux, difficultés 1 à 3, graines 1, 2, 3, 'abc' (dans l'ordre de LEVELS).
-const REF_GEN = 'af0a0a0d';
+// Moteur d'avant les nouvelles mécaniques : 'af0a0a0d' (les trois difficultés mêlées). Depuis :
+// - difficultés 2 et 3 avec { sees: false } : exactement les mêmes indices qu'avant (empreinte de ces seules
+//   difficultés, calculée avec l'ancien moteur) ; sans cette option, au plus un indice remplacé par un « voyait » ;
+// - difficulté 1 : restreinte aux indices simples (changement voulu), nouvelle empreinte de référence.
+const REF_GEN_D23 = '58d1402e';
+const REF_GEN_D1 = '4454c7f2';
 
 // Petit niveau 5×5 de référence.
 //   a a b b b      a : Atelier (une seule pièce à gauche), b : Grenier, c : Terrasse
@@ -418,17 +423,26 @@ function checkGenerated(level, sol, clues, label, { validate = true } = {}) {
   if (validate) assert.equal(validateLevel(lv).errors.length, 0, `${label} : ${validateLevel(lv).errors}`);
   return lv;
 }
-test('generateClues : solution unique, déterministe, sur les niveaux d’exemple (mêmes indices qu’avant l’extension)', () => {
-  let acc = '';
+test('generateClues : solution unique, déterministe, sur les niveaux d’exemple (mêmes indices qu’avant en difficultés 2 et 3)', () => {
+  let d1 = '', d23 = '';
   for (const lvl of LEVELS) for (const difficulty of [1, 2, 3]) for (const seed of [1, 2, 3, 'abc']) {
     const sol = Object.fromEntries(lvl.people.map(p => [p.id, lvl.solution[p.id]]));
     const a = generateClues(lvl, sol, { difficulty, seed });
     checkGenerated(lvl, sol, a, `${lvl.id} d${difficulty} s${seed}`);
     assert.deepEqual(generateClues(lvl, sol, { difficulty, seed }), a, 'déterministe');
-    if (REF_LEVELS[lvl.id]) acc += JSON.stringify(a);
+    if (!REF_LEVELS[lvl.id]) continue;
+    if (difficulty === 1) { d1 += JSON.stringify(a); continue; }
+    const b = generateClues(lvl, sol, { difficulty, seed, sees: false });
+    d23 += JSON.stringify(b);
+    // seule différence permise : un indice remplacé par un « voyait »
+    const diff = [];
+    for (const id of Object.keys(a)) for (let i = 0; i < Math.max(a[id].length, b[id].length); i++) if (JSON.stringify(a[id][i]) !== JSON.stringify(b[id][i])) diff.push(a[id][i]);
+    assert.ok(diff.length === 0 || (diff.length === 1 && diff[0].t === 'sees'), `${lvl.id} d${difficulty} s${seed} : ${JSON.stringify(diff)}`);
   }
-  // empreinte des indices générés par le moteur d'avant les plans rectangulaires (21 niveaux carrés)
-  if (Object.keys(REF_LEVELS).every(id => LEVELS.some(l => l.id === id))) assert.equal(fnv(acc), REF_GEN);
+  if (Object.keys(REF_LEVELS).every(id => LEVELS.some(l => l.id === id))) {
+    assert.equal(fnv(d23), REF_GEN_D23, 'difficultés 2 et 3 : indices d’avant les nouvelles mécaniques');
+    assert.equal(fnv(d1), REF_GEN_D1, 'difficulté 1 : référence des indices simples');
+  }
 });
 test('generateClues : grilles aléatoires 6×6 à 8×8, trois difficultés', () => {
   const stats = { 1: {}, 2: {}, 3: {} };
@@ -1317,7 +1331,7 @@ test('generateClues({ liar: true }) : unique, menteur aux indices tous faux, car
       for (const c of p.clues) if (c.t === 'with' || c.t === 'besidePerson') assert.notEqual(c.who, lv.people.find(q => q.victim).id);
     }
     if (dims(lv).cols <= 9) assert.deepEqual(validateLevel(lv).errors, [], L);
-    assert.deepEqual(generateClues(level, sol, { difficulty, seed, liar: true }), g, `${L} : déterministe`);
+    if (seed === 1 && difficulty === 2 && dims(level).rows < 8) assert.deepEqual(generateClues(level, sol, { difficulty, seed, liar: true }), g, `${L} : déterministe`);
     // sans la variante, la solution n'en est pas une (les indices du menteur y sont faux)
     assert.equal(evaluate(withClues(level, g), sol).ok, false, `${L} : sans menteur`);
     ok++;

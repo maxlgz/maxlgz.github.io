@@ -1294,7 +1294,9 @@ function flipCandidate(ctx, p, cand, unblocked) {
   return { clue, cat: cand.cat, neg: !!clue.not, cc, set, sym: cand.sym, sel, norm: cand.norm };
 }
 
-export function generateClues(level, solution, { difficulty = 1, seed = 1, liar = false } = {}) {
+// Options : difficulty (1 à 3), seed, liar (témoin menteur). `sees: false` désactive le remplacement
+// occasionnel par un « voyait » (difficultés 2 et 3 : on retrouve alors exactement l'ancien générateur).
+export function generateClues(level, solution, { difficulty = 1, seed = 1, liar = false, sees = true } = {}) {
   const raw = clone(level && level[PREP] ? stripPrep(level) : (level || {}));
   (raw.people || []).forEach(p => { p.clues = []; });
   const L = prepare(raw), ctx = L[PREP];
@@ -1528,7 +1530,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1, liar 
 
   // 4) difficultés 2 et 3 : de temps en temps, un indice est remplacé par un « voyait » (avec parcimonie ;
   //    tirage séparé, le reste de la génération est inchangé)
-  if (dLevel >= 2) {
+  if (dLevel >= 2 && sees !== false) {
     const r2 = mulberry32(hashSeed(`${seed}#sees#${dLevel}#${(raw.roomMap || []).join('/')}#${ctx.people.map(p => p.id).join('')}`));
     if (r2() < (dLevel === 2 ? 0.2 : 0.3)) {
       const types = Object.keys(ctx.typeCount).filter(t => OBJECTS[t]);
@@ -1660,7 +1662,7 @@ export function explain(level, placements, { prefer } = {}) {
         if (cl) why = `l'indice de ${nm(q)} « ${clueHTML(L, person(q), cl)} » n'est alors pas respecté`;
       }
     }
-    if (!why) why = `rien ne ${fem(p) ? 'la' : 'le'} contredit encore, mais ${fem(p) ? 'sa' : 'sa'} bonne case est ailleurs`;
+    if (!why) why = `rien ne ${fem(p) ? 'la' : 'le'} contredit encore, mais sa bonne case est ailleurs`;
     return { kind: 'wrong', person: person(p).id, cell: [r, c], cells: [[r, c]], html: `${nm(p)} n'est pas à sa place : ${why}.` };
   }
   const unplaced = [];
