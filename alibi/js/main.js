@@ -1,0 +1,332 @@
+// Alibi — coquille : accueil, routage par hash, stockage.
+import { LEVELS } from './levels.js';
+import { floorColor } from './art.js';
+import {
+  mountGame, openModal, confirmDialog, loadSettings, saveSettings,
+  readJSON, writeJSON, removeKey, esc, formatTime, ICONS,
+} from './game.js';
+
+const app = document.getElementById('app');
+const DIFFS = [
+  { d: 1, label: 'Facile', meta: 'pour se faire la main' },
+  { d: 2, label: 'Moyen', meta: 'quelques détours' },
+  { d: 3, label: 'Difficile', meta: 'pour fins limiers' },
+];
+
+/* ---------------- stockage ---------------- */
+const getProgress = () => { const p = readJSON('alibi:progress', {}); return p && typeof p === 'object' ? p : {}; };
+const getCustom = () => { const c = readJSON('alibi:custom', []); return Array.isArray(c) ? c.filter((l) => l && typeof l === 'object' && l.id) : []; };
+const hasSave = (id) => { try { return localStorage.getItem(`alibi:save:${id}`) != null; } catch { return false; } };
+
+function recordSolve(levelId, { seconds }) {
+  const prog = getProgress();
+  const prev = prog[levelId];
+  const record = !prev || !prev.best || seconds < prev.best;
+  prog[levelId] = { done: true, best: record ? seconds : prev.best };
+  writeJSON('alibi:progress', prog);
+  return { record: record && !!prev, best: prog[levelId].best };
+}
+
+const officialLevels = () => (Array.isArray(LEVELS) ? LEVELS : []);
+function findLevel(id) {
+  return officialLevels().find((l) => l.id === id) || getCustom().find((l) => l.id === id) || null;
+}
+
+/* ---------------- vignette ---------------- */
+function thumbSVG(level) {
+  const n = level.size || (level.roomMap ? level.roomMap.length : 5);
+  const rooms = Object.fromEntries((level.rooms || []).map((r) => [r.key, r]));
+  const map = level.roomMap || [];
+  const at = (r, c) => (map[r] ? map[r][c] : undefined);
+  let rects = '';
+  let walls = '';
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const room = rooms[at(r, c)];
+      let col = '#e6dcc8';
+      try { if (room && room.floor) col = floorColor(room.floor) || col; } catch { /* rien */ }
+      rects += `<rect x="${c * 10}" y="${r * 10}" width="10.4" height="10.4" fill="${esc(col)}"/>`;
+      if (c < n - 1 && at(r, c + 1) !== at(r, c)) walls += `M${(c + 1) * 10} ${r * 10}v10`;
+      if (r < n - 1 && at(r + 1, c) !== at(r, c)) walls += `M${c * 10} ${(r + 1) * 10}h10`;
+    }
+  }
+  let objs = '';
+  for (const o of level.objects || []) {
+    objs += `<rect x="${o.c * 10 + 2}" y="${o.r * 10 + 2}" width="${(o.w || 1) * 10 - 4}" height="${(o.h || 1) * 10 - 4}" rx="2" fill="#23212b" opacity=".22"/>`;
+  }
+  return `<svg viewBox="0 0 ${n * 10} ${n * 10}" aria-hidden="true" preserveAspectRatio="none">${rects}${objs}<path d="${walls}" stroke="#23212b" stroke-width="1.3" fill="none" stroke-linecap="square"/></svg>`;
+}
+
+/* ---------------- tutoriel ---------------- */
+function mini(n, rooms, marks = {}) {
+  let html = `<div class="mini" style="--n:${n}" aria-hidden="true">`;
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const k = rooms[r][c];
+      const cls = [k === 'b' ? 'b' : 'a'];
+      if (c < n - 1 && rooms[r][c + 1] !== k) cls.push('wr');
+      if (r < n - 1 && rooms[r + 1][c] !== k) cls.push('wb');
+      const m = marks[`${r},${c}`];
+      let l = '';
+      if (m) { cls.push(...m.cls.split(' ')); l = m.l || ''; }
+      html += `<i class="${cls.join(' ')}"${l ? ` data-l="${esc(l)}"` : ''}></i>`;
+    }
+  }
+  return `${html}</div>`;
+}
+
+const TUTO = [
+  {
+    title: 'Un crime, un plan',
+    html: `<p>Quelqu'un a été tué. Toutes les personnes présentes figurent dans le dossier, et chacune a laissé un témoignage. Votre travail : retrouver <b>la case exacte</b> où se tenait chacune d'elles, puis démasquer le coupable.</p>
+      <p>Les témoignages ne mentent jamais. À vous de les croiser.</p>`,
+    fig: () => `<figure>${mini(4, ['aabb', 'aabb', 'aabb', 'aabb'], { '0,1': { cls: 'p', l: 'A' }, '2,3': { cls: 'p v', l: 'V' }, '1,2': { cls: 'obj' } })}<figcaption>Un plan, des pièces, des objets</figcaption></figure>`,
+  },
+  {
+    title: 'Une personne par ligne et par colonne',
+    html: `<p>Sur chaque ligne et sur chaque colonne du plan se trouve <b>exactement une personne</b>. Dès que vous posez quelqu'un, le reste de sa ligne et de sa colonne se barre de petites croix pâles pour vous le rappeler.</p>`,
+    fig: () => `<figure>${mini(4, ['aaaa', 'aaaa', 'aaaa', 'aaaa'], {
+      '0,2': { cls: 'p', l: 'A' }, '1,0': { cls: 'p', l: 'B' }, '2,3': { cls: 'p', l: 'C' }, '3,1': { cls: 'p', l: 'D' },
+    })}<figcaption>Correct : une par ligne, une par colonne</figcaption></figure>
+      <figure>${mini(4, ['aaaa', 'aaaa', 'aaaa', 'aaaa'], {
+      '1,1': { cls: 'p', l: 'A' }, '1,0': { cls: 'x' }, '1,2': { cls: 'x' }, '1,3': { cls: 'x' }, '0,1': { cls: 'x' }, '2,1': { cls: 'x' }, '3,1': { cls: 'x' },
+    })}<figcaption>Croix automatiques autour d'une pose</figcaption></figure>`,
+  },
+  {
+    title: '« À côté », c’est collé… et dans la même pièce',
+    html: `<p>Une case est <b>à côté</b> d'une autre si elle la touche par un bord (en haut, en bas, à gauche ou à droite) <b>et</b> qu'elle est dans la même pièce. Les diagonales ne comptent pas, et un mur sépare toujours.</p>
+      <p>Les points sur les fiches s'allument en vert ou en rouge dès que vos poses suffisent à trancher un indice.</p>`,
+    fig: () => `<figure>${mini(3, ['aab', 'aab', 'aab'], {
+      '1,1': { cls: 'p', l: 'A' }, '0,1': { cls: 'ok' }, '2,1': { cls: 'ok' }, '1,0': { cls: 'ok' }, '1,2': { cls: 'no' }, '0,0': { cls: 'no' }, '2,2': { cls: 'no' },
+    })}<figcaption>Vert : à côté de A. Rouge : diagonale ou derrière un mur</figcaption></figure>`,
+  },
+  {
+    title: 'Noter ou poser',
+    html: `<p>Choisissez d'abord une personne (sa fiche ou son jeton). Ensuite :</p>
+      <ul><li><b>Toucher brièvement</b> une case y inscrit son initiale au crayon : une simple hypothèse. Plusieurs notes peuvent cohabiter ; retouchez pour effacer.</li>
+      <li><b>Appuyer longuement</b> (ou double-clic, clic droit) pose réellement la personne. Ses notes ailleurs disparaissent.</li></ul>
+      <p>Outils : croix manuelles, gomme (appui long = tout effacer), annuler, indice. Le réglage « pose en un toucher » inverse les deux gestes.</p>`,
+    fig: () => `<figure>${mini(3, ['aaa', 'aaa', 'aaa'], { '0,0': { cls: 'n', l: 'A' }, '0,2': { cls: 'n', l: 'AB' }, '2,1': { cls: 'n', l: 'B' } })}<figcaption>Notes au crayon</figcaption></figure>
+      <figure>${mini(3, ['aaa', 'aaa', 'aaa'], { '1,1': { cls: 'p', l: 'A' }, '1,0': { cls: 'x' }, '1,2': { cls: 'x' }, '0,1': { cls: 'x' }, '2,1': { cls: 'x' } })}<figcaption>Pose (appui long)</figcaption></figure>`,
+  },
+  {
+    title: 'Seul à seul avec la victime',
+    html: `<p>La victime se trouvait <b>seule avec son meurtrier</b> : sa pièce contient exactement deux personnes, ni plus ni moins. Quand tout le monde est posé, validez votre plan ; s'il tient, il ne reste qu'à désigner le coupable.</p>`,
+    fig: () => `<figure>${mini(4, ['aabb', 'aabb', 'aaab', 'aaab'], {
+      '0,3': { cls: 'p v', l: 'V' }, '1,2': { cls: 'p', l: 'M' }, '2,0': { cls: 'p', l: 'C' }, '3,1': { cls: 'p', l: 'D' },
+    })}<figcaption>V et M seuls dans la pièce de droite : M est coupable</figcaption></figure>`,
+  },
+];
+
+let tutoOpen = null;
+function showTutorial() {
+  if (tutoOpen) return;
+  let step = 0;
+  const finish = () => { tutoOpen = null; saveSettings({ tutoSeen: true }); };
+  tutoOpen = openModal((body, close) => {
+    const draw = () => {
+      const s = TUTO[step];
+      body.innerHTML = `<div class="modal-kicker">Comment jouer · ${step + 1}/${TUTO.length}</div>
+        <h2>${s.title}</h2>
+        <div class="tuto-fig">${s.fig()}</div>
+        ${s.html}
+        <div class="tuto-dots" aria-hidden="true">${TUTO.map((_, i) => `<i class="${i === step ? 'on' : ''}"></i>`).join('')}</div>
+        <div class="modal-actions">
+          ${step === 0 ? '<button type="button" class="btn btn--ghost" data-t="skip">Passer</button>' : '<button type="button" class="btn btn--ghost" data-t="prev">Précédent</button>'}
+          ${step < TUTO.length - 1 ? '<button type="button" class="btn btn--primary" data-t="next" autofocus>Suivant</button>' : '<button type="button" class="btn btn--accent" data-t="done" autofocus>C’est parti</button>'}
+        </div>`;
+      const primary = body.querySelector('[data-t="next"],[data-t="done"]');
+      if (primary) primary.focus();
+    };
+    body.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-t]');
+      if (!b) return;
+      const t = b.dataset.t;
+      if (t === 'next') { step++; draw(); } else if (t === 'prev') { step--; draw(); } else { close(); finish(); }
+    });
+    draw();
+  }, { label: 'Comment jouer', className: 'modal--tuto', onCancel: finish });
+}
+function maybeFirstTutorial() {
+  if (!loadSettings().tutoSeen) showTutorial();
+}
+
+/* ---------------- écrans ---------------- */
+let current = null;
+let routeToken = 0;
+function unmount() {
+  if (current && typeof current.destroy === 'function') { try { current.destroy(); } catch (e) { console.warn(e); } }
+  current = null;
+  app.innerHTML = '';
+}
+
+function levelCard(l, prog) {
+  const p = prog[l.id];
+  const done = p && p.done;
+  return `<a class="level-card${hasSave(l.id) && !done ? ' has-save' : ''}" href="#/jouer/${encodeURIComponent(l.id)}" aria-label="${esc(l.title)}, ${l.size}×${l.size}${done ? ', résolu' : ''}">
+    <span class="thumb">${thumbSVG(l)}</span>
+    ${done ? '<span class="stamp">Résolu</span>' : ''}
+    <h3>${esc(l.title)}</h3>
+    <span class="sub">${l.size}×${l.size} · ${(l.people || []).length} pers.</span>
+    ${done && p.best ? `<span class="best">Record ${formatTime(p.best)}</span>` : ''}
+  </a>`;
+}
+
+function renderHome() {
+  unmount();
+  document.title = 'Alibi — jeu de déduction';
+  const prog = getProgress();
+  const levels = officialLevels();
+  const custom = getCustom();
+  const dots = (d) => `<span class="diff-dots" aria-hidden="true">${[1, 2, 3].map((i) => `<i class="${i <= d ? 'on' : ''}"></i>`).join('')}</span>`;
+  const sections = DIFFS.map(({ d, label, meta }) => {
+    const ls = levels.filter((l) => (l.difficulty || 1) === d);
+    if (!ls.length) return '';
+    const solved = ls.filter((l) => prog[l.id] && prog[l.id].done).length;
+    return `<section class="home-section" aria-labelledby="h-d${d}">
+      <div class="section-head"><h2 id="h-d${d}">${label}</h2>${dots(d)}<span class="meta">${meta} · ${solved}/${ls.length} résolus</span></div>
+      <div class="level-grid">${ls.map((l) => levelCard(l, prog)).join('')}</div>
+    </section>`;
+  }).join('');
+  const customHTML = custom.length
+    ? `<div class="custom-list">${custom.map((l) => {
+      const p = prog[l.id];
+      return `<div class="custom-item">
+        <span class="thumb">${thumbSVG(l)}</span>
+        <div><h3>${esc(l.title || 'Sans titre')}</h3><span class="sub">${l.size}×${l.size} · ${(l.people || []).length} pers.${p && p.done ? ` · résolu en ${formatTime(p.best)}` : ''}</span></div>
+        <div class="actions">
+          <a class="btn btn--small btn--primary" href="#/jouer/${encodeURIComponent(l.id)}">Jouer</a>
+          <a class="btn btn--small" href="#/editeur/${encodeURIComponent(l.id)}">Modifier</a>
+          <button type="button" class="btn btn--small btn--ghost" data-del="${esc(l.id)}">Supprimer</button>
+        </div></div>`;
+    }).join('')}</div>`
+    : '<p class="empty-note">Aucun niveau personnel pour l’instant. Dessinez le vôtre dans l’éditeur !</p>';
+
+  const el = document.createElement('div');
+  el.className = 'home';
+  el.innerHTML = `
+    <header class="hero">
+      <span class="hero-tab">DOSSIER N° ${String(levels.length).padStart(3, '0')}</span>
+      <h1>Alibi<span>.</span></h1>
+      <p>Un crime, un plan, des témoins qui ne mentent jamais. Placez chacun à sa place : le coupable finira par se trahir.</p>
+      <div class="hero-actions">
+        <button type="button" class="btn btn--primary" data-home="tuto">${ICONS.help} Comment jouer</button>
+        <a class="btn" href="#/editeur">${ICONS.pencil} Éditeur de niveaux</a>
+      </div>
+    </header>
+    ${sections || '<p class="empty-note">Aucun niveau officiel disponible.</p>'}
+    <section class="home-section" aria-labelledby="h-perso">
+      <div class="section-head"><h2 id="h-perso">Mes niveaux</h2><span class="meta">${custom.length} niveau${custom.length > 1 ? 'x' : ''}</span></div>
+      ${customHTML}
+      <a class="btn btn--small" href="#/editeur">+ Nouveau niveau</a>
+    </section>
+    <p class="home-foot">Alibi — une enquête logique, faite main.</p>`;
+  app.appendChild(el);
+  el.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-home="tuto"]')) { showTutorial(); return; }
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      const id = del.dataset.del;
+      const lvl = getCustom().find((l) => l.id === id);
+      const ok = await confirmDialog({
+        kicker: 'Mes niveaux', title: 'Supprimer ce niveau ?',
+        text: `« ${lvl ? lvl.title || 'Sans titre' : id} » sera définitivement supprimé de cet appareil.`,
+        ok: 'Supprimer', danger: true,
+      });
+      if (!ok) return;
+      writeJSON('alibi:custom', getCustom().filter((l) => l.id !== id));
+      removeKey(`alibi:save:${id}`);
+      const prog = getProgress();
+      if (prog[id]) { delete prog[id]; writeJSON('alibi:progress', prog); }
+      renderHome();
+    }
+  });
+  current = { destroy() {} };
+  maybeFirstTutorial();
+}
+
+function renderNotice(title, text) {
+  unmount();
+  app.innerHTML = `<div class="notice"><h1>${esc(title)}</h1><p>${esc(text)}</p><a class="btn btn--primary" href="#/">Retour à l’accueil</a></div>`;
+}
+
+function renderGame(level, { test = false } = {}) {
+  unmount();
+  document.title = `${level.title || 'Enquête'} — Alibi`;
+  const levels = officialLevels();
+  const idx = levels.findIndex((l) => l.id === level.id);
+  const isOfficial = idx >= 0;
+  const next = isOfficial ? levels.slice(idx + 1).find(Boolean) : null;
+  const backToEditor = () => {
+    const inCustom = getCustom().some((l) => l.id === level.id);
+    location.hash = inCustom ? `#/editeur/${encodeURIComponent(level.id)}` : '#/editeur';
+  };
+  current = mountGame(app, {
+    level,
+    persist: !test,
+    exitLabel: test ? 'Retour à l’éditeur' : 'Accueil',
+    onExit: test ? backToEditor : () => { location.hash = '#/'; },
+    onSolved: test ? () => null : (res) => recordSolve(level.id, res),
+    onNext: next ? () => { location.hash = `#/jouer/${encodeURIComponent(next.id)}`; } : null,
+    onHelp: showTutorial,
+  });
+  if (!test) maybeFirstTutorial();
+}
+
+async function renderEditor(id, token) {
+  unmount();
+  document.title = 'Éditeur — Alibi';
+  app.innerHTML = '<p class="notice">Ouverture de l’éditeur…</p>';
+  let mod;
+  try {
+    mod = await import('./editor.js');
+  } catch (err) {
+    if (token !== routeToken) return;
+    console.warn('Éditeur indisponible :', err);
+    renderNotice('Éditeur indisponible', 'Le module de l’éditeur n’a pas pu être chargé. Réessayez plus tard.');
+    return;
+  }
+  if (token !== routeToken) return;
+  if (!mod || typeof mod.mountEditor !== 'function') {
+    renderNotice('Éditeur indisponible', 'Le module de l’éditeur est incomplet.');
+    return;
+  }
+  app.innerHTML = '';
+  const level = id ? getCustom().find((l) => l.id === id) || null : null;
+  try {
+    current = mod.mountEditor(app, {
+      level: level ? JSON.parse(JSON.stringify(level)) : null,
+      onTest: (raw) => {
+        writeJSON('alibi:test', raw, 'session');
+        location.hash = '#/test';
+      },
+      onExit: () => { location.hash = '#/'; },
+    });
+  } catch (err) {
+    console.error(err);
+    renderNotice('Éditeur indisponible', 'L’éditeur a rencontré une erreur au démarrage.');
+  }
+}
+
+function route() {
+  const token = ++routeToken;
+  const hash = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+  const parts = hash.split('/').filter(Boolean);
+  window.scrollTo(0, 0);
+  if (!parts.length) return renderHome();
+  if (parts[0] === 'jouer' && parts[1]) {
+    const lvl = findLevel(parts.slice(1).join('/'));
+    if (!lvl) return renderNotice('Dossier introuvable', 'Ce niveau n’existe pas (ou plus) sur cet appareil.');
+    return renderGame(lvl);
+  }
+  if (parts[0] === 'test') {
+    const lvl = readJSON('alibi:test', null, 'session');
+    if (!lvl || !lvl.size) return renderNotice('Aucun niveau à tester', 'Ouvrez l’éditeur et utilisez « Tester » pour jouer votre niveau.');
+    return renderGame(lvl, { test: true });
+  }
+  if (parts[0] === 'editeur') return renderEditor(parts.slice(1).join('/') || null, token);
+  return renderHome();
+}
+
+window.addEventListener('hashchange', route);
+route();

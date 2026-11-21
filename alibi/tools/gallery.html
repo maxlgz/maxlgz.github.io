@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alibi — planche de contrôle</title>
+<style>
+  :root { --paper:#f4ecdd; --paper-2:#eadfca; --ink:#23212b; --ink-soft:#5b5766; --accent:#b3262f; --brass:#c8973a; --teal:#2f6f73; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px; background: var(--paper); color: var(--ink); font: 13px/1.4 system-ui, sans-serif; }
+  h1, h2 { font-family: Georgia, 'Times New Roman', serif; font-weight: normal; }
+  h1 { margin: 0 0 4px; }
+  h2 { margin: 28px 0 10px; border-bottom: 2px solid var(--ink); padding-bottom: 4px; font-variant: small-caps; letter-spacing: .08em; }
+  .wrap { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-start; }
+  .item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .label { font: 11px ui-monospace, monospace; color: var(--ink-soft); }
+  .board { position: relative; display: grid; border: 2px solid var(--ink); }
+  .cell { border-right: 1px dashed rgba(35,33,43,.25); border-bottom: 1px dashed rgba(35,33,43,.25); }
+  .obj { position: absolute; pointer-events: none; }
+  .obj svg { display: block; width: 100%; height: 100%; }
+  .token { position: absolute; border-radius: 50%; border: 2px solid var(--ink); background: #f4ecdd; box-shadow: 0 1px 2px rgba(0,0,0,.3); display:flex; align-items:center; justify-content:center; font: bold 11px Georgia, serif; }
+  .row { display: flex; gap: 6px; align-items: flex-end; }
+  .faces { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
+  .face { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .face .small { display: flex; gap: 4px; align-items: center; }
+</style>
+</head>
+<body>
+<h1>Alibi — planche de contrôle des visuels</h1>
+<div class="label">Objets vus de dessus, sols, portraits — généré par ../js/art.js</div>
+
+<h2>Objets 1×1 (44 px et 72 px, jeton sur les occupables)</h2>
+<div class="wrap" id="singles"></div>
+
+<h2>Objets multi-cases</h2>
+<div class="wrap" id="multis"></div>
+
+<h2>Sols (blocs 3×3, 56 px et 36 px)</h2>
+<div class="wrap" id="floors"></div>
+
+<h2>Portraits (96 px et 32 px)</h2>
+<div class="faces" id="faces"></div>
+
+<script type="module">
+import { objectSVG, floorCSS, floorColor, avatarSVG, LOOK_OPTIONS } from '../js/art.js';
+
+const BLOCK = ['tree','bush','rock','plant','shelf','table','desk','counter','wardrobe','barrel','crate','statue','fountain','piano','stove','fireplace','lamp','telescope','aquarium','well'];
+const OCC = ['chair','armchair','sofa','stool','bench','bed','deckchair','hammock','rug','bathtub','boat','car','tent','stage'];
+const FLOORS = ['grass','wood','parquet','tile','stone','carpet','sand','snow','concrete','deck','marble','gravel'];
+const FLOOR_FOR = { tree:'grass', bush:'grass', rock:'gravel', plant:'parquet', shelf:'wood', table:'tile', desk:'carpet', counter:'tile',
+  wardrobe:'parquet', barrel:'stone', crate:'concrete', statue:'marble', fountain:'stone', piano:'parquet', stove:'wood', fireplace:'stone',
+  lamp:'carpet', telescope:'deck', aquarium:'marble', well:'grass', chair:'wood', armchair:'carpet', sofa:'parquet', stool:'tile',
+  bench:'gravel', bed:'wood', deckchair:'sand', hammock:'grass', rug:'wood', bathtub:'tile', boat:'sand', car:'concrete', tent:'snow', stage:'deck' };
+
+function board(type, w, h, cell, floor, token, gw = w, gh = h) {
+  const b = document.createElement('div');
+  b.className = 'board';
+  b.style.gridTemplateColumns = `repeat(${gw}, ${cell}px)`;
+  b.style.gridTemplateRows = `repeat(${gh}, ${cell}px)`;
+  for (let i = 0; i < gw * gh; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    c.style.background = floorCSS(floor);
+    b.appendChild(c);
+  }
+  if (type) {
+    const o = document.createElement('div');
+    o.className = 'obj';
+    o.style.left = '0px'; o.style.top = '0px';
+    o.style.width = w * cell + 'px'; o.style.height = h * cell + 'px';
+    o.innerHTML = objectSVG(type, { w, h });
+    b.appendChild(o);
+    if (token) {
+      const t = document.createElement('div');
+      t.className = 'token';
+      const d = cell * 0.6;
+      t.style.width = t.style.height = d + 'px';
+      t.style.left = (cell - d) / 2 + 'px'; t.style.top = (cell - d) / 2 + 'px';
+      t.textContent = 'A';
+      b.appendChild(t);
+    }
+  }
+  return b;
+}
+
+function item(label, ...nodes) {
+  const d = document.createElement('div');
+  d.className = 'item';
+  const r = document.createElement('div');
+  r.className = 'row';
+  nodes.forEach((x) => r.appendChild(x));
+  d.appendChild(r);
+  const l = document.createElement('div');
+  l.className = 'label';
+  l.textContent = label;
+  d.appendChild(l);
+  return d;
+}
+
+const singles = document.getElementById('singles');
+for (const t of [...BLOCK, ...OCC, 'mystere']) {
+  const f = FLOOR_FOR[t] || 'wood';
+  const nodes = [board(t, 1, 1, 44, f), board(t, 1, 1, 72, f)];
+  if (OCC.includes(t)) nodes.push(board(t, 1, 1, 72, f, true));
+  singles.appendChild(item(t, ...nodes));
+}
+
+const MULTI = [
+  ['sofa',2,1],['sofa',1,2],['bench',2,1],['bench',1,2],['bed',1,2],['bed',2,1],['bed',2,2],['rug',2,1],['rug',1,2],['rug',2,2],
+  ['car',2,1],['car',1,2],['boat',2,1],['boat',1,2],['stage',2,1],['stage',3,2],['stage',2,2],['stage',2,3],
+  ['table',2,1],['table',1,2],['table',2,2],['desk',2,1],['desk',1,2],['counter',2,1],['counter',3,1],['counter',1,2],
+  ['shelf',2,1],['shelf',1,2],['wardrobe',2,1],['aquarium',2,1],['aquarium',1,2],['piano',2,2],['piano',2,1],
+  ['tree',2,2],['tree',2,1],['bush',2,1],['rock',2,1],['fountain',2,2],['well',2,2],['bathtub',2,1],['bathtub',1,2],
+  ['hammock',2,1],['hammock',1,2],['deckchair',1,2],['tent',2,2],['fireplace',2,1],['statue',2,2],['crate',2,1],['barrel',1,2],
+];
+const multis = document.getElementById('multis');
+for (const [t, w, h] of MULTI) {
+  const f = FLOOR_FOR[t] || 'wood';
+  multis.appendChild(item(`${t} ${w}×${h}`, board(t, w, h, 56, f, OCC.includes(t))));
+}
+
+const floors = document.getElementById('floors');
+for (const f of FLOORS) {
+  const sw = document.createElement('div');
+  sw.style.cssText = `width:16px;height:16px;border:1px solid #23212b;background:${floorColor(f)}`;
+  floors.appendChild(item(f + ' ' + floorColor(f), board(null, 3, 3, 56, f), board(null, 3, 3, 36, f), sw));
+}
+
+const PEOPLE = [
+  { name: 'Agathe', gender: 'f' }, { name: 'Bruno', gender: 'm' }, { name: 'Céleste', gender: 'f' }, { name: 'Damien', gender: 'm' },
+  { name: 'Élise', gender: 'f' }, { name: 'Fernand', gender: 'm' }, { name: 'Gisèle', gender: 'f' }, { name: 'Hugo', gender: 'm' },
+  { name: 'Inès', gender: 'f' }, { name: 'Jules', gender: 'm' }, { name: 'Karim', gender: 'm' }, { name: 'Léa', gender: 'f' },
+  { name: 'Marius', gender: 'm' }, { name: 'Nadia', gender: 'f' }, { name: 'Octave', gender: 'm' }, { name: 'Paulette', gender: 'f' },
+  { name: 'Quentin', gender: 'm' }, { name: 'Rosalie', gender: 'f' }, { name: 'Samuel', gender: 'm' }, { name: 'Thaïs', gender: 'f' },
+  { name: 'Victor', gender: 'm', look: { skin: 1, hair: 8, hairColor: 6, accessory: 'moustache', bg: 5 } },
+  { name: 'Yvonne', gender: 'f', look: { skin: 4, hair: 5, hairColor: 0, accessory: 'earrings', bg: 2 } },
+  { name: 'Zoé', gender: 'f', look: { skin: 0, hair: 9, hairColor: 5, accessory: 'bow', bg: 1 } },
+  { name: 'Wilfried', gender: 'm', look: { skin: 5, hair: 7, hairColor: 7, accessory: 'glasses', bg: 3 } },
+];
+// toutes les coiffures / accessoires
+for (let i = 0; i < LOOK_OPTIONS.hair; i++) PEOPLE.push({ name: 'Coiffure ' + i, look: { skin: i % 6, hair: i, hairColor: i % 8, accessory: 'none', bg: i % 8 } });
+LOOK_OPTIONS.accessory.forEach((a, i) => PEOPLE.push({ name: a, gender: i % 2 ? 'm' : 'f', look: { skin: (i + 2) % 6, hair: (i * 3) % 10, hairColor: (i + 3) % 8, accessory: a, bg: (i + 4) % 8 } }));
+
+const faces = document.getElementById('faces');
+for (const p of PEOPLE) {
+  const d = document.createElement('div');
+  d.className = 'face';
+  d.innerHTML = avatarSVG(p, { size: 96 }) + `<div class="small">${avatarSVG(p, { size: 32 })}<span class="label">${p.name}</span></div>`;
+  faces.appendChild(d);
+}
+document.body.dataset.ready = '1';
+</script>
+</body>
+</html>
