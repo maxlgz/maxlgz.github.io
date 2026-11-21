@@ -7,12 +7,54 @@
   <meta name="description" content="Alibi — un jeu de déduction : placez chaque personnage sur le plan, puis démasquez le coupable.">
   <title>Alibi — jeu de déduction</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23f4ecdd'/%3E%3Ccircle cx='28' cy='28' r='14' fill='none' stroke='%2323212b' stroke-width='6'/%3E%3Cpath d='M38 38l14 14' stroke='%23b3262f' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="editor.css">
+  <style>body { margin: 0; background: #f4ecdd; color: #23212b; font-family: Georgia, 'Times New Roman', serif; } .notice { padding: 24px; }</style>
 </head>
 <body>
   <div id="app"><p class="notice">Chargement du dossier…</p></div>
   <noscript><p class="notice">Alibi a besoin de JavaScript pour fonctionner.</p></noscript>
-  <script type="module" src="js/main.js"></script>
+  <script>
+    // Toujours à jour : le service worker du jeu (sw.js) redemande chaque fichier au réseau.
+    // Tant qu'il ne contrôle pas encore la page (première visite), on attend qu'il prenne la main
+    // puis on recharge une fois, pour ne jamais exécuter des fichiers restés dans le cache du navigateur.
+    (function () {
+      function boot() {
+        if (boot.done) return;
+        boot.done = true;
+        // Feuilles de style puis script, tous chargés une fois le service worker aux commandes.
+        var left = 2;
+        function ready() {
+          if (--left) return;
+          var s = document.createElement('script');
+          s.type = 'module';
+          s.src = 'js/main.js';
+          document.body.appendChild(s);
+        }
+        ['styles.css', 'editor.css'].forEach(function (href) {
+          var l = document.createElement('link');
+          l.rel = 'stylesheet';
+          l.href = href;
+          l.onload = l.onerror = ready;
+          document.head.appendChild(l);
+        });
+      }
+      var sw = navigator.serviceWorker;
+      if (!sw) { boot(); return; }
+      function ours() {
+        return !!(sw.controller && /\/alibi\/sw\.js$/.test(new URL(sw.controller.scriptURL).pathname));
+      }
+      var register = function () { return sw.register('sw.js').catch(function () {}); };
+      if (ours()) { register(); boot(); return; }
+      var reloaded = false;
+      try { reloaded = sessionStorage.getItem('alibi:sw-reload') === '1'; } catch (e) {}
+      if (reloaded) { register(); boot(); return; }
+      sw.addEventListener('controllerchange', function () {
+        if (!ours() || boot.done) return;
+        try { sessionStorage.setItem('alibi:sw-reload', '1'); } catch (e) {}
+        location.reload();
+      });
+      register();
+      setTimeout(boot, 4000);
+    })();
+  </script>
 </body>
 </html>

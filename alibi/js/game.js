@@ -1,5 +1,6 @@
 // Alibi — écran de jeu.
-import { prepare, personCluesHTML, checkClue, evaluate, solve, canPlace } from './engine.js';
+import { prepare, personCluesHTML, checkClue, evaluate, solve, canPlace, OBJECTS } from './engine.js';
+import { objectSVG } from './art.js';
 import { createBoard, tokenHTML } from './board.js';
 
 /* ------------------------------------------------------------------ */
@@ -197,6 +198,10 @@ export function mountGame(root, opts = {}) {
         <p class="status" role="status" aria-live="polite"></p>
       </section>
       <section class="game-side" aria-label="Dossier">
+        <details class="legend" data-legend hidden>
+          <summary>Légende du plan</summary>
+          <div class="legend-body"></div>
+        </details>
         <div class="cards-scroll">
           <div class="dossier-head"><h2>Témoignages</h2><span class="meta"></span></div>
           <div class="cards"></div>
@@ -224,6 +229,46 @@ export function mountGame(root, opts = {}) {
   const board = createBoard(level);
   $('.board-wrap').appendChild(board.el);
   board.el.classList.add('board--play');
+
+  // légende des objets (construite une seule fois : le rendu ne la touche pas)
+  (function buildLegend() {
+    const det = $('[data-legend]');
+    const seen = new Map();
+    const objs = (level.objects || []).filter((o) => OBJECTS[o.type]);
+    objs.slice().sort((a, b) => (a.r - b.r) || (a.c - b.c)).forEach((o) => {
+      if (!seen.has(o.type)) seen.set(o.type, 0);
+      seen.set(o.type, seen.get(o.type) + 1);
+    });
+    if (!seen.size) return;
+    const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+    const group = (occ, title) => {
+      const items = [...seen].filter(([t]) => !!OBJECTS[t].occ === occ);
+      if (!items.length) return '';
+      return `<div class="legend-group${occ ? '' : ' legend-group--block'}"><h3>${title}</h3><ul>${items.map(([t, k]) => {
+        const o = OBJECTS[t];
+        return `<li><button type="button" class="legend-chip" data-type="${esc(t)}" aria-label="Montrer ${k > 1 ? `les ${esc(o.pl)}` : (/^[aeiouyéèêâî]/i.test(o.n) ? `l’${esc(o.n)}` : o.g === 'f' ? `la ${esc(o.n)}` : `le ${esc(o.n)}`)} sur le plan">`
+          + `<span class="legend-thumb" aria-hidden="true">${objectSVG(t, { w: 1, h: 1 })}</span>`
+          + `<span class="legend-name">${esc(cap(o.n))}</span>${k > 1 ? `<span class="legend-count">×${k}</span>` : ''}</button></li>`;
+      }).join('')}</ul></div>`;
+    };
+    $('.legend-body').innerHTML = group(true, 'On peut s\'y placer') + group(false, 'Bloque la case');
+    det.hidden = false;
+    det.open = settings.legendOpen !== false;
+    det.addEventListener('toggle', () => {
+      if (det.open !== (settings.legendOpen !== false)) settings = saveSettings({ legendOpen: det.open });
+    });
+    let flashTimer = null;
+    det.addEventListener('click', (e) => {
+      const b = e.target.closest('.legend-chip');
+      if (!b) return;
+      board.el.querySelectorAll('.board-object.flash').forEach((x) => x.classList.remove('flash'));
+      const hits = board.el.querySelectorAll(`.board-object[data-type="${b.dataset.type}"]`);
+      void board.el.offsetWidth;
+      hits.forEach((x) => x.classList.add('flash'));
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => hits.forEach((x) => x.classList.remove('flash')), 1500);
+    });
+  })();
 
   // jetons (HTML mis en cache)
   const tokenCache = {};
