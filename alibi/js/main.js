@@ -1,6 +1,8 @@
 // Alibi — coquille : accueil, routage par hash, stockage.
 import { LEVELS } from './levels.js';
 import { floorColor } from './art.js';
+import { tokenHTML } from './board.js';
+import { colorOf, INK } from './palette.js';
 import {
   mountGame, openModal, confirmDialog, loadSettings, saveSettings,
   readJSON, writeJSON, removeKey, esc, formatTime, ICONS,
@@ -8,9 +10,9 @@ import {
 
 const app = document.getElementById('app');
 const DIFFS = [
-  { d: 1, label: 'Facile', meta: 'pour se faire la main' },
-  { d: 2, label: 'Moyen', meta: 'quelques détours' },
-  { d: 3, label: 'Difficile', meta: 'pour fins limiers' },
+  { d: 1, label: 'Facile', meta: 'pour se faire la main', tone: 'mint' },
+  { d: 2, label: 'Moyen', meta: 'quelques détours', tone: 'sun' },
+  { d: 3, label: 'Difficile', meta: 'pour fins limiers', tone: 'coral' },
 ];
 
 /* ---------------- stockage ---------------- */
@@ -43,7 +45,7 @@ function thumbSVG(level) {
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
       const room = rooms[at(r, c)];
-      let col = '#e6dcc8';
+      let col = '#F2E6CC';
       try { if (room && room.floor) col = floorColor(room.floor) || col; } catch { /* rien */ }
       rects += `<rect x="${c * 10}" y="${r * 10}" width="10.4" height="10.4" fill="${esc(col)}"/>`;
       if (c < n - 1 && at(r, c + 1) !== at(r, c)) walls += `M${(c + 1) * 10} ${r * 10}v10`;
@@ -52,9 +54,10 @@ function thumbSVG(level) {
   }
   let objs = '';
   for (const o of level.objects || []) {
-    objs += `<rect x="${o.c * 10 + 2}" y="${o.r * 10 + 2}" width="${(o.w || 1) * 10 - 4}" height="${(o.h || 1) * 10 - 4}" rx="2" fill="#23212b" opacity=".22"/>`;
+    objs += `<rect x="${o.c * 10 + 2.2}" y="${o.r * 10 + 2.2}" width="${(o.w || 1) * 10 - 4.4}" height="${(o.h || 1) * 10 - 4.4}" rx="2.4" fill="#FFFDF6" fill-opacity=".55" stroke="${INK}" stroke-opacity=".5" stroke-width=".8"/>`;
   }
-  return `<svg viewBox="0 0 ${n * 10} ${n * 10}" aria-hidden="true" preserveAspectRatio="none">${rects}${objs}<path d="${walls}" stroke="#23212b" stroke-width="1.3" fill="none" stroke-linecap="square"/></svg>`;
+  const sw = (0.03 * n * 10).toFixed(2);
+  return `<svg viewBox="0 0 ${n * 10} ${n * 10}" aria-hidden="true" preserveAspectRatio="none">${rects}${objs}<path d="${walls}" stroke="${INK}" stroke-width="${sw}" fill="none" stroke-linecap="round"/></svg>`;
 }
 
 /* ---------------- tutoriel ---------------- */
@@ -165,9 +168,9 @@ function levelCard(l, prog) {
   const done = p && p.done;
   return `<a class="level-card${hasSave(l.id) && !done ? ' has-save' : ''}" href="#/jouer/${encodeURIComponent(l.id)}" aria-label="${esc(l.title)}, ${l.size}×${l.size}${done ? ', résolu' : ''}">
     <span class="thumb">${thumbSVG(l)}</span>
-    ${done ? '<span class="stamp">Résolu</span>' : ''}
+    ${done ? '<span class="stamp stamp--ok">Résolu</span>' : ''}
     <h3>${esc(l.title)}</h3>
-    <span class="sub">${l.size}×${l.size} · ${(l.people || []).length} pers.</span>
+    <span class="sub"><span class="size-pill">${l.size}×${l.size}</span> ${(l.people || []).length} pers.</span>
     ${done && p.best ? `<span class="best">Record ${formatTime(p.best)}</span>` : ''}
   </a>`;
 }
@@ -179,12 +182,12 @@ function renderHome() {
   const levels = officialLevels();
   const custom = getCustom();
   const dots = (d) => `<span class="diff-dots" aria-hidden="true">${[1, 2, 3].map((i) => `<i class="${i <= d ? 'on' : ''}"></i>`).join('')}</span>`;
-  const sections = DIFFS.map(({ d, label, meta }) => {
+  const sections = DIFFS.map(({ d, label, meta, tone }) => {
     const ls = levels.filter((l) => (l.difficulty || 1) === d);
     if (!ls.length) return '';
     const solved = ls.filter((l) => prog[l.id] && prog[l.id].done).length;
-    return `<section class="home-section" aria-labelledby="h-d${d}">
-      <div class="section-head"><h2 id="h-d${d}">${label}</h2>${dots(d)}<span class="meta">${meta} · ${solved}/${ls.length} résolus</span></div>
+    return `<section class="home-section" data-tone="${tone}" aria-labelledby="h-d${d}">
+      <div class="section-head"><h2 id="h-d${d}">${label}</h2>${dots(d)}<span class="meta">${meta} · <b>${solved}/${ls.length}</b> résolus</span></div>
       <div class="level-grid">${ls.map((l) => levelCard(l, prog)).join('')}</div>
     </section>`;
   }).join('');
@@ -202,15 +205,19 @@ function renderHome() {
     }).join('')}</div>`
     : '<p class="empty-note">Aucun niveau personnel pour l’instant. Dessinez le vôtre dans l’éditeur !</p>';
 
+  // Quelques jetons du premier niveau, pour la vitrine de l'accueil.
+  const first = levels[0];
+  const cast = first ? (first.people || []).slice(0, 4).map((p) => tokenHTML(p, { size: 64, color: colorOf(first, p.id) })).join('') : '';
   const el = document.createElement('div');
   el.className = 'home';
   el.innerHTML = `
     <header class="hero">
-      <span class="hero-tab">DOSSIER N° ${String(levels.length).padStart(3, '0')}</span>
-      <h1>Alibi<span>.</span></h1>
+      <span class="hero-tab">${levels.length} enquêtes</span>
+      ${cast ? `<div class="hero-cast" aria-hidden="true">${cast}</div>` : ''}
+      <h1>Alibi</h1>
       <p>Un crime, un plan, des témoins qui ne mentent jamais. Placez chacun à sa place : le coupable finira par se trahir.</p>
       <div class="hero-actions">
-        <button type="button" class="btn btn--primary" data-home="tuto">${ICONS.help} Comment jouer</button>
+        <button type="button" class="btn btn--accent" data-home="tuto">${ICONS.help} Comment jouer</button>
         <a class="btn" href="#/editeur">${ICONS.pencil} Éditeur de niveaux</a>
       </div>
     </header>

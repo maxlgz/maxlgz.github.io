@@ -2,6 +2,7 @@
 import { prepare, personCluesHTML, checkClue, evaluate, solve, canPlace, OBJECTS } from './engine.js';
 import { objectSVG } from './art.js';
 import { createBoard, tokenHTML } from './board.js';
+import { colorOf } from './palette.js';
 
 /* ------------------------------------------------------------------ */
 /* Utilitaires partagés (aussi utilisés par main.js)                   */
@@ -61,7 +62,8 @@ export const ICONS = {
   help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.6 2.6 0 115 1c-.8 1-2.5 1.4-2.5 3"/><path d="M12 17.2v.1"/></svg>',
 };
 
-const X_SVG = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+// Croix « cartoon » : trait bleu nuit aux bouts arrondis, cerné d'un halo crème pour se détacher des sols.
+const X_SVG = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2L2 8" stroke="var(--x-halo, #FFF6E3)" stroke-width="2.7" stroke-linecap="round" fill="none"/><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" fill="none"/></svg>';
 
 /* ------------------------------------------------------------------ */
 /* Fenêtres modales                                                    */
@@ -138,6 +140,11 @@ export function mountGame(root, opts = {}) {
   const n = level.size;
   const people = level.people || [];
   const byId = Object.fromEntries(people.map((p) => [p.id, p]));
+  const colors = Object.fromEntries(people.map((p) => [p.id, colorOf(level, p.id)]));
+  const pcStyle = (id) => {
+    const col = colors[id];
+    return col ? `--pc:${col.main};--pcp:${col.pastel};--pcd:${col.dark}` : '';
+  };
   const roomsByKey = Object.fromEntries((level.rooms || []).map((r) => [r.key, r]));
   const saveKey = `alibi:save:${raw.id || 'sans-id'}`;
   const sig = signature(raw);
@@ -272,10 +279,10 @@ export function mountGame(root, opts = {}) {
 
   // jetons (HTML mis en cache)
   const tokenCache = {};
-  const tok = (id) => (tokenCache[id] ||= tokenHTML(byId[id], { size: 64 }));
+  const tok = (id) => (tokenCache[id] ||= tokenHTML(byId[id], { size: 64, color: colors[id] }));
 
   // picker
-  pickerEl.innerHTML = people.map((p) => `<button type="button" class="pick" data-pick="${esc(p.id)}" aria-pressed="false" aria-label="Choisir ${esc(p.name)}${p.victim ? ' (victime)' : ''}">${tokenHTML(p, { size: 40 })}</button>`).join('');
+  pickerEl.innerHTML = people.map((p) => `<button type="button" class="pick" data-pick="${esc(p.id)}" aria-pressed="false" aria-label="Choisir ${esc(p.name)}${p.victim ? ' (victime)' : ''}">${tokenHTML(p, { size: 40, color: colors[p.id] })}</button>`).join('');
 
   // fiches
   const clueHTML = {};
@@ -284,9 +291,10 @@ export function mountGame(root, opts = {}) {
     const lines = personCluesHTML(level, p) || [];
     clueHTML[p.id] = lines;
     clueOffset[p.id] = lines.length - ((p.clues || []).length);
-    return `<div class="card${p.victim ? ' victim' : ''}" role="button" tabindex="0" aria-pressed="false" data-card="${esc(p.id)}" aria-label="Fiche de ${esc(p.name)}${p.victim ? ', victime' : ''}">
-      <div class="card-face">${tokenHTML(p, { size: 64 })}</div>
-      <div class="card-name"><strong>${esc(p.name)}</strong><span class="placed-tag"></span></div>
+    return `<div class="card${p.victim ? ' victim' : ''}" role="button" tabindex="0" aria-pressed="false" data-card="${esc(p.id)}" aria-label="Fiche de ${esc(p.name)}${p.victim ? ', victime' : ''}" style="${pcStyle(p.id)}">
+      <div class="card-face">${tokenHTML(p, { size: 64, color: colors[p.id] })}</div>
+      <div class="card-name"><strong>${esc(p.name)}</strong>${p.victim ? '<span class="victim-tag">Victime</span>' : ''}<span class="placed-tag"></span></div>
+      <span class="card-letter" aria-hidden="true">${esc(p.id)}</span>
       <ul>${lines.map((h, i) => `<li data-i="${i}">${h}</li>`).join('')}</ul>
     </div>`;
   }).join('');
@@ -357,7 +365,7 @@ export function mountGame(root, opts = {}) {
           else if (rows.has(r) || cols.has(c)) html += `<span class="mark-x">${X_SVG}</span>`;
           const notes = st.notes[k];
           if (notes && notes.length) {
-            html += `<span class="notes">${notes.map((nid) => `<span class="note${nid === selected ? ' sel' : ''}">${esc(nid)}</span>`).join('')}</span>`;
+            html += `<span class="notes">${notes.map((nid) => `<span class="note${nid === selected ? ' sel' : ''}" style="${pcStyle(nid)}">${esc(nid)}</span>`).join('')}</span>`;
           }
         }
         if (layer.innerHTML !== html) layer.innerHTML = html;
@@ -625,7 +633,7 @@ export function mountGame(root, opts = {}) {
       body.innerHTML = `<div class="modal-kicker">Plan reconstitué</div>
         <h2>Qui est le coupable ?</h2>
         <p>Votre plan tient debout : chaque témoignage est respecté.${victim ? ` Qui se trouvait seul à seul avec ${esc(victim.name)} ?` : ' Désignez le coupable.'}</p>
-        <div class="suspects">${suspects.map((p) => `<button type="button" class="suspect" data-s="${esc(p.id)}">${tokenHTML(p, { size: 64 })}<span>${esc(p.name)}</span></button>`).join('')}</div>
+        <div class="suspects">${suspects.map((p) => `<button type="button" class="suspect" data-s="${esc(p.id)}" style="${pcStyle(p.id)}">${tokenHTML(p, { size: 64, color: colors[p.id] })}<span>${esc(p.name)}</span></button>`).join('')}</div>
         <p class="accuse-msg" role="status" aria-live="polite"></p>
         <div class="modal-actions"><button type="button" class="btn btn--ghost" data-back>Revenir au plan</button></div>`;
       const msg = body.querySelector('.accuse-msg');
@@ -641,7 +649,7 @@ export function mountGame(root, opts = {}) {
         b.disabled = true;
         const p = byId[id];
         msg.textContent = `Mauvaise piste : ${p.name} n’était pas seul${fem(p, '', 'e')} avec la victime. Erreurs : ${st.errors}.`;
-        msg.style.color = 'var(--accent)';
+        msg.dataset.tone = 'error';
       });
     }, { label: 'Qui est le coupable ?', onCancel: backToPlay });
   }
@@ -663,8 +671,8 @@ export function mountGame(root, opts = {}) {
     modal = openModal((body, close) => {
       body.innerHTML = `<div class="modal-kicker">Affaire classée</div>
         <h2>${esc(level.title || 'Enquête')} : résolu !</h2>
-        <div class="win-reveal">${tokenHTML(m, { size: 96 })}
-          <div><span class="stamp">Coupable</span><p style="margin:.4em 0 0"><strong>${esc(m.name)}</strong> était ${fem(m, 'le meurtrier', 'la meurtrière')}.</p></div></div>
+        <div class="win-reveal" style="${pcStyle(m.id)}">${tokenHTML(m, { size: 96, color: colors[m.id] })}
+          <div><span class="stamp stamp--culprit">Coupable</span><p style="margin:.4em 0 0"><strong>${esc(m.name)}</strong> était ${fem(m, 'le meurtrier', 'la meurtrière')}.</p></div></div>
         <dl class="win-stats">
           <div><dt>Temps</dt><dd>${formatTime(st.seconds)}</dd></div>
           <div><dt>Indices</dt><dd>${st.hints}</dd></div>
