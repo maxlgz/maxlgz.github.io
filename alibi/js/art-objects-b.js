@@ -358,18 +358,21 @@ const DRAW = {
     rc(30, 15, 40, 6, 3, DK) + rc(37, 2, 26, 15, 3, DK) + rc(37, 10, 26, 5, 0, COR, NS) + rc(37, 2, 26, 15, 3, null, { sw: 3 }) + hl('M41 5 V8', DK_L, 2.5) },
 
   hay: { k: 'fix', f: () => {
-    const TW = '#8A5A2B';
-    const front = 'M8 44 Q6 40 10 39 H76 Q80 40 78 44 V84 Q79 88 74 88 H12 Q7 88 8 84 Z';
-    return ground(50, 92, 46, 4) +
-      pa('M77 40 L91 26 Q94 26 93 30 V72 Q93 76 90 78 L78 88 Z', SUN_D) + dt([84, 50, 88, 60, 84, 70, 88, 42]) +
-      pa('M9 40 L23 26 H91 L77 40 Z', SUN_L) +
-      ln('M30 30 l10 -1 M52 33 l12 -2 M70 30 l8 0', 2.5, SUN_D) +
-      pa(front, SUN) +
-      ln('M14 50 l9 -2 M36 56 l11 2 M16 70 l9 -1 M46 76 l10 -2 M60 50 l9 2 M28 80 l8 1 M56 64 l9 -1 M28 62 l6 2 M66 78 l6 -1 M42 46 l7 -1', 2.5, SUN_D) +
-      ln('M84 40 l4 -3 M84 56 l4 -3 M84 70 l4 -3', 2.5, '#B57E10') +
-      ln('M27 40 V88 M59 40 V88 M27 40 L41 26 M59 40 L73 26', 3.5, TW) +
-      ln('M10 40 l-5 -6 M18 32 l-4 -7 M34 26 l-1 -7 M50 26 l2 -7 M68 26 l2 -6 M88 27 l5 -5 M93 44 l5 -1 M93 62 l5 2 M7 56 l-5 -1 M7 74 l-5 2 M20 88 l-2 5 M44 88 l1 5 M68 88 l2 5', 3) +
-      hl('M14 45 H30', SUN_L, 3.5);
+    // botte ronde couchée : disque avant en spirale, corps qui fuit vers l'arrière droit
+    const body = 'M38 28 L64 14 A30 30 0 0 1 64 74 L38 88 Z';
+    let tufts = '';
+    for (const a of [200, 235, 265, 300, 140, 110]) {
+      const r = a * Math.PI / 180, x = 38 + Math.cos(r) * 30, y = 58 + Math.sin(r) * 30;
+      tufts += `M${n(x)} ${n(y)} l${n(Math.cos(r + 0.4) * 6)} ${n(Math.sin(r + 0.4) * 6)}`;
+    }
+    return ground(54, 90, 42, 5) +
+      pa(body, SUN) + pa('M38 72 L64 60 Q86 60 92 52 A30 30 0 0 1 64 74 L38 88 Z', SUN_D, NS) + dt([60, 70, 70, 66, 80, 64, 66, 78]) +
+      ln('M52 26 l14 -7 M60 40 l14 -7 M72 50 l12 -6 M58 56 l10 -5', 2.5, SUN_D) +
+      ln('M48 22.6 A30 30 0 0 1 48 82.6 M58 17.4 A30 30 0 0 1 58 77.4', 3.5, '#8A5A2B') + pa(body) +
+      ln('M78 18 l4 -5 M93 36 l5 -2 M92 58 l5 2 M80 72 l3 5', 3) +
+      ci(38, 58, 30, SUN_L) +
+      ln('M38 58 a3.5 3.5 0 0 1 7 0 a7 7 0 0 1 -14 0 a10.5 10.5 0 0 1 21 0 a14 14 0 0 1 -28 0 a17.5 17.5 0 0 1 35 0 a21 21 0 0 1 -42 0', 3, SUN_D) +
+      ln(tufts, 3) + hl('M16 46 Q20 36 30 31', WH, 3.5);
   } },
 
   billiard: { k: 'rot', o: 'h', f: (W, H) => {

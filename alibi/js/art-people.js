@@ -217,13 +217,15 @@ export function avatarSVG(person, { size = 96, color } = {}) {
   }
   if (hairI === 13) {
     // dreadlocks : mèches en boudins, de part et d'autre du visage
-    const locks = [];
-    for (const [x, len] of [[23.5, 34], [30.5, 42], [37, 30]]) {
-      locks.push(rrect(x - 3.6, 44, 7.2, len, 3.6), rrect(100 - x - 3.6, 44, 7.2, len - (x === 30.5 ? 6 : -3), 3.6));
+    push(shaded('M28 52 C25 30 36 24 50 24 C64 24 75 30 72 52 L70 60 L30 60 Z', hair, hairD, { dx: -3, dy: -2.4 }));
+    // chaque mèche a son propre contour (de l'intérieur vers l'extérieur) pour bien se détacher
+    const LOCKS = [[36, 46, 34], [64, 46, 32], [30.6, 42, 42], [69.4, 42, 38], [24.6, 38, 40], [75.4, 38, 44], [19.6, 40, 30], [80.4, 40, 28]];
+    for (const [x, y, len] of LOCKS) {
+      push(shaded(rrect(x - 3.3, y, 6.6, len, 3.3), hair, hairD, { dx: x < 50 ? -1.4 : -1.8, dy: -1.4, sw: 2.4 }));
+      push(line(`M${n(x - 2)} ${n(y + len * 0.45)} L${n(x + 2)} ${n(y + len * 0.45 + 1.6)}`, 1.6, hairD));
     }
-    push(shaded('M28 52 C25 30 36 24 50 24 C64 24 75 30 72 52 Z ' + locks.join(' '), hair, hairD, { dx: -1.8, dy: -1.6, sw: 2.7 }));
     push(`<g fill="${accent}" stroke="${INK}" stroke-width="2">` +
-      `<rect x="26.4" y="78" width="8.2" height="4.4" rx="1.6"/><rect x="65.4" y="73" width="8.2" height="4.4" rx="1.6"/></g>`);
+      `<rect x="26.2" y="72" width="8.8" height="4.6" rx="1.6"/><rect x="71" y="70" width="8.8" height="4.6" rx="1.6"/></g>`);
   }
   if (back[hairI]) push(shaded(back[hairI], hair, hairD, { dx: -3.4, dy: -2.4 }));
   if (hairI === 6) push(`<circle cx="64" cy="37" r="4.4" fill="${accent}" stroke="${INK}" stroke-width="2.4"/>`);
@@ -242,11 +244,12 @@ export function avatarSVG(person, { size = 96, color } = {}) {
 
   if (hairI === 12) {
     // tresse unique ramenée sur l'épaule droite
-    const pts = [[67.5, 63, 6], [66.6, 70.6, 6.2], [64.6, 78, 6]];
-    push(shaded(pts.map(([x, y, r]) => ell(x, y, r, r * 0.86)).join(' '), hair, hairD, { dx: -1.8, dy: -1.6, sw: 2.7 }));
-    push(line('M63 66.6 Q67 69 71 66.4 M61.4 74.2 Q65.4 76.6 69.6 74 M59.6 81.6 Q63.4 83.8 67.6 81.4', 1.8, hairD));
-    push(shaded('M58.6 86 L62.6 84 L66 88.6 L64 92 L59.4 91.4 Z', hair, hairD, { dx: -1.2, dy: -1.2, sw: 2.4 }));
-    push(`<rect x="57.6" y="82" width="9" height="4.6" rx="1.8" transform="rotate(-24 62 84)" fill="${accent}" stroke="${INK}" stroke-width="2.2"/>`);
+    const pts = [[71.4, 60, 6.8], [71.2, 68.4, 7], [68.8, 76.4, 6.8], [64.8, 83, 6]];
+    for (const [x, y, r] of pts) {
+      push(shaded(ell(x, y, r, r * 0.8), hair, hairD, { dx: -1.8, dy: -1.6, sw: 2.6 }));
+      push(line(`M${n(x - r * 0.55)} ${n(y - 0.6)} Q${x} ${n(y + 2.6)} ${n(x + r * 0.55)} ${n(y - 0.6)}`, 1.8, hairD));
+    }
+    push(`<rect x="56.4" y="85.4" width="10" height="5" rx="1.8" transform="rotate(-36 61.4 88)" fill="${accent}" stroke="${INK}" stroke-width="2.2"/>`);
   }
 
   // ---------------------------------------------------------------- tête
@@ -319,7 +322,7 @@ export function avatarSVG(person, { size = 96, color } = {}) {
     8: 'M30.5 56 C27 38 32 28 42 26 C46 16 60 13 70 19 C77 23 76 31 70 33 C72.5 40 71 48 69.5 56 C68 48 65.5 42.5 61 38.5 C55 41 45 43.5 35 41.5 C33 45 31.5 50 30.5 56 Z',
     9: 'M30.5 56 C29 33 38 29.5 50 29.5 C62 29.5 71 33 69.5 56 C67 43 61 37.5 50 37 C39 37.5 33 43 30.5 56 Z',
     10: 'M30.5 55 C29 33 38 30 50 30 C62 30 71 33 69.5 55 C68 46 65 41 60.5 38.5 C57 41.5 53.5 42 50 39 C46.5 42 43 41.5 39.5 38.5 C35 41 32 46 30.5 55 Z',
-    11: newCover || acc === 'hat' || acc === 'cap'
+    11: newCover || acc === 'hat' || acc === 'cap' || acc === 'crown'
       ? 'M42.5 44 C42 38 43 34 50 33 C57 34 58 38 57.5 44 C53 42.4 47 42.4 42.5 44 Z'
       : 'M42.5 45 C41.5 36 42 27 44.5 19 L48.5 24.5 L50.5 15 L53.5 23.5 L57 17.5 L57.8 27 C58.4 33 58 39 57.5 45 C53 43.4 47 43.4 42.5 45 Z',
     12: 'M30.5 56 C28 36 36 29 50 29 C64 29 72 36 69.5 56 C68.5 49 67 44 63.5 40.5 C57 46.5 44 48.5 33.6 49 C32.2 51 31.2 53.4 30.5 56 Z',
@@ -342,7 +345,7 @@ export function avatarSVG(person, { size = 96, color } = {}) {
   if (hairI === 3 || hairI === 9) push(line('M50 30 L50 34', 2.2, hairD));
   if (hairI === 13) push(line('M41 33 Q37.6 39 35 46 M50 31.4 V37 M59 33 Q62.4 39 65 46', 2, hairD));
   if (hairI === 12) push(line('M60 33 Q56 38.6 50 42', 2, hairD));
-  if (hairI === 11 && !(newCover || acc === 'hat' || acc === 'cap')) push(line('M50 26 V41', 2, hairD));
+  if (hairI === 11 && !(newCover || acc === 'hat' || acc === 'cap' || acc === 'crown')) push(line('M50 26 V41', 2, hairD));
   if (hairI === 10 && acc !== 'hat' && acc !== 'cap' && !newCover) {
     for (const x of [35, 65]) push(`<circle cx="${x + (x < 50 ? 4.4 : -4.4)}" cy="37" r="3.4" fill="${accent}" stroke="${INK}" stroke-width="2.2"/>`);
   }
@@ -454,16 +457,15 @@ export function avatarSVG(person, { size = 96, color } = {}) {
   if (acc === 'helmet') {
     // casque de cosmonaute : bulle de verre (tête visible), col et combinaison
     const bid = `${id}-b`, suit = '#F4F1EA', suitD = '#CDC9D8';
-    inner = `<defs><clipPath id="${bid}"><circle cx="50" cy="51" r="29.4"/></clipPath></defs>` +
-      `<circle cx="50" cy="51" r="29.4" fill="#E2F3FF"/>` +
+    inner = `<defs><clipPath id="${bid}"><circle cx="50" cy="50" r="27.8"/></clipPath></defs>` +
+      `<circle cx="50" cy="50" r="27.8" fill="#E2F3FF"/>` +
       `<g clip-path="url(#${bid})">${inner}</g>` +
       shaded('M12 106 C13 88 26 80 50 80 C74 80 87 88 88 106 Z', suit, suitD, { dx: -5, dy: -1 }) +
-      shaded(rrect(28, 90, 12, 9, 2.4), accent, accentD, { dx: -1, dy: -1, sw: 2.4 }) +
-      `<circle cx="63" cy="94" r="2.6" fill="#FF6B5E" stroke="${INK}" stroke-width="2"/><circle cx="70" cy="94" r="2.6" fill="#4FCFA3" stroke="${INK}" stroke-width="2"/>` +
-      `<circle cx="50" cy="51" r="29.4" fill="#BFE6FF" fill-opacity="0.2" stroke="${INK}" stroke-width="3.4"/>` +
-      shaded('M23 78 C30 86 70 86 77 78 L77 83.6 C70 92 30 92 23 83.6 Z', '#C9CEE2', '#A3A9C6', { dx: 0, dy: -1.6, sw: 2.9 }) +
-      line('M28.4 44 Q31.4 31 43 26.4', 3.2, '#FFFFFF') + `<circle cx="27.8" cy="51" r="1.8" fill="#FFFFFF"/>` +
-      line('M70 64 Q73.6 58 74.4 52', 2.4, '#FFFFFF');
+      `<circle cx="50" cy="50" r="27.8" fill="#BFE6FF" fill-opacity="0.22" stroke="${INK}" stroke-width="3.4"/>` +
+      shaded('M22.5 71 C30 79.4 70 79.4 77.5 71 L78 79 C70 88.6 30 88.6 22 79 Z', '#DCE0EE', '#A9AFCB', { dx: 0, dy: -2, sw: 2.9,
+        hi: `<circle cx="36" cy="80.6" r="2.2" fill="${accent}" stroke="${INK}" stroke-width="1.6"/><circle cx="64" cy="80.6" r="2.2" fill="${accent}" stroke="${INK}" stroke-width="1.6"/>` }) +
+      line('M29.4 42 Q32.4 31 43 27', 3.2, '#FFFFFF') + `<circle cx="28.4" cy="49" r="1.8" fill="#FFFFFF"/>` +
+      line('M70 62 Q73 57 73.6 51', 2.4, '#FFFFFF');
   }
 
   const ringHi = shade(ringMain, 0.5);
