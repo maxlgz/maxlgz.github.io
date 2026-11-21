@@ -4,6 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#FFF6E3">
+  <script>
+    // Thème clair / sombre : appliqué avant le premier affichage pour éviter un éclair de la mauvaise couleur.
+    (function () {
+      var theme = 'light';
+      try { var s = JSON.parse(localStorage.getItem('alibi:settings') || '{}'); if (s && s.theme === 'dark') theme = 'dark'; } catch (e) {}
+      document.documentElement.setAttribute('data-theme', theme);
+      if (theme === 'dark') {
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', '#14162E');
+      }
+    })();
+  </script>
   <meta name="description" content="Alibi — un jeu de déduction : placez chaque personnage sur le plan, puis démasquez le coupable.">
   <title>Alibi — jeu de déduction</title>
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
@@ -18,7 +30,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" media="print" onload="this.media='all'">
-  <style>body { margin: 0; background: #FFF6E3; color: #1F2147; font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-weight: 700; } .notice { padding: 24px; font-family: 'Fredoka', 'Nunito', system-ui, sans-serif; font-weight: 600; }</style>
+  <style>html[data-theme="dark"] body { background: #14162E; color: #FFF6E3; } body { margin: 0; background: #FFF6E3; color: #1F2147; font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-weight: 700; } .notice { padding: 24px; font-family: 'Fredoka', 'Nunito', system-ui, sans-serif; font-weight: 600; }</style>
 </head>
 <body>
   <div id="app"><p class="notice">Chargement du dossier…</p></div>
@@ -32,7 +44,7 @@
         if (boot.done) return;
         boot.done = true;
         // Feuilles de style puis script, tous chargés une fois le service worker aux commandes.
-        var left = 2;
+        var left = 0;
         function ready() {
           if (--left) return;
           var s = document.createElement('script');
@@ -40,7 +52,9 @@
           s.src = 'js/main.js';
           document.body.appendChild(s);
         }
-        ['styles.css', 'editor.css'].forEach(function (href) {
+        var sheets = ['styles.css', 'editor.css', 'theme-dark.css'];
+        left = sheets.length;
+        sheets.forEach(function (href) {
           var l = document.createElement('link');
           l.rel = 'stylesheet';
           l.href = href;

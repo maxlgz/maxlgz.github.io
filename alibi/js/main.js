@@ -163,6 +163,18 @@ function unmount() {
   app.innerHTML = '';
 }
 
+const svgi = (d) => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ACT_ICONS = {
+  play: svgi('<path d="M8 5.5v13l11-6.5z" fill="currentColor"/>'),
+  edit: svgi('<path d="M4 20l1-4L16.5 4.5a2 2 0 012.8 0l.2.2a2 2 0 010 2.8L8 19z"/><path d="M14.5 6.5l3 3"/>'),
+  trash: svgi('<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/>'),
+};
+const VIEW_ICONS = {
+  large: svgi('<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>'),
+  compact: svgi('<rect x="3.5" y="4" width="17" height="4" rx="2"/><rect x="3.5" y="10" width="17" height="4" rx="2"/><rect x="3.5" y="16" width="17" height="4" rx="2"/>'),
+};
+const getHomeView = () => (loadSettings().homeView === 'compact' ? 'compact' : 'large');
+
 function levelCard(l, prog) {
   const p = prog[l.id];
   const done = p && p.done;
@@ -170,9 +182,67 @@ function levelCard(l, prog) {
     <span class="thumb">${thumbSVG(l)}</span>
     ${done ? '<span class="stamp stamp--ok">Résolu</span>' : ''}
     <h3>${esc(l.title)}</h3>
-    <span class="sub"><span class="size-pill">${l.size}×${l.size}</span> ${(l.people || []).length} pers.</span>
+    <span class="sub"><span class="size-pill">${l.size}×${l.size}</span> <span class="ppl">${(l.people || []).length} pers.</span></span>
     ${done && p.best ? `<span class="best">Record ${formatTime(p.best)}</span>` : ''}
   </a>`;
+}
+
+function setHomeView(v) {
+  const el = document.querySelector('.home');
+  if (!el || el.dataset.homeView === v) return;
+  // Ancre : premier repère visible, pour garder la position dans la page.
+  const anchor = [...el.querySelectorAll('.section-head, .level-card, .custom-item')].find((n) => n.getBoundingClientRect().bottom > 8);
+  const before = anchor ? anchor.getBoundingClientRect().top : 0;
+  el.dataset.homeView = v;
+  saveSettings({ homeView: v });
+  if (anchor) window.scrollBy(0, anchor.getBoundingClientRect().top - before);
+}
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', t === 'dark' ? '#14162E' : '#FFF6E3');
+}
+const switchHTML = (key, title, hint, on) => `<button type="button" class="sw" role="switch" aria-checked="${on}" data-set="${key}">
+  <span class="sw-text"><b>${title}</b>${hint ? `<small>${hint}</small>` : ''}</span>
+  <span class="sw-ctl"><span class="sw-track" aria-hidden="true"><i></i></span><span class="sw-state">${on ? 'Activé' : 'Désactivé'}</span></span></button>`;
+
+let homeSettingsOpen = null;
+function openHomeSettings() {
+  if (homeSettingsOpen && !homeSettingsOpen.closed) return;
+  const back = () => { const b = document.querySelector('[data-act="home-settings"]'); if (b) b.focus(); };
+  homeSettingsOpen = openModal((body, close) => {
+    const st = loadSettings();
+    const view = getHomeView();
+    body.innerHTML = `<div class="modal-kicker">Accueil</div>
+      <h2>Réglages</h2>
+      <div class="set-group"><h3 id="set-view">Affichage des énigmes</h3>
+        <div class="view-switch" role="group" aria-label="Affichage des énigmes">
+          <button type="button" data-view="large" aria-pressed="${view === 'large'}">${VIEW_ICONS.large}<span>Grandes cartes</span></button>
+          <button type="button" data-view="compact" aria-pressed="${view === 'compact'}">${VIEW_ICONS.compact}<span>Compact</span></button>
+        </div></div>
+      <div class="set-group"><h3>Thème</h3>${switchHTML('theme', 'Mode sombre', 'Fond sombre, plus reposant le soir.', st.theme === 'dark')}</div>
+      <div class="set-group"><h3>Liste</h3>${switchHTML('hideSolved', 'Masquer les énigmes résolues', 'Les énigmes déjà résolues disparaissent de la liste.', !!st.hideSolved)}</div>
+      <div class="set-group"><h3>En jeu</h3>${switchHTML('oneTap', 'Pose en un toucher', 'Toucher une case pose le personnage ; l’appui long ajoute une note.', !!st.oneTap)}</div>
+      <div class="modal-actions"><button type="button" class="btn btn--primary" data-close autofocus>Fermer</button></div>`;
+    body.addEventListener('click', (e) => {
+      if (e.target.closest('[data-close]')) { close(); back(); return; }
+      const vb = e.target.closest('[data-view]');
+      if (vb) {
+        setHomeView(vb.dataset.view);
+        body.querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b === vb)));
+        return;
+      }
+      const sw = e.target.closest('[data-set]');
+      if (!sw) return;
+      const key = sw.dataset.set;
+      const on = sw.getAttribute('aria-checked') !== 'true';
+      sw.setAttribute('aria-checked', String(on));
+      sw.querySelector('.sw-state').textContent = on ? 'Activé' : 'Désactivé';
+      if (key === 'theme') { saveSettings({ theme: on ? 'dark' : 'light' }); applyTheme(on ? 'dark' : 'light'); }
+      else if (key === 'hideSolved') { saveSettings({ hideSolved: on }); if (document.querySelector('.home')) renderHome(); }
+      else saveSettings({ [key]: on });
+    });
+  }, { label: 'Réglages', className: 'modal--settings', onCancel: back });
 }
 
 function renderHome() {
@@ -182,13 +252,18 @@ function renderHome() {
   const levels = officialLevels();
   const custom = getCustom();
   const dots = (d) => `<span class="diff-dots" aria-hidden="true">${[1, 2, 3].map((i) => `<i class="${i <= d ? 'on' : ''}"></i>`).join('')}</span>`;
+  const hideSolved = !!loadSettings().hideSolved;
+  const isDone = (l) => !!(prog[l.id] && prog[l.id].done);
+  let hiddenCount = 0;
   const sections = DIFFS.map(({ d, label, meta, tone }) => {
-    const ls = levels.filter((l) => (l.difficulty || 1) === d);
-    if (!ls.length) return '';
-    const solved = ls.filter((l) => prog[l.id] && prog[l.id].done).length;
+    const all = levels.filter((l) => (l.difficulty || 1) === d);
+    if (!all.length) return '';
+    const solved = all.filter(isDone).length;
+    const ls = hideSolved ? all.filter((l) => !isDone(l)) : all;
+    if (hideSolved) hiddenCount += all.length - ls.length;
     return `<section class="home-section" data-tone="${tone}" aria-labelledby="h-d${d}">
-      <div class="section-head"><h2 id="h-d${d}">${label}</h2>${dots(d)}<span class="meta">${meta} · <b>${solved}/${ls.length}</b> résolus</span></div>
-      <div class="level-grid">${ls.map((l) => levelCard(l, prog)).join('')}</div>
+      <div class="section-head"><h2 id="h-d${d}">${label}</h2>${dots(d)}<span class="meta">${meta} · <b>${solved}/${all.length}</b> résolus</span></div>
+      ${ls.length ? `<div class="level-grid">${ls.map((l) => levelCard(l, prog)).join('')}</div>` : '<p class="all-solved">Toutes résolues</p>'}
     </section>`;
   }).join('');
   const customHTML = custom.length
@@ -198,18 +273,23 @@ function renderHome() {
         <span class="thumb">${thumbSVG(l)}</span>
         <div><h3>${esc(l.title || 'Sans titre')}</h3><span class="sub">${l.size}×${l.size} · ${(l.people || []).length} pers.${p && p.done ? ` · résolu en ${formatTime(p.best)}` : ''}</span></div>
         <div class="actions">
-          <a class="btn btn--small btn--primary" href="#/jouer/${encodeURIComponent(l.id)}">Jouer</a>
-          <a class="btn btn--small" href="#/editeur/${encodeURIComponent(l.id)}">Modifier</a>
-          <button type="button" class="btn btn--small btn--ghost" data-del="${esc(l.id)}">Supprimer</button>
+          <a class="btn btn--small btn--primary" data-play href="#/jouer/${encodeURIComponent(l.id)}" aria-label="Jouer : ${esc(l.title || 'Sans titre')}">${ACT_ICONS.play}<span class="lbl">Jouer</span></a>
+          <a class="btn btn--small" href="#/editeur/${encodeURIComponent(l.id)}" aria-label="Modifier : ${esc(l.title || 'Sans titre')}">${ACT_ICONS.edit}<span class="lbl">Modifier</span></a>
+          <button type="button" class="btn btn--small btn--ghost" data-del="${esc(l.id)}" aria-label="Supprimer : ${esc(l.title || 'Sans titre')}">${ACT_ICONS.trash}<span class="lbl">Supprimer</span></button>
         </div></div>`;
     }).join('')}</div>`
     : '<p class="empty-note">Aucun niveau personnel pour l’instant. Dessinez le vôtre dans l’éditeur !</p>';
+
+  const filterNote = hiddenCount
+    ? `<p class="filter-note" role="status"><span>${hiddenCount} énigme${hiddenCount > 1 ? 's' : ''} résolue${hiddenCount > 1 ? 's' : ''} masquée${hiddenCount > 1 ? 's' : ''}</span> <button type="button" class="btn btn--small" data-act="show-solved">Afficher</button></p>`
+    : '';
 
   // Quelques jetons du premier niveau, pour la vitrine de l'accueil.
   const first = levels[0];
   const cast = first ? (first.people || []).slice(0, 4).map((p) => tokenHTML(p, { size: 64, color: colorOf(first, p.id) })).join('') : '';
   const el = document.createElement('div');
   el.className = 'home';
+  el.dataset.homeView = getHomeView();
   el.innerHTML = `
     <header class="hero">
       <span class="hero-tab">${levels.length} enquêtes</span>
@@ -219,8 +299,10 @@ function renderHome() {
       <div class="hero-actions">
         <button type="button" class="btn btn--accent" data-home="tuto">${ICONS.help} Comment jouer</button>
         <a class="btn" href="#/editeur">${ICONS.pencil} Éditeur de niveaux</a>
+        <button type="button" class="btn" data-act="home-settings" aria-haspopup="dialog">${ICONS.gear} Réglages</button>
       </div>
     </header>
+    ${filterNote}
     ${sections || '<p class="empty-note">Aucun niveau officiel disponible.</p>'}
     <section class="home-section" aria-labelledby="h-perso">
       <div class="section-head"><h2 id="h-perso">Mes niveaux</h2><span class="meta">${custom.length} niveau${custom.length > 1 ? 'x' : ''}</span></div>
@@ -230,6 +312,14 @@ function renderHome() {
     <p class="home-foot">Alibi — une enquête logique, faite main.</p>`;
   app.appendChild(el);
   el.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-act="home-settings"]')) { openHomeSettings(); return; }
+    if (e.target.closest('[data-act="show-solved"]')) { saveSettings({ hideSolved: false }); renderHome(); return; }
+    // En compact, toute la ligne d'un niveau perso ouvre le niveau (hors boutons d'action).
+    const row = e.target.closest('.custom-item');
+    if (row && el.dataset.homeView === 'compact' && !e.target.closest('a, button')) {
+      const play = row.querySelector('[data-play]');
+      if (play) { location.hash = play.getAttribute('href'); return; }
+    }
     if (e.target.closest('[data-home="tuto"]')) { showTutorial(); return; }
     const del = e.target.closest('[data-del]');
     if (del) {
