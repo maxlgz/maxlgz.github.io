@@ -744,10 +744,10 @@ export function mountGame(root, opts = {}) {
           <div><dt>Erreurs</dt><dd>${st.errors}</dd></div>
         </dl>
         ${extra && extra.record ? '<p class="win-record">Nouveau record personnel !</p>' : ''}
-        <div class="modal-actions">
+        <div class="modal-actions win-actions">
+          ${onNext ? '<button type="button" class="btn btn--accent" data-w="next" autofocus>Niveau suivant</button>' : ''}
           <button type="button" class="btn btn--ghost" data-w="plan">Voir le plan</button>
           <button type="button" class="btn" data-w="home">${esc(exitLabel)}</button>
-          ${onNext ? '<button type="button" class="btn btn--accent" data-w="next" autofocus>Niveau suivant</button>' : ''}
         </div>`;
       body.addEventListener('click', (e) => {
         const b = e.target.closest('[data-w]');

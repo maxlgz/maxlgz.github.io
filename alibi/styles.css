@@ -869,6 +869,10 @@ dialog.modal[open] { animation: pop 0.2s ease-out; }
 }
 .win-reveal .token { --tok: 84px; margin: 4px 0 6px 4px; }
 .win-reveal .stamp { font-size: 0.82rem; }
+/* Fin de niveau : le bouton principal sur toute la largeur, les deux autres côte à côte dessous. */
+.win-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.win-actions .btn { width: 100%; justify-content: center; text-align: center; }
+.win-actions [data-w="next"] { grid-column: 1 / -1; }
 .win-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0; }
 .win-stats div {
   padding: 10px 6px 12px; text-align: center;
