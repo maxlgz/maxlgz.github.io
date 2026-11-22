@@ -1039,6 +1039,31 @@ dialog.modal[open] { animation: pop 0.2s ease-out; }
 /* deux interrupteurs dans un même groupe de réglages */
 .sw + .sw { margin-top: 8px; }
 
+/* Réglages de l'accueil, version compacte : une ligne par réglage dans une seule carte, pour que
+   tout tienne sur un petit écran ; si ça ne tient pas, le panneau défile et « Fermer » reste visible. */
+dialog.modal { max-height: calc(100dvh - 24px); }
+.modal--settings .modal-body { padding: 16px; }
+.modal--settings h2 { margin: 0 0 8px; font-size: 1.35rem; }
+.modal--settings .set-group { margin: 0 0 10px; }
+.modal--settings .set-group h3 { margin: 0 0 4px; font-size: 0.86rem; }
+.modal--settings .view-switch button { min-height: 44px; padding-top: 6px; padding-bottom: 6px; }
+.set-list { border: 2.5px solid var(--ink); border-radius: 18px; background: var(--paper-3); overflow: hidden; }
+.set-list .sw { min-height: 48px; padding: 5px 12px; border: 0; border-radius: 0; background: transparent; }
+.set-list .sw + .sw { margin-top: 0; border-top: 2px solid var(--line); }
+.set-list .sw-text b { font-size: 1rem; line-height: 1.2; }
+.set-list .sw-text small { font-size: 0.78rem; line-height: 1.25; }
+.set-list .sw-ctl { min-width: 0; }
+/* l'état reste annoncé par aria-checked ; le libellé « Activé / Désactivé » n'est plus affiché */
+.set-list .sw-state { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.set-list .sw:focus-visible { outline-offset: -3px; }
+.modal--settings .modal-actions {
+  position: sticky; bottom: 0; margin-top: 0; padding: 10px 0 2px; background: var(--paper);
+}
+@media (max-width: 350px) {
+  .modal--settings .view-switch button { font-size: 0.9rem; gap: 5px; padding-left: 8px; padding-right: 8px; }
+}
+
+
 /* première visite : trois façons de commencer */
 .welcome-choices { display: grid; gap: 10px; margin-top: 16px; }
 .welcome-choices .btn {
