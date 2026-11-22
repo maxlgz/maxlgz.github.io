@@ -267,3 +267,7 @@
 :root[data-theme="dark"] .ed-switch:has(input:checked) { background: #2E2752; }
 :root[data-theme="dark"] .ed-switch input:checked + .ed-switch-track i { background: var(--ink); border-color: var(--on-vivid); }
 :root[data-theme="dark"] .ed-twist-pend::before { color: var(--ink); }
+/* réglages compacts de l'accueil */
+:root[data-theme="dark"] .set-list { border-color: var(--edge); }
+:root[data-theme="dark"] .set-list .sw + .sw { border-top-color: var(--edge-soft, rgba(138, 144, 216, 0.35)); }
+:root[data-theme="dark"] .modal--settings .modal-actions { background: var(--raise); }

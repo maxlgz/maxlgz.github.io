@@ -300,18 +300,20 @@ function openHomeSettings() {
   homeSettingsOpen = openModal((body, close) => {
     const st = loadSettings();
     const view = getHomeView();
-    body.innerHTML = `<div class="modal-kicker">Accueil</div>
-      <h2>Réglages</h2>
+    // Panneau compact : une ligne par réglage, pour tout voir sans défiler sur un petit écran.
+    body.innerHTML = `<h2>Réglages</h2>
       <div class="set-group"><h3 id="set-view">Affichage des énigmes</h3>
         <div class="view-switch" role="group" aria-label="Affichage des énigmes">
           <button type="button" data-view="large" aria-pressed="${view === 'large'}">${VIEW_ICONS.large}<span>Grandes cartes</span></button>
           <button type="button" data-view="compact" aria-pressed="${view === 'compact'}">${VIEW_ICONS.compact}<span>Compact</span></button>
         </div></div>
-      <div class="set-group"><h3>Thème</h3>${switchHTML('theme', 'Mode sombre', 'Fond sombre, plus reposant le soir.', st.theme === 'dark')}</div>
-      <div class="set-group"><h3>Liste</h3>${switchHTML('hideSolved', 'Masquer les énigmes résolues', 'Les énigmes déjà résolues disparaissent de la liste.', !!st.hideSolved)}</div>
-      <div class="set-group"><h3>En jeu</h3>${switchHTML('oneTap', 'Pose en un toucher', 'Toucher une case pose le personnage ; l’appui long ajoute une note.', !!st.oneTap)}
-        ${switchHTML('sound', 'Sons', 'Effets : pose, croix, erreur, victoire…', st.sound !== false)}
-        ${switchHTML('ambience', 'Ambiance', 'Fond sonore du lieu : vagues, vent, oiseaux…', st.ambience !== false)}</div>
+      <div class="set-list">
+        ${switchHTML('theme', 'Mode sombre', '', st.theme === 'dark')}
+        ${switchHTML('hideSolved', 'Masquer les énigmes résolues', '', !!st.hideSolved)}
+        ${switchHTML('oneTap', 'Pose en un toucher', 'L’appui long ajoute alors une note.', !!st.oneTap)}
+        ${switchHTML('sound', 'Sons', 'Pose, croix, erreur, victoire…', st.sound !== false)}
+        ${switchHTML('ambience', 'Ambiance', 'Vagues, vent, oiseaux…', st.ambience !== false)}
+      </div>
       <div class="modal-actions"><button type="button" class="btn btn--primary" data-close autofocus>Fermer</button></div>`;
     body.addEventListener('click', (e) => {
       if (e.target.closest('[data-close]')) { close(); back(); return; }
