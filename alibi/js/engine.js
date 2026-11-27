@@ -119,7 +119,9 @@ export const CLUE_TYPES = [
   { t: 'besidePerson', label: 'À côté de quelqu’un',           fields: ['who'], negatable: true },
   { t: 'with',         label: 'Avec quelqu’un (même pièce)',   fields: ['who'], negatable: true },
   { t: 'alone',        label: 'Seul(e) dans sa pièce',         fields: [], negatable: true },
-  { t: 'dir',          label: 'Direction (nord/sud/est/ouest)', fields: ['dir', 'of', 'exact'], negatable: true },
+  { t: 'dir',          label: 'Position (au-dessus / en dessous / à gauche / à droite)', fields: ['dir', 'of', 'exact'], negatable: true,
+    options: { dir: [['N', 'au-dessus'], ['S', 'en dessous'], ['W', 'à gauche'], ['E', 'à droite']] },
+    help: 'Au-dessus / en dessous : sur une ligne plus haut / plus bas que la cible. À gauche / à droite : dans une colonne plus à gauche / à droite. Avec un écart exact : exactement ce nombre de lignes ou de colonnes.' },
   { t: 'sameRow',      label: 'Même ligne qu’un objet',        fields: ['obj'], negatable: true },
   { t: 'sameCol',      label: 'Même colonne qu’un objet',      fields: ['obj'], negatable: true },
   { t: 'sees',         label: 'Voyait',                        fields: ['obj'], negatable: true,
@@ -127,6 +129,12 @@ export const CLUE_TYPES = [
 ];
 
 const CLUE_T = new Set(CLUE_TYPES.map(c => c.t));
+// Indices « peu lisibles » : la négation d'une position relative (direction, même ligne / colonne,
+// « voyait »). Le générateur n'en produit jamais ; validateLevel les signale par un avertissement.
+const AWKWARD_NEG_T = new Set(['dir', 'sameRow', 'sameCol', 'sees']);
+export function isAwkwardClue(clue) {
+  return !!(clue && typeof clue === 'object' && clue.not && AWKWARD_NEG_T.has(clue.t));
+}
 const DIRS = ['N', 'S', 'E', 'W'];
 
 /* ------------------------------------------------------------------ */
@@ -1017,8 +1025,8 @@ function onLocution(type, g) {
 const onPrep = type => (objInfo(type).on || 'sur').split(' ').pop();
 
 const ROOM_G = (() => {
-  const m = 'salon bureau jardin dortoir grenier hall couloir atelier cellier garage bar parc verger potager patio porche perron vestibule cabinet studio débarras refuge quai pont port chalet kiosque belvédère préau réfectoire laboratoire labo observatoire boudoir fumoir hangar entrepôt magasin comptoir local lavoir chai cloître château donjon phare sous-sol palier balcon toit bassin bois champ sentier chemin camp campement ponton débarcadère embarcadère auditorium amphithéâtre théâtre foyer vestiaire office sauna solarium spa pavillon manoir moulin musée marché salle-de-bain wagon compartiment bivouac abri chantier dépôt grand petit vieux poste chenil poulailler pigeonnier jardinet square belvédère mess carré pont-promenade cockpit salonnet nid alpage col lac étang ruisseau rivage rocher sommet plateau vallon pré bosquet sous-bois verger cabanon habitat hôtel hôpital herbier hublot hémicycle héliport hippodrome hangar hammam'.split(' ');
-  const f = 'cuisine chambre salle cave terrasse véranda bibliothèque buanderie serre cour galerie loge suite mezzanine piscine plage forêt clairière grange écurie étable remise cabane tour crypte chapelle nef sacristie alcôve antichambre roseraie pinède prairie rive berge jetée cale cabine passerelle dune grotte pergola tonnelle orangerie cantine réserve boutique vitrine scène coulisse salle-à-manger lingerie bergerie halle gare station cabane-perchée allée place esplanade digue baie crique falaise montagne colline grande petite vieille chaufferie infirmerie salle-de-jeux arrière-boutique arrière-cour basse-cour ferme maison villa auberge taverne guinguette verrière rotonde laverie mansarde soupente baraque hutte yourte caravane péniche barge écluse marina dépendance laiterie fromagerie boulangerie forge horloge hôtellerie halte'.split(' ');
+  const m = 'salon bureau jardin dortoir grenier hall couloir atelier cellier garage bar parc verger potager patio porche perron vestibule cabinet studio débarras refuge quai pont port chalet kiosque belvédère préau réfectoire laboratoire labo observatoire boudoir fumoir hangar entrepôt magasin comptoir local lavoir chai cloître château donjon phare sous-sol palier balcon toit bassin bois champ sentier chemin camp campement ponton débarcadère embarcadère auditorium amphithéâtre théâtre foyer vestiaire office sauna solarium spa pavillon manoir moulin musée marché salle-de-bain wagon compartiment bivouac abri chantier dépôt grand petit vieux poste chenil poulailler pigeonnier jardinet square belvédère mess carré pont-promenade cockpit salonnet nid alpage col lac étang ruisseau rivage rocher sommet plateau vallon pré bosquet sous-bois verger cabanon habitat hôtel hôpital herbier hublot hémicycle héliport hippodrome hangar hammam parvis'.split(' ');
+  const f = 'cuisine chambre salle cave terrasse véranda bibliothèque buanderie serre cour galerie loge suite mezzanine piscine plage forêt clairière grange écurie étable remise cabane tour crypte chapelle nef sacristie alcôve antichambre roseraie pinède prairie rive berge jetée cale cabine passerelle dune grotte pergola tonnelle orangerie cantine réserve boutique vitrine scène coulisse salle-à-manger lingerie bergerie halle gare station cabane-perchée allée place esplanade digue baie crique falaise montagne colline grande petite vieille chaufferie infirmerie salle-de-jeux arrière-boutique arrière-cour basse-cour ferme maison villa auberge taverne guinguette verrière rotonde laverie mansarde soupente baraque hutte yourte caravane péniche barge écluse marina dépendance laiterie fromagerie boulangerie forge horloge hôtellerie halte piste banquise pelouse glace patinoire'.split(' ');
   const p = 'combles coulisses douches toilettes thermes communs cuisines écuries jardins bains'.split(' ');
   const map = new Map();
   m.forEach(w => map.set(w, 'm')); f.forEach(w => map.set(w, 'f')); p.forEach(w => map.set(w, 'p'));
@@ -1026,7 +1034,7 @@ const ROOM_G = (() => {
 })();
 
 // Lieux « ouverts » où l'on est « sur » plutôt que « dans ».
-const ROOM_SUR = new Set('terrasse balcon toit quai pont ponton jetée plage place esplanade digue passerelle scène palier perron parvis rivage berge rive sommet plateau falaise dune pont-promenade embarcadère débarcadère'.split(' '));
+const ROOM_SUR = new Set('terrasse balcon toit quai pont ponton jetée plage place esplanade digue passerelle scène palier perron parvis rivage berge rive sommet plateau falaise dune pont-promenade embarcadère débarcadère piste banquise pelouse glace patinoire'.split(' '));
 
 function roomPhrase(ctx, key) {
   const rm = ctx.lvl.rooms.find(r => r && String(r.key) === String(key));
@@ -1045,8 +1053,8 @@ function roomPhrase(ctx, key) {
   return `dans la pièce ${b}`;
 }
 
-const DIR_W = { N: 'au nord', S: 'au sud', E: "à l'est", W: "à l'ouest" };
-const OPP = { N: 'S', S: 'N', E: 'W', W: 'E' };
+// Directions telles que le joueur les voit sur le plan (N = haut, S = bas, E = droite, W = gauche).
+const DIR_REL = { N: 'au-dessus', S: 'en dessous', E: 'à droite', W: 'à gauche' };
 
 function personOf(ctx, person) {
   if (person && typeof person === 'object') return person;
@@ -1089,34 +1097,22 @@ export function clueHTML(level, person, clue) {
       if (!not) return `${S} <b>voyait</b> ${objNP(ctx, clue.obj)}.`;
       return `${S} <b>ne voyait pas</b> ${ctx.typeCount[clue.obj] === 1 ? objNP(ctx, clue.obj) : objNP(ctx, clue.obj, 'pasde')}.`;
     case 'dir': {
+      // Lignes et colonnes, gauche / droite / au-dessus / en dessous (le nord du plan est en haut).
       const dir = DIRS.includes(clue.dir) ? clue.dir : 'N';
       const of = clue.of || {};
       const exact = typeof clue.exact === 'number' ? clue.exact : null;
-      const unit = exact == null ? '' : `${exact} ${dir === 'N' || dir === 'S' ? 'ligne' : 'colonne'}${exact > 1 ? 's' : ''}`;
-      // Cible : who / obj / on
-      let kind, target = prep => '';
-      if (of.who != null) { kind = 'who'; target = prep => nameNP(nameOf(ctx, of.who), prep); }
-      else if (of.obj != null) { kind = ctx.typeCount[of.obj] === 1 ? 'objDef' : 'objIndef'; target = prep => objNP(ctx, of.obj, prep); }
-      else { kind = 'on'; target = prep => `${prep === 'de' ? 'de ' : prep === 'que' ? 'que ' : ''}quelqu'un se trouvant ${escapeHTML(onPrep(of.on))} ${objNP(ctx, of.on)}`; }
-      if (!not) {
-        if (exact == null) return `${S} était <b>plus ${DIR_W[dir]}</b> ${target('que')}.`;
-        return `${S} était exactement <b>${unit} ${DIR_W[dir]}</b> ${target('de')}.`;
+      const vert = dir === 'N' || dir === 'S';
+      let target;
+      if (of.who != null) target = nameNP(nameOf(ctx, of.who), 'de');
+      else if (of.obj != null) target = objNP(ctx, of.obj, 'de');
+      else target = `de quelqu'un se trouvant ${escapeHTML(onPrep(of.on))} ${objNP(ctx, of.on)}`;
+      const neg = not ? ' <b>pas</b>' : '';
+      if (exact == null) {
+        const frame = vert ? 'sur une ligne' : 'dans une colonne';
+        return `${S} ${v}${neg} ${frame} <b>${DIR_REL[dir]}</b> de celle ${target}.`;
       }
-      if (kind === 'who' || kind === 'objDef') {
-        if (exact == null) return `${S} n'était <b>pas plus ${DIR_W[dir]}</b> ${target('que')}.`;
-        return `${S} n'était <b>pas</b> exactement <b>${unit} ${DIR_W[dir]}</b> ${target('de')}.`;
-      }
-      // Négation avec cible indéfinie : on retourne la phrase pour éviter toute ambiguïté.
-      const o = DIR_W[OPP[dir]];
-      let subj;
-      if (kind === 'objIndef') {
-        const info = objInfo(of.obj);
-        subj = `<b>${info.g === 'f' ? 'Aucune' : 'Aucun'} ${escapeHTML(info.n)}</b>`;
-      } else {
-        subj = `<b>Personne</b> se trouvant ${escapeHTML(onPrep(of.on))} ${objNP(ctx, of.on)}`;
-      }
-      if (exact == null) return `${subj} n'était <b>plus ${o}</b> ${fem ? "qu'elle" : 'que lui'}.`;
-      return `${subj} n'était exactement <b>${unit} ${o}</b> ${fem ? "d'elle" : 'de lui'}.`;
+      const unit = `${exact} ${vert ? 'ligne' : 'colonne'}${exact > 1 ? 's' : ''}`;
+      return `${S} ${v}${neg} exactement <b>${unit} ${DIR_REL[dir]}</b> ${target}.`;
     }
   }
   return '';
@@ -1224,9 +1220,9 @@ function enumerateCandidates(ctx, pos, p) {
       add({ t: 'besidePerson', who, not: true }, 'besidePerson', `bpN|${pair}`);
     }
   }
-  // dir : personnes
+  // dir : personnes (jamais envers la victime)
   for (let q = 0; q < n; q++) {
-    if (q === p) continue;
+    if (q === p || q === victim) continue;
     const who = ctx.people[q].id;
     const rq = (pos[q] / W) | 0, cq = pos[q] % W;
     const pair = p < q ? `${p}|${q}` : `${q}|${p}`;
@@ -1254,7 +1250,8 @@ function enumerateCandidates(ctx, pos, p) {
   for (const t of occTypes) {
     const sitters = [];
     for (let q = 0; q < n; q++) if (q !== p && cellType[pos[q]] === t) sitters.push(q);
-    if (!sitters.length) continue;
+    // (la victime sur un objet de ce type en ferait une cible déguisée)
+    if (!sitters.length || (victim >= 0 && victim !== p && cellType[pos[victim]] === t)) continue;
     for (const d of DIRS) {
       add({ t: 'dir', dir: d, of: { on: t } }, 'dirOn');
       add({ t: 'dir', dir: d, of: { on: t }, not: true }, 'dirOn');
@@ -1326,8 +1323,12 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1, liar,
   const suspects = [];
   for (let p = 0; p < n; p++) if (p !== ctx.victim) suspects.push(p);
   if (liar && suspects.length < 2) return null;
-  const baseCands = [];
-  for (let p = 0; p < n; p++) baseCands.push(p === ctx.victim ? [] : enumerateCandidates(ctx, pos, p));
+  // Tous les indices vrais de chaque suspect ; jamais d'indice peu lisible (négation d'une position
+  // relative) dans ce qui est proposé : un témoin sincère n'affirme que des indices lisibles, et le
+  // menteur reçoit la négation d'un indice vrai seulement si elle reste lisible (affirmation fausse).
+  const allCands = [];
+  for (let p = 0; p < n; p++) allCands.push(p === ctx.victim ? [] : enumerateCandidates(ctx, pos, p));
+  const baseCands = allCands.map(list => list.filter(c => !isAwkwardClue(c.clue)));
   const unblocked = [];
   for (let i = 0; i < ctx.NN; i++) if (!ctx.blocked[i]) unblocked.push(i);
   const liarCands = new Map();
@@ -1335,7 +1336,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1, liar,
     if (Lr < 0) return baseCands;
     if (!liarCands.has(Lr)) {
       const c = baseCands.slice();
-      c[Lr] = baseCands[Lr].map(x => flipCandidate(ctx, Lr, x, unblocked));
+      c[Lr] = allCands[Lr].map(x => flipCandidate(ctx, Lr, x, unblocked)).filter(x => !isAwkwardClue(x.clue));
       liarCands.set(Lr, c);
     }
     return liarCands.get(Lr);
@@ -1543,7 +1544,7 @@ export function generateClues(level, solution, { difficulty = 1, seed = 1, liar,
           if (chosen[p].some((c, k) => k !== idx && c.clue.t === 'sees')) continue;
           for (const t of types) {
             if (t === ctx.cellType[pos[p]]) continue;
-            for (const neg of [false, true]) {
+            for (const neg of [false]) { // (« ne voyait pas » : peu lisible, jamais produit)
               const clue = neg ? { t: 'sees', obj: t, not: true } : { t: 'sees', obj: t };
               const cc = compileClue(ctx, p, clue);
               if (evalCompiled(ctx, p, cc, pos) !== want) continue;
@@ -1608,7 +1609,9 @@ function subjectSentence(ctx, P, clues) {
   return `${name} ${joined.join(' et ')}${texts.length ? `, et ${texts.join(' et ')}` : ''}`;
 }
 
-export function explain(level, placements, { prefer } = {}) {
+// Options : `prefer` (id du personnage sélectionné par le joueur), `skip` (ids à ne pas proposer :
+// « passer à une autre piste » ; ils reviennent quand il ne reste qu'eux à poser).
+export function explain(level, placements, { prefer, skip = [] } = {}) {
   const L = prepare(level), ctx = L[PREP];
   const { n, H, W, cellRoom, cellType, blocked } = ctx;
   const pos = readPlacements(ctx, placements);
@@ -1619,6 +1622,8 @@ export function explain(level, placements, { prefer } = {}) {
   const queNm = p => `${elides(person(p).name) ? "qu'" : 'que '}${nm(p)}`;
   const fem = p => person(p).gender === 'f';
   const prefIdx = prefer != null && ctx.pidx.has(String(prefer)) ? ctx.pidx.get(String(prefer)) : -1;
+  const skipSet = new Set();
+  for (const id of Array.isArray(skip) ? skip : []) if (ctx.pidx.has(String(id))) skipSet.add(ctx.pidx.get(String(id)));
   const roomOfCell = i => roomPhrase(ctx, ctx.roomKeys[cellRoom[i]]);
   const cellDesc = (i, p) => {
     let s = cellRoom[i] >= 0 ? roomOfCell(i) : `en ligne ${((i / W) | 0) + 1}, colonne ${(i % W) + 1}`;
@@ -1670,8 +1675,13 @@ export function explain(level, placements, { prefer } = {}) {
   const unplaced = [];
   for (let p = 0; p < n; p++) if (pos[p] < 0) unplaced.push(p);
   if (!unplaced.length) return { kind: 'done', person: null, cell: null, cells: [], html: 'Tout le monde est à sa place : il ne reste plus qu’à désigner le coupable.' };
+  // Personnages que l'on peut proposer : les non posés hors `skip`, ou tous s'il ne reste qu'eux.
+  const avail = unplaced.filter(p => !skipSet.has(p));
+  const pool = avail.length ? avail : unplaced;
+  const inPool = p => pool.includes(p);
+  const pref = skipSet.has(prefIdx) ? -1 : prefIdx; // la préférence ne vaut que hors `skip`
   if (ctx.liar) {
-    const p = unplaced.includes(prefIdx) ? prefIdx : unplaced[0];
+    const p = pool.includes(pref) ? pref : pool[0];
     return reveal(p, "Avec un témoin menteur, l'aide ne s'appuie pas sur les indices.");
   }
 
@@ -1736,7 +1746,7 @@ export function explain(level, placements, { prefer } = {}) {
       elims.push({ test: i => placedIn[cellRoom[i] + 1] < 2, cost: 1.5, attr: i => `${roomOfCell(i)}, où se trouvent déjà deux personnes (la victime était seule avec le meurtrier)` });
     }
     const D = base.filter(i => premises.every(s => s.test(i)) && elims.every(e => e.test(i)));
-    if (!D.includes(sol[p])) return reveal(p, 'Pas de déduction simple pour l’instant.'); // garde-fou
+    if (!D.includes(sol[p])) return reveal(inPool(p) ? p : pool[0], 'Pas de déduction simple pour l’instant.'); // garde-fou
     info.set(p, { premises, elims, D });
   }
 
@@ -1804,7 +1814,7 @@ export function explain(level, placements, { prefer } = {}) {
   };
 
   const forced = [], narrow = [];
-  for (const p of unplaced) {
+  for (const p of pool) {
     const { D, premises } = info.get(p);
     if (D.length === 1) { const f = explainForced(p); if (f) forced.push(f); }
     else {
@@ -1821,6 +1831,7 @@ export function explain(level, placements, { prefer } = {}) {
     for (const p of unplaced) { const cs = info.get(p).D.filter(has); if (cs.length) who.push({ p, cs }); }
     if (who.length !== 1) continue;
     const { p, cs } = who[0];
+    if (!inPool(p)) continue;
     if (info.get(p).D.length === cs.length) continue; // rien de neuf
     if (cs.length === 1) forced.push({ p, x: cs[0], cost: 3.5, html: `Dans la <b>${label}</b>, il ne reste qu'une case possible, pour ${nm(p)} (${cellDesc(cs[0], p)}).` });
     else narrow.push({ p, cells: cs, html: `Dans la <b>${label}</b>, seul${fem(p) ? 'e' : ''} ${nm(p)} peut encore se placer : il lui reste ${numF(cs.length)} cases possibles.` });
@@ -1829,7 +1840,7 @@ export function explain(level, placements, { prefer } = {}) {
   if (vRoom != null && placedIn[vRoom + 1] === 1) {
     const who = [];
     for (const p of unplaced) { const cs = info.get(p).D.filter(i => cellRoom[i] === vRoom); if (cs.length) who.push({ p, cs }); }
-    if (who.length === 1 && info.get(who[0].p).D.length !== who[0].cs.length) {
+    if (who.length === 1 && inPool(who[0].p) && info.get(who[0].p).D.length !== who[0].cs.length) {
       const { p, cs } = who[0];
       const lead = `La victime, ${nm(v)}, était seule avec le meurtrier : quelqu'un doit ${fem(v) ? 'la' : 'le'} rejoindre ${roomOfCell(pos[v])}, et seul${fem(p) ? 'e' : ''} ${nm(p)} peut encore y aller`;
       if (cs.length === 1) forced.push({ p, x: cs[0], cost: 3.5, html: `${lead}.` });
@@ -1838,20 +1849,20 @@ export function explain(level, placements, { prefer } = {}) {
   }
   const order = p => unplaced.indexOf(p);
   if (forced.length) {
-    const mine = forced.filter(f => f.p === prefIdx);
+    const mine = forced.filter(f => f.p === pref);
     const pool = mine.length ? mine : forced;
     pool.sort((a, b) => a.cost - b.cost || order(a.p) - order(b.p));
     const f = pool[0];
     if (f.x !== sol[f.p]) return reveal(f.p, 'Pas de déduction simple pour l’instant.'); // garde-fou
     return { kind: 'forced', person: person(f.p).id, cell: rc(f.x), cells: [rc(f.x)], html: f.html };
   }
-  narrow.sort((a, b) => a.cells.length - b.cells.length || (b.p === prefIdx) - (a.p === prefIdx) || order(a.p) - order(b.p));
+  narrow.sort((a, b) => a.cells.length - b.cells.length || (b.p === pref) - (a.p === pref) || order(a.p) - order(b.p));
   const nw = narrow[0];
   if (nw && nw.cells.length <= NARROW_MAX && nw.cells.includes(sol[nw.p])) {
     return { kind: 'narrow', person: person(nw.p).id, cell: null, cells: nw.cells.map(rc), html: nw.html };
   }
-  const p = unplaced.includes(prefIdx) ? prefIdx
-    : unplaced.slice().sort((a, b) => info.get(a).D.length - info.get(b).D.length || order(a) - order(b))[0];
+  const p = pool.includes(pref) ? pref
+    : pool.slice().sort((a, b) => info.get(a).D.length - info.get(b).D.length || order(a) - order(b))[0];
   return reveal(p, 'Pas de déduction simple pour l’instant.');
 }
 
@@ -1993,6 +2004,7 @@ export function validateLevel(raw) {
         if (!ids.has(w) && !people.some(q => q && q.id === w)) E(`${L} : personne inconnue « ${w} ».`);
         else if (w === p.id) E(`${L} : un indice ne peut pas viser la personne elle-même.`);
       };
+      if (isAwkwardClue(cl)) Wn(`${L} : indice peu lisible (négation ${cl.t === 'dir' ? 'd\'une position relative' : cl.t === 'sees' ? 'de « voyait »' : cl.t === 'sameRow' ? 'de « même ligne »' : 'de « même colonne »'}) ; préférez une affirmation.`);
       switch (cl.t) {
         case 'room': if (!keys.has(cl.room)) E(`${L} : pièce inconnue « ${cl.room} ».`); break;
         case 'on': needObj(cl.obj, true); break;

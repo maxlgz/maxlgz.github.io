@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {
   OBJECTS, OBJECT_SIZES, FLOORS, CLUE_TYPES, prepare, dims, canPlace, clueHTML, personCluesHTML, checkClue,
-  evaluate, murdererOf, solve, generateClues, validateLevel, explain, liarOf, weaponOf,
+  evaluate, murdererOf, solve, generateClues, validateLevel, explain, liarOf, weaponOf, isAwkwardClue,
 } from '../js/engine.js';
 import { LEVELS } from '../js/levels.js';
 // Les tests historiques (génération d'indices classiques, parcours avec les aides) portent sur les
@@ -18,21 +18,27 @@ function test(name, fn) {
 const clone = x => JSON.parse(JSON.stringify(x));
 const strip = html => html.replace(/<\/?b>/g, '');
 const fnv = s => { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16).padStart(8, '0'); };
-// Non-régression : empreintes capturées avec le moteur d'AVANT les plans rectangulaires.
-// Par niveau : fnv(JSON.stringify({ sol: solve(niveau, { max: 3 }), phrases: personCluesHTML de chaque personne })).
+// Non-régression : empreintes par niveau, fnv(JSON.stringify({ sol: solve(niveau, { max: 3 }), phrases: personCluesHTML
+// de chaque personne })). Capturées avec le moteur d'avant les plans rectangulaires ; recalculées depuis pour les
+// 8 niveaux dont les phrases ont changé (directions dites « à gauche / au-dessus… » et indices peu lisibles
+// remplacés : vignoble, chapiteau, observatoire, musee, station, opera, manoir, grand-hotel ; et, pour musee et
+// station, « dans les Armures » / « sur la Banquise » au lieu de « dans la pièce … »). Les 13 autres n'ont
+// aucun indice de direction : leur empreinte d'origine est inchangée. Les solutions, elles, sont toutes identiques.
 const REF_LEVELS = {
   peniche: '946e16dc', refuge: '95f5bb9b', librairie: '6533c825', boulangerie: '3b3a3c68', camping: '43f1ef3f',
   gare: 'd0cfde4d', serre: 'e2490077', marche: 'c159a63b', ecole: '1bba00d1', ferme: 'e9151c7b', piscine: '6fffc04d',
-  coiffure: '3b6a0c8f', phare: 'a628fffb', vignoble: '6ae9d621', chapiteau: 'b32661f0', observatoire: '2addf192',
-  musee: '00a1f512', station: '067dfe82', opera: '1e57c7fb', manoir: 'e49be0df', 'grand-hotel': '7b110764',
+  coiffure: '3b6a0c8f', phare: 'a628fffb', vignoble: '9e98d0c0', chapiteau: 'a4a9634c', observatoire: '63b3c5f9',
+  musee: '25e34641', station: '429cd0b4', opera: '143a3aac', manoir: '9c3cfd80', 'grand-hotel': 'ddb0f8b9',
 };
 // generateClues sur ces 21 niveaux, difficultés 1 à 3, graines 1, 2, 3, 'abc' (dans l'ordre de LEVELS).
-// Moteur d'avant les nouvelles mécaniques : 'af0a0a0d' (les trois difficultés mêlées). Depuis :
-// - difficultés 2 et 3 avec { sees: false } : exactement les mêmes indices qu'avant (empreinte de ces seules
-//   difficultés, calculée avec l'ancien moteur) ; sans cette option, au plus un indice remplacé par un « voyait » ;
-// - difficulté 1 : restreinte aux indices simples (changement voulu), nouvelle empreinte de référence.
-const REF_GEN_D23 = '58d1402e';
-const REF_GEN_D1 = '4454c7f2';
+// Moteur d'avant les nouvelles mécaniques : 'af0a0a0d' (les trois difficultés mêlées), puis '58d1402e' (d2-d3,
+// { sees: false }) et '4454c7f2' (d1). Depuis que le générateur écarte les indices peu lisibles (négations de
+// direction, même ligne / colonne, « voyait ») et toute direction visant la victime, empreintes recalculées :
+// - difficultés 2 et 3 avec { sees: false } : le tirage de base ; sans cette option, au plus un indice remplacé
+//   par un « voyait » ;
+// - difficulté 1 : restreinte aux indices simples.
+const REF_GEN_D23 = '5d5c9daa';
+const REF_GEN_D1 = 'a47d3fc4';
 
 // Petit niveau 5×5 de référence.
 //   a a b b b      a : Atelier (une seule pièce à gauche), b : Grenier, c : Terrasse
@@ -255,17 +261,18 @@ test('élisions, contractions, défini/indéfini', () => {
   assert.equal(T(lv, 'B', { t: 'beside', obj: 'wardrobe' }), "Il était à côté de l'armoire.");
   assert.equal(T(lv, 'B', { t: 'sameRow', obj: 'aquarium' }), "Il était sur la même ligne que l'aquarium.");
   assert.equal(T(lv, 'A', { t: 'on', obj: 'stage' }), "Elle était sur l'estrade.");
-  assert.equal(T(lv, 'B', { t: 'dir', dir: 'N', of: { obj: 'well' } }), 'Il était plus au nord que le puits.');
-  assert.equal(T(lv, 'B', { t: 'dir', dir: 'N', of: { obj: 'well' }, exact: 2 }), 'Il était exactement 2 lignes au nord du puits.');
-  assert.equal(T(lv, 'B', { t: 'dir', dir: 'E', of: { obj: 'tree' }, exact: 1 }), "Il était exactement 1 colonne à l'est de l'arbre.");
+  // directions : lignes / colonnes, au-dessus / en dessous / à gauche / à droite (le nord du plan est en haut)
+  assert.equal(T(lv, 'B', { t: 'dir', dir: 'N', of: { obj: 'well' } }), 'Il était sur une ligne au-dessus de celle du puits.');
+  assert.equal(T(lv, 'B', { t: 'dir', dir: 'N', of: { obj: 'well' }, exact: 2 }), 'Il était exactement 2 lignes au-dessus du puits.');
+  assert.equal(T(lv, 'B', { t: 'dir', dir: 'E', of: { obj: 'tree' }, exact: 1 }), "Il était exactement 1 colonne à droite de l'arbre.");
   assert.equal(T(lv, 'B', { t: 'sameCol', obj: 'shelf' }), "Il était dans la même colonne qu'une étagère.");
   assert.equal(T(lv, 'B', { t: 'beside', obj: 'hammock' }), 'Il était à côté du hamac.', 'h aspiré : pas d’élision');
-  assert.equal(T(lv, 'A', { t: 'dir', dir: 'E', of: { on: 'boat' }, exact: 2 }), "Elle était exactement 2 colonnes à l'est de quelqu'un se trouvant dans une barque.");
-  assert.equal(T(lv, 'A', { t: 'dir', dir: 'W', of: { on: 'chair' } }), "Elle était plus à l'ouest que quelqu'un se trouvant sur la chaise.");
-  // Négation d'une cible indéfinie : formulation non ambiguë
-  assert.equal(T(lv, 'A', { t: 'dir', dir: 'N', of: { obj: 'shelf' }, not: true }), "Aucune étagère n'était plus au sud qu'elle.");
-  assert.equal(T(lv, 'B', { t: 'dir', dir: 'W', of: { obj: 'bush' }, exact: 2, not: true }), "Aucun buisson n'était exactement 2 colonnes à l'est de lui.");
-  assert.equal(T(lv, 'B', { t: 'dir', dir: 'S', of: { obj: 'well' }, not: true }), "Il n'était pas plus au sud que le puits.");
+  assert.equal(T(lv, 'A', { t: 'dir', dir: 'E', of: { on: 'boat' }, exact: 2 }), "Elle était exactement 2 colonnes à droite de quelqu'un se trouvant dans une barque.");
+  assert.equal(T(lv, 'A', { t: 'dir', dir: 'W', of: { on: 'chair' } }), "Elle était dans une colonne à gauche de celle de quelqu'un se trouvant sur la chaise.");
+  // Négations : forme simple et régulière, y compris avec une cible indéfinie (au sens : d'aucune étagère)
+  assert.equal(T(lv, 'A', { t: 'dir', dir: 'N', of: { obj: 'shelf' }, not: true }), "Elle n'était pas sur une ligne au-dessus de celle d'une étagère.");
+  assert.equal(T(lv, 'B', { t: 'dir', dir: 'W', of: { obj: 'bush' }, exact: 2, not: true }), "Il n'était pas exactement 2 colonnes à gauche d'un buisson.");
+  assert.equal(T(lv, 'B', { t: 'dir', dir: 'S', of: { obj: 'well' }, not: true }), "Il n'était pas sur une ligne en dessous de celle du puits.");
 });
 test('accords en genre (assis/assise, allongé/allongée, seul/seule)', () => {
   const lv = prepare(base({ objects: [{ type: 'chair', r: 0, c: 0 }, { type: 'bed', r: 1, c: 0 }, { type: 'hammock', r: 2, c: 0 }, { type: 'armchair', r: 3, c: 0 }, { type: 'tent', r: 4, c: 0 }] }));
@@ -287,9 +294,9 @@ test('personnes, pièces, HTML échappé, mots-clés en gras', () => {
   assert.equal(clueHTML(L, P('A'), { t: 'with', who: 'B', not: true }), "Elle n'était <b>pas avec Bruno</b>.");
   assert.equal(T(L, 'B', { t: 'besidePerson', who: 'A' }), "Il était à côté d'Agathe.");
   assert.equal(T(L, 'A', { t: 'besidePerson', who: 'B' }), 'Elle était à côté de Bruno.');
-  assert.equal(T(L, 'A', { t: 'dir', dir: 'S', of: { who: 'B' } }), 'Elle était plus au sud que Bruno.');
-  assert.equal(T(L, 'B', { t: 'dir', dir: 'S', of: { who: 'A' }, exact: 1 }), "Il était exactement 1 ligne au sud d'Agathe.");
-  assert.equal(T(L, 'B', { t: 'dir', dir: 'N', of: { who: 'A' } }), "Il était plus au nord qu'Agathe.");
+  assert.equal(T(L, 'A', { t: 'dir', dir: 'S', of: { who: 'B' } }), 'Elle était sur une ligne en dessous de celle de Bruno.');
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'S', of: { who: 'A' }, exact: 1 }), "Il était exactement 1 ligne en dessous d'Agathe.");
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'N', of: { who: 'A' } }), "Il était sur une ligne au-dessus de celle d'Agathe.");
   assert.equal(clueHTML(L, P('A'), { t: 'room', room: 'a' }), "Elle était dans l'<b>Atelier</b>.");
   assert.equal(T(L, 'A', { t: 'room', room: 'b', not: true }), "Elle n'était pas dans le Grenier.");
   assert.equal(T(L, 'A', { t: 'room', room: 'c' }), 'Elle était sur la Terrasse.');
@@ -418,6 +425,8 @@ function checkGenerated(level, sol, clues, label, { validate = true } = {}) {
     for (const c of clues[p.id]) {
       assert.equal(checkClue(lv, sol, p, c), true, `${label} : indice faux ${JSON.stringify(c)}`);
       if (c.t === 'with' || c.t === 'besidePerson') assert.notEqual(c.who, victim.id, `${label} : indice visant la victime`);
+      if (c.t === 'dir') assert.ok(!c.of || c.of.who !== victim.id, `${label} : direction visant la victime`);
+      assert.ok(!isAwkwardClue(c), `${label} : indice peu lisible ${JSON.stringify(c)}`);
     }
   }
   const s = solve(lv, { max: 2 });
@@ -426,7 +435,7 @@ function checkGenerated(level, sol, clues, label, { validate = true } = {}) {
   if (validate) assert.equal(validateLevel(lv).errors.length, 0, `${label} : ${validateLevel(lv).errors}`);
   return lv;
 }
-test('generateClues : solution unique, déterministe, sur les niveaux d’exemple (mêmes indices qu’avant en difficultés 2 et 3)', () => {
+test('generateClues : solution unique, déterministe, sur les niveaux d’exemple (empreintes de référence)', () => {
   let d1 = '', d23 = '';
   for (const lvl of CLASSIC) for (const difficulty of [1, 2, 3]) for (const seed of [1, 2, 3, 'abc']) {
     const sol = Object.fromEntries(lvl.people.map(p => [p.id, lvl.solution[p.id]]));
@@ -443,7 +452,7 @@ test('generateClues : solution unique, déterministe, sur les niveaux d’exempl
     assert.ok(diff.length === 0 || (diff.length === 1 && diff[0].t === 'sees'), `${lvl.id} d${difficulty} s${seed} : ${JSON.stringify(diff)}`);
   }
   if (Object.keys(REF_LEVELS).every(id => LEVELS.some(l => l.id === id))) {
-    assert.equal(fnv(d23), REF_GEN_D23, 'difficultés 2 et 3 : indices d’avant les nouvelles mécaniques');
+    assert.equal(fnv(d23), REF_GEN_D23, 'difficultés 2 et 3 : tirage de base ({ sees: false })');
     assert.equal(fnv(d1), REF_GEN_D1, 'difficulté 1 : référence des indices simples');
   }
 });
@@ -799,13 +808,51 @@ test('solve sur des rectangles = force brute (4×6, 6×4, 5×7, 7×5)', () => {
   assert.equal(checked, 18);
   assert.ok(nonTrivial >= 6, `trop peu de cas non triviaux (${nonTrivial})`);
 });
+// Tous les indices vrais et permis au générateur (lisibles, sans viser la victime), pour tous les suspects à la
+// fois : si même cet ensemble ne rend pas la solution unique, aucune génération n'est possible. Sur un grand
+// rectangle, c'est le cas dès que la case de la victime ne se déduit de rien (aucun indice ne peut la viser).
+function allowedTrueClues(level, sol) {
+  const lv = prepare(level);
+  const { rows, cols } = dims(level);
+  const victim = lv.people.find(p => p.victim);
+  const types = [...new Set(level.objects.map(o => o.type))];
+  const occ = types.filter(t => OBJECTS[t].occ);
+  const typeAt = ([r, c]) => lv.cells[r][c].objType;
+  const out = {};
+  for (const p of lv.people) {
+    if (p.victim) { out[p.id] = []; continue; }
+    const cs = [];
+    const add = c => { if (!isAwkwardClue(c) && checkClue(lv, sol, p, c) === true) cs.push(c); };
+    for (const rm of level.rooms) { add({ t: 'room', room: rm.key }); add({ t: 'room', room: rm.key, not: true }); }
+    for (const t of occ) { add({ t: 'on', obj: t }); add({ t: 'on', obj: t, not: true }); }
+    for (const t of types) {
+      add({ t: 'beside', obj: t }); add({ t: 'beside', obj: t, not: true });
+      add({ t: 'sameRow', obj: t }); add({ t: 'sameCol', obj: t }); add({ t: 'sees', obj: t });
+    }
+    add({ t: 'alone' }); add({ t: 'alone', not: true });
+    const ofs = [...lv.people.filter(q => q !== p && !q.victim).map(q => ({ who: q.id })), ...types.map(t => ({ obj: t })),
+      ...occ.filter(t => t !== typeAt(sol[victim.id])).map(t => ({ on: t }))];
+    for (const q of lv.people) if (q !== p && !q.victim) for (const t of ['with', 'besidePerson']) { add({ t, who: q.id }); add({ t, who: q.id, not: true }); }
+    for (const of of ofs) for (const d of ['N', 'S', 'E', 'W']) {
+      add({ t: 'dir', dir: d, of });
+      for (let k = 1; k < Math.max(rows, cols); k++) add({ t: 'dir', dir: d, of, exact: k });
+    }
+    out[p.id] = cs;
+  }
+  return out;
+}
+const pinnable = (level, sol) => solve({ ...level, people: level.people.map(p => ({ ...p, clues: allowedTrueClues(level, sol)[p.id] })) }, { max: 2 }).length === 1;
 test('generateClues : solution unique sur des rectangles 4×9, 6×9, 9×6, 5×12 (trois difficultés)', () => {
-  let ok = 0, total = 0, three = 0;
+  let ok = 0, total = 0, three = 0, possible = 0;
   for (const [H, W] of [[4, 9], [6, 9], [9, 6], [5, 12]]) for (const difficulty of [1, 2, 3]) for (const seed of [1, 2]) {
     const { level, sol } = randomRect(H, W, H * 1000 + W * 31 + seed * 17 + difficulty);
     const clues = generateClues(level, sol, { difficulty, seed });
     total++;
-    if (!clues) continue; // « null si impossible » est permis, mais doit rester rare
+    // Sans indice visant la victime, beaucoup de ces plans tirés au hasard n'ont plus aucune génération possible :
+    // un échec n'est permis que dans ce cas (prouvé), et chaque plan possible doit réussir.
+    const can = pinnable(level, sol);
+    if (can) possible++;
+    if (!clues) { assert.equal(can, false, `${H}×${W} d${difficulty} s${seed} : échec alors qu'une génération est possible`); continue; }
     // 5×12 dépasse la limite de 9 colonnes de validateLevel, mais le moteur doit le résoudre
     const lv = checkGenerated(level, sol, clues, `${H}×${W} d${difficulty} s${seed}`, { validate: W <= 9 });
     if (W > 9) assert.ok(validateLevel(lv).errors.some(e => e.includes('colonnes (cols)')));
@@ -813,7 +860,9 @@ test('generateClues : solution unique sur des rectangles 4×9, 6×9, 9×6, 5×12
     three += lv.people.filter(p => p.clues.length === 3).length;
     ok++;
   }
-  assert.ok(ok >= total - 2, `seulement ${ok}/${total} générations réussies`);
+  assert.equal(ok, possible, `seulement ${ok}/${possible} générations possibles réussies`);
+  assert.ok(possible >= 4, `trop peu de plans possibles (${possible}/${total})`);
+  console.log(`    (${ok}/${total} générations sur rectangles ; les ${total - possible} autres sont prouvées impossibles)`);
   // le 12×9 (plus grand plan permis) aussi
   const { level, sol } = randomRect(12, 9, 4242);
   checkGenerated(level, sol, generateClues(level, sol, { difficulty: 2, seed: 1 }), '12×9');
@@ -911,17 +960,17 @@ test('textes des 38 nouveaux objets : défini / indéfini, élisions, contractio
     assert.equal(Tx(two, 'A', { t: 'beside', obj: t }), `Elle était à côté ${indef}.`, t);
     assert.equal(Tx(one, 'B', { t: 'sameRow', obj: t }), `Il était sur la même ligne ${que}.`, t);
     assert.equal(Tx(two, 'B', { t: 'sameCol', obj: t }), `Il était dans la même colonne ${o.g === 'f' ? "qu'une" : "qu'un"} ${o.n}.`, t);
-    assert.equal(Tx(one, 'B', { t: 'dir', dir: 'N', of: { obj: t } }), `Il était plus au nord ${que}.`, t);
-    assert.equal(Tx(one, 'B', { t: 'dir', dir: 'E', of: { obj: t }, exact: 2 }), `Il était exactement 2 colonnes à l'est ${def}.`, t);
-    assert.equal(Tx(two, 'A', { t: 'dir', dir: 'N', of: { obj: t }, not: true }), `${o.g === 'f' ? 'Aucune' : 'Aucun'} ${o.n} n'était plus au sud qu'elle.`, t);
+    assert.equal(Tx(one, 'B', { t: 'dir', dir: 'N', of: { obj: t } }), `Il était sur une ligne au-dessus de celle ${def}.`, t);
+    assert.equal(Tx(one, 'B', { t: 'dir', dir: 'E', of: { obj: t }, exact: 2 }), `Il était exactement 2 colonnes à droite ${def}.`, t);
+    assert.equal(Tx(two, 'A', { t: 'dir', dir: 'N', of: { obj: t }, not: true }), `Elle n'était pas sur une ligne au-dessus de celle ${indef}.`, t);
     if (o.occ) {
       const [fem, masc] = ON[t];
       assert.equal(Tx(one, 'A', { t: 'on', obj: t }), `Elle était ${fem}.`, t);
       assert.equal(Tx(one, 'B', { t: 'on', obj: t }), `Il était ${masc}.`, t);
       assert.equal(Tx(one, 'A', { t: 'on', obj: t, not: true }), `Elle n'était pas ${fem}.`, t);
       const prep = o.on.split(' ').pop();
-      assert.equal(Tx(one, 'B', { t: 'dir', dir: 'W', of: { on: t } }), `Il était plus à l'ouest que quelqu'un se trouvant ${prep} ${bare}.`, t);
-      assert.equal(Tx(two, 'B', { t: 'dir', dir: 'S', of: { on: t }, exact: 1 }), `Il était exactement 1 ligne au sud de quelqu'un se trouvant ${prep} ${o.g === 'f' ? 'une' : 'un'} ${o.n}.`, t);
+      assert.equal(Tx(one, 'B', { t: 'dir', dir: 'W', of: { on: t } }), `Il était dans une colonne à gauche de celle de quelqu'un se trouvant ${prep} ${bare}.`, t);
+      assert.equal(Tx(two, 'B', { t: 'dir', dir: 'S', of: { on: t }, exact: 1 }), `Il était exactement 1 ligne en dessous de quelqu'un se trouvant ${prep} ${o.g === 'f' ? 'une' : 'un'} ${o.n}.`, t);
     }
   }
   // quelques phrases complètes, en toutes lettres
@@ -934,9 +983,9 @@ test('textes des 38 nouveaux objets : défini / indéfini, élisions, contractio
   assert.equal(Tx(one, 'C', { t: 'on', obj: 'parasol' }), 'Elle était sous le parasol.');
   assert.equal(Tx(one, 'B', { t: 'on', obj: 'horse' }), 'Il était sur le cheval.');
   assert.equal(Tx(one, 'D', { t: 'on', obj: 'bike', not: true }), "Il n'était pas sur le vélo.");
-  assert.equal(Tx(one, 'B', { t: 'dir', dir: 'E', of: { obj: 'antenna' }, exact: 1 }), "Il était exactement 1 colonne à l'est de l'antenne.");
-  assert.equal(Tx(two, 'B', { t: 'dir', dir: 'W', of: { obj: 'campfire' }, exact: 2, not: true }), "Aucun feu de camp n'était exactement 2 colonnes à l'est de lui.");
-  assert.equal(Tx(one, 'B', { t: 'dir', dir: 'S', of: { obj: 'tv' }, not: true }), "Il n'était pas plus au sud que la télévision.");
+  assert.equal(Tx(one, 'B', { t: 'dir', dir: 'E', of: { obj: 'antenna' }, exact: 1 }), "Il était exactement 1 colonne à droite de l'antenne.");
+  assert.equal(Tx(two, 'B', { t: 'dir', dir: 'W', of: { obj: 'campfire' }, exact: 2, not: true }), "Il n'était pas exactement 2 colonnes à gauche d'un feu de camp.");
+  assert.equal(Tx(one, 'B', { t: 'dir', dir: 'S', of: { obj: 'tv' }, not: true }), "Il n'était pas sur une ligne en dessous de celle de la télévision.");
   assert.equal(clueHTML(one, one.people[0], { t: 'beside', obj: 'snowman' }), 'Elle était <b>à côté</b> du <b>bonhomme de neige</b>.');
   // pluriels irréguliers (utilisés par l'interface, ex. « les chevaux ») et contraction « des »
   assert.equal(`des ${OBJECTS.campfire.pl}`, 'des feux de camp');
@@ -944,13 +993,14 @@ test('textes des 38 nouveaux objets : défini / indéfini, élisions, contractio
 });
 
 console.log('Non-régression des 21 niveaux carrés');
-test('les 21 niveaux gardent leur solution unique et les mêmes phrases d’indices qu’avant l’extension', () => {
+test('les 21 niveaux gardent leur solution unique et leurs phrases d’indices de référence', () => {
   for (const [id, hash] of Object.entries(REF_LEVELS)) {
     const raw = LEVELS.find(l => l.id === id);
     assert.ok(raw, `niveau « ${id} » absent de levels.js`);
     const lv = prepare(raw);
     const sols = solve(raw, { max: 3 });
     assert.equal(sols.length, 1, id);
+    for (const p of raw.people) assert.deepEqual(sols[0][p.id], raw.solution[p.id], `${id} : solution modifiée (${p.id})`);
     assert.equal(dims(raw).rows, raw.size); assert.equal(dims(raw).cols, raw.size);
     const phrases = lv.people.map(p => personCluesHTML(lv, p));
     assert.equal(fnv(JSON.stringify({ sol: sols, phrases })), hash, `${id} : solution ou phrases modifiées`);
@@ -1122,7 +1172,7 @@ test('objets : « de l’horloge », « l’herbier », mais « le hamac », « 
   const one = prepare(base({ objects: [{ type: 'hammock', r: 0, c: 0 }] }));
   assert.equal(strip(clueHTML(one, one.people[0], { t: 'on', obj: 'hammock' })), 'Elle était allongée dans le hamac.');
   assert.equal(strip(clueHTML(one, one.people[1], { t: 'beside', obj: 'hammock' })), 'Il était à côté du hamac.');
-  assert.equal(strip(clueHTML(one, one.people[1], { t: 'dir', dir: 'S', of: { obj: 'hammock' } })), 'Il était plus au sud que le hamac.');
+  assert.equal(strip(clueHTML(one, one.people[1], { t: 'dir', dir: 'S', of: { obj: 'hammock' } })), 'Il était sur une ligne en dessous de celle du hamac.');
   assert.equal(strip(clueHTML(one, one.people[1], { t: 'sees', obj: 'hammock', not: true })), 'Il ne voyait pas le hamac.');
   assert.equal(Object.keys(OBJECTS).length, 34 + 38);
 });
@@ -1312,11 +1362,17 @@ test('generateClues({ liar: true }) : unique, menteur aux indices tous faux, car
   for (const [H, W] of [[4, 9], [6, 9], [9, 6]]) cases.push({ ...randomRect(H, W, H * 13 + W), label: `${H}×${W}` });
   let ok = 0, total = 0;
   const liars = new Set();
+  const can = new Map();
   for (const { level, sol, label } of cases) for (const difficulty of [1, 2, 3]) for (const seed of [1, 2]) {
     if (dims(level).rows > 7 && seed === 2) continue;
     total++;
     const g = generateClues(level, sol, { difficulty, seed, liar: true });
-    if (!g) continue;
+    if (!g) {
+      // échec permis seulement quand la case de la victime ne peut se déduire d'aucun indice permis
+      if (!can.has(label)) can.set(label, pinnable(level, sol));
+      assert.equal(can.get(label), false, `${label} d${difficulty} s${seed} : échec avec menteur sur un plan où la victime peut être située`);
+      continue;
+    }
     const lv = withClues(level, g, { twist: { liar: true } });
     const L = `${label} d${difficulty} s${seed}`;
     const s = solve(lv, { max: 2 });
@@ -1331,7 +1387,12 @@ test('generateClues({ liar: true }) : unique, menteur aux indices tous faux, car
       if (p.victim) { assert.deepEqual(p.clues, []); continue; }
       assert.ok(p.clues.length >= 1 && p.clues.length <= (dims(lv).rows === dims(lv).cols ? 2 : 3), `${L} : ${p.id}`);
       assert.deepEqual(ev.people[p.id].clues, p.clues.map(() => p.id !== liar), `${L} : ${p.id}`);
-      for (const c of p.clues) if (c.t === 'with' || c.t === 'besidePerson') assert.notEqual(c.who, lv.people.find(q => q.victim).id);
+      for (const c of p.clues) {
+        if (c.t === 'with' || c.t === 'besidePerson') assert.notEqual(c.who, lv.people.find(q => q.victim).id);
+        if (c.t === 'dir') assert.ok(!c.of || c.of.who !== lv.people.find(q => q.victim).id, `${L} : direction visant la victime`);
+        // menteur compris : une affirmation fausse reste une phrase lisible
+        assert.ok(!isAwkwardClue(c), `${L} : indice peu lisible ${JSON.stringify(c)}`);
+      }
     }
     if (dims(lv).cols <= 9) assert.deepEqual(validateLevel(lv).errors, [], L);
     if (seed === 1 && difficulty === 2 && dims(level).rows < 8) assert.deepEqual(generateClues(level, sol, { difficulty, seed, liar: true }), g, `${L} : déterministe`);
@@ -1339,9 +1400,10 @@ test('generateClues({ liar: true }) : unique, menteur aux indices tous faux, car
     assert.equal(evaluate(withClues(level, g), sol).ok, false, `${L} : sans menteur`);
     ok++;
   }
-  // « null si impossible » est permis : cela arrive surtout sur un 4×9 (trois suspects seulement)
+  // « null si impossible » est permis : cela arrive sur le 4×9 (trois suspects seulement), où rien ne permet de
+  // situer la victime sans indice qui la vise (vérifié ci-dessus)
   console.log(`    (${ok}/${total} générations avec menteur réussies)`);
-  assert.ok(ok >= total - 4, `seulement ${ok}/${total}`);
+  assert.ok(ok >= total - 6, `seulement ${ok}/${total}`);
   assert.ok(liars.size >= 8, 'menteurs variés');
 });
 test('explain sur un niveau à menteur : seulement wrong, reveal, done', () => {
@@ -1394,14 +1456,16 @@ test('generateClues difficulté 1 : indices simples (au plus un with/sameRow/sam
   };
   let kept = 0, total = 0;
   for (const lvl of CLASSIC) {
-    const small = dims(lvl).rows * dims(lvl).cols <= 45;
+    // L'exigence « que des indices simples » vaut pour les petits plans conçus comme faciles ; un plan
+    // moyen de même taille peut ne pas avoir de solution unique avec ces seuls indices.
+    const small = lvl.difficulty === 1 && dims(lvl).rows * dims(lvl).cols <= 45;
     for (const seed of [1, 2, 3, 'abc']) {
       const a = generateClues(lvl, lvl.solution, { difficulty: 1, seed });
       checkGenerated(lvl, lvl.solution, a, `${lvl.id} s${seed}`);
       if (small) { total++; if (simple(a)) kept++; }
     }
   }
-  assert.equal(kept, total, `${kept}/${total} générations simples sur les petits plans`);
+  assert.equal(kept, total, `${kept}/${total} générations simples sur les petits plans faciles`);
   let n = 0, s = 0;
   for (const seed of [1, 2, 3, 4, 5, 6]) {
     const { level, sol } = randomLevel(6, 600 + seed);
@@ -1413,6 +1477,266 @@ test('generateClues difficulté 1 : indices simples (au plus un with/sameRow/sam
   // plans aléatoires (pièces et objets tirés au hasard) : l'unicité y exige souvent d'autres types,
   // le repli est alors permis ; on le signale seulement
   console.log(`    (6×6 aléatoires : ${s}/${n} générations limitées aux indices simples)`);
+});
+
+
+/* ------------------------------------------------------------------ */
+/* Indices plus clairs : directions en lignes / colonnes, indices peu  */
+/* lisibles écartés, « passer à une autre piste »                       */
+/* ------------------------------------------------------------------ */
+
+console.log('Indices plus clairs');
+test('directions : au-dessus / en dessous / à gauche / à droite, sans écart exact', () => {
+  // L : Agathe (f), Bruno (m), Chloé (f), Denis (m), Victor (victime) ; Atelier, Grenier, Terrasse ;
+  // objets : canapé (unique), arbre (unique), tonneau (unique), deux chaises
+  assert.equal(clueHTML(L, P('A'), { t: 'dir', dir: 'W', of: { who: 'B' } }), 'Elle était dans une colonne <b>à gauche</b> de celle de <b>Bruno</b>.');
+  assert.equal(clueHTML(L, P('A'), { t: 'dir', dir: 'E', of: { who: 'B' } }), 'Elle était dans une colonne <b>à droite</b> de celle de <b>Bruno</b>.');
+  assert.equal(clueHTML(L, P('A'), { t: 'dir', dir: 'N', of: { who: 'B' } }), 'Elle était sur une ligne <b>au-dessus</b> de celle de <b>Bruno</b>.');
+  assert.equal(clueHTML(L, P('A'), { t: 'dir', dir: 'S', of: { who: 'B' } }), 'Elle était sur une ligne <b>en dessous</b> de celle de <b>Bruno</b>.');
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'W', of: { who: 'A' } }), "Il était dans une colonne à gauche de celle d'Agathe.");
+  // objet unique : article défini, contraction « du », élision « de l' »
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'E', of: { obj: 'barrel' } }), 'Il était dans une colonne à droite de celle du tonneau.');
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'N', of: { obj: 'tree' } }), "Il était sur une ligne au-dessus de celle de l'arbre.");
+  assert.equal(clueHTML(L, P('A'), { t: 'dir', dir: 'S', of: { obj: 'sofa' } }), 'Elle était sur une ligne <b>en dessous</b> de celle du <b>canapé</b>.');
+  // objet multiple : article indéfini
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'W', of: { obj: 'chair' } }), "Il était dans une colonne à gauche de celle d'une chaise.");
+  // quelqu'un sur un objet
+  assert.equal(T(L, 'A', { t: 'dir', dir: 'E', of: { on: 'sofa' } }), "Elle était dans une colonne à droite de celle de quelqu'un se trouvant sur le canapé.");
+  assert.equal(T(L, 'A', { t: 'dir', dir: 'N', of: { on: 'chair' } }), "Elle était sur une ligne au-dessus de celle de quelqu'un se trouvant sur une chaise.");
+  const hm = prepare(base({ objects: [{ type: 'hammock', r: 0, c: 0 }, { type: 'bench', r: 4, c: 2, w: 2 }, { type: 'bench', r: 2, c: 2, w: 2 }] }));
+  assert.equal(T(hm, 'B', { t: 'dir', dir: 'S', of: { on: 'hammock' } }), "Il était sur une ligne en dessous de celle de quelqu'un se trouvant dans le hamac.");
+  assert.equal(T(hm, 'B', { t: 'dir', dir: 'W', of: { obj: 'bench' } }), "Il était dans une colonne à gauche de celle d'un banc.");
+  // plus aucun point cardinal ni « plus … que »
+  for (const d of ['N', 'S', 'E', 'W']) for (const of of [{ who: 'B' }, { obj: 'tree' }, { obj: 'chair' }, { on: 'chair' }]) for (const exact of [undefined, 1, 2]) for (const not of [false, true]) {
+    const c = { t: 'dir', dir: d, of, ...(exact ? { exact } : {}), ...(not ? { not } : {}) };
+    const h = T(L, 'A', c);
+    assert.ok(!/nord|sud|est\b|ouest|plus |Aucun|Personne/.test(h), h);
+    assert.ok(/^Elle (était|n'était pas) /.test(h), h);
+  }
+});
+test('directions : écart exact, accords singulier / pluriel', () => {
+  assert.equal(clueHTML(L, P('A'), { t: 'dir', dir: 'W', of: { who: 'B' }, exact: 2 }), 'Elle était exactement <b>2 colonnes à gauche</b> de <b>Bruno</b>.');
+  assert.equal(T(L, 'A', { t: 'dir', dir: 'N', of: { who: 'B' }, exact: 1 }), 'Elle était exactement 1 ligne au-dessus de Bruno.');
+  assert.equal(T(L, 'A', { t: 'dir', dir: 'N', of: { who: 'B' }, exact: 3 }), 'Elle était exactement 3 lignes au-dessus de Bruno.');
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'E', of: { who: 'A' }, exact: 1 }), "Il était exactement 1 colonne à droite d'Agathe.");
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'S', of: { who: 'C' }, exact: 4 }), 'Il était exactement 4 lignes en dessous de Chloé.');
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'W', of: { obj: 'barrel' }, exact: 2 }), 'Il était exactement 2 colonnes à gauche du tonneau.');
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'S', of: { obj: 'tree' }, exact: 1 }), "Il était exactement 1 ligne en dessous de l'arbre.");
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'E', of: { obj: 'chair' }, exact: 3 }), "Il était exactement 3 colonnes à droite d'une chaise.");
+  assert.equal(T(L, 'A', { t: 'dir', dir: 'W', of: { on: 'sofa' }, exact: 2 }), "Elle était exactement 2 colonnes à gauche de quelqu'un se trouvant sur le canapé.");
+  assert.equal(T(L, 'A', { t: 'dir', dir: 'N', of: { on: 'chair' }, exact: 1 }), "Elle était exactement 1 ligne au-dessus de quelqu'un se trouvant sur une chaise.");
+  const shelf = prepare(base({ objects: [{ type: 'shelf', r: 0, c: 4 }, { type: 'counter', r: 2, c: 4 }] }));
+  assert.equal(T(shelf, 'A', { t: 'dir', dir: 'W', of: { obj: 'shelf' } }), "Elle était dans une colonne à gauche de celle de l'étagère.");
+  assert.equal(T(shelf, 'A', { t: 'dir', dir: 'W', of: { obj: 'counter' }, exact: 2 }), 'Elle était exactement 2 colonnes à gauche du comptoir.');
+  assert.equal(T(shelf, 'A', { t: 'dir', dir: 'W', of: { obj: 'counter' } }), 'Elle était dans une colonne à gauche de celle du comptoir.');
+});
+test('directions : négations simples et régulières (cible définie, indéfinie, personne, quelqu’un sur)', () => {
+  assert.equal(clueHTML(L, P('A'), { t: 'dir', dir: 'W', of: { who: 'B' }, not: true }), "Elle n'était <b>pas</b> dans une colonne <b>à gauche</b> de celle de <b>Bruno</b>.");
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'N', of: { who: 'A' }, not: true }), "Il n'était pas sur une ligne au-dessus de celle d'Agathe.");
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'E', of: { obj: 'barrel' }, not: true }), "Il n'était pas dans une colonne à droite de celle du tonneau.");
+  // cible indéfinie : « de celle d'une chaise » (au sens : d'aucune chaise)
+  assert.equal(T(L, 'A', { t: 'dir', dir: 'S', of: { obj: 'chair' }, not: true }), "Elle n'était pas sur une ligne en dessous de celle d'une chaise.");
+  assert.equal(T(L, 'A', { t: 'dir', dir: 'W', of: { on: 'chair' }, not: true }), "Elle n'était pas dans une colonne à gauche de celle de quelqu'un se trouvant sur une chaise.");
+  assert.equal(clueHTML(L, P('B'), { t: 'dir', dir: 'E', of: { who: 'A' }, exact: 2, not: true }), "Il n'était <b>pas</b> exactement <b>2 colonnes à droite</b> d'<b>Agathe</b>.");
+  assert.equal(T(L, 'B', { t: 'dir', dir: 'S', of: { obj: 'chair' }, exact: 1, not: true }), "Il n'était pas exactement 1 ligne en dessous d'une chaise.");
+  // la sémantique ne change pas : « pas à gauche d'une chaise » = à gauche d'aucune chaise
+  const pl = { A: [0, 3], B: [1, 0], C: [2, 1], D: [3, 4], V: [4, 2] };
+  // chaises en colonnes 2 et 4 : en colonne 3, A est à gauche de celle de la colonne 4 (négation fausse) ;
+  // en colonne 4, elle n'est à gauche d'aucune (négation vraie)
+  assert.equal(chk(pl, 'A', { t: 'dir', dir: 'W', of: { obj: 'chair' }, not: true }), false);
+  assert.equal(chk({ ...pl, A: [0, 4] }, 'A', { t: 'dir', dir: 'W', of: { obj: 'chair' }, not: true }), true);
+  assert.equal(chk({ ...pl, A: [0, 1] }, 'A', { t: 'dir', dir: 'W', of: { obj: 'chair' }, not: true }), false);
+});
+test('pièces « ouvertes » : sur la Piste, la Banquise, la Scène, la Pelouse, la Glace, le Quai, le Toit…', () => {
+  const names = ['Piste', 'Banquise', 'Scène', 'Pelouse', 'Glace', 'Quai', 'Toit', 'Place', 'Parvis', 'Digue', 'Terrasse', 'Pont', 'Plage', 'Ponton'];
+  const lv = prepare(base({
+    rooms: names.map((name, i) => ({ key: 'abcdefghijklmn'[i], name, floor: 'wood' })),
+    roomMap: ['abcde', 'fghij', 'klmnn', 'aaaaa', 'aaaaa'],
+    objects: [],
+  }));
+  const got = names.map((_, i) => strip(clueHTML(lv, lv.people[1], { t: 'room', room: 'abcdefghijklmn'[i] })));
+  assert.deepEqual(got, ['Il était sur la Piste.', 'Il était sur la Banquise.', 'Il était sur la Scène.', 'Il était sur la Pelouse.',
+    'Il était sur la Glace.', 'Il était sur le Quai.', 'Il était sur le Toit.', 'Il était sur la Place.', 'Il était sur le Parvis.',
+    'Il était sur la Digue.', 'Il était sur la Terrasse.', 'Il était sur le Pont.', 'Il était sur la Plage.', 'Il était sur le Ponton.']);
+  assert.equal(strip(clueHTML(lv, lv.people[0], { t: 'room', room: 'b', not: true })), "Elle n'était pas sur la Banquise.");
+  assert.equal(clueHTML(lv, lv.people[0], { t: 'room', room: 'a' }), 'Elle était sur la <b>Piste</b>.');
+  // niveaux officiels : plus de repli « dans la pièce … » sauf la Radio de la station (« dans la Radio » sonnerait faux)
+  const fallback = [];
+  for (const raw of LEVELS) {
+    const L2 = prepare(raw);
+    for (const rm of raw.rooms) if (/dans la pièce/.test(clueHTML(L2, L2.people[0], { t: 'room', room: rm.key }))) fallback.push(`${raw.id}:${rm.name}`);
+  }
+  assert.deepEqual(fallback.filter(x => !x.startsWith('station:Radio')), []);
+  const st = prepare(LEVELS.find(l => l.id === 'station')), ch = prepare(LEVELS.find(l => l.id === 'chapiteau'));
+  assert.equal(strip(clueHTML(st, st.people.find(p => p.id === 'M'), { t: 'room', room: 'f', not: true })), "Il n'était pas sur la Banquise.");
+  assert.equal(strip(clueHTML(ch, ch.people[0], { t: 'room', room: 'a' })), 'Il était sur la Piste.');
+});
+test('CLUE_TYPES : entrée « dir » sans points cardinaux, libellés d’options pour l’éditeur', () => {
+  const d = CLUE_TYPES.find(c => c.t === 'dir');
+  assert.ok(d && !/nord|sud|est\b|ouest/i.test(d.label + (d.help || '')), d && d.label);
+  assert.deepEqual(d.fields, ['dir', 'of', 'exact']);
+  assert.deepEqual(Object.fromEntries(d.options.dir), { N: 'au-dessus', S: 'en dessous', W: 'à gauche', E: 'à droite' });
+});
+test('isAwkwardClue : négations de dir, sameRow, sameCol, sees seulement', () => {
+  for (const c of [
+    { t: 'dir', dir: 'N', of: { who: 'B' }, not: true }, { t: 'dir', dir: 'E', of: { obj: 'tree' }, exact: 2, not: true },
+    { t: 'dir', dir: 'W', of: { on: 'chair' }, not: true }, { t: 'sameRow', obj: 'tree', not: true },
+    { t: 'sameCol', obj: 'chair', not: true }, { t: 'sees', obj: 'piano', not: true },
+  ]) assert.equal(isAwkwardClue(c), true, JSON.stringify(c));
+  for (const c of [
+    { t: 'dir', dir: 'N', of: { who: 'B' } }, { t: 'dir', dir: 'E', of: { obj: 'tree' }, exact: 2 }, { t: 'sameRow', obj: 'tree' },
+    { t: 'sameCol', obj: 'chair' }, { t: 'sees', obj: 'piano' }, { t: 'sameRow', obj: 'tree', not: false },
+    { t: 'room', room: 'a', not: true }, { t: 'on', obj: 'chair', not: true }, { t: 'beside', obj: 'tree', not: true },
+    { t: 'besidePerson', who: 'B', not: true }, { t: 'with', who: 'B', not: true }, { t: 'alone', not: true }, { t: 'alone' },
+  ]) assert.equal(isAwkwardClue(c), false, JSON.stringify(c));
+  for (const x of [null, undefined, 0, 'dir', {}, []]) assert.equal(isAwkwardClue(x), false);
+});
+test('validateLevel : avertissement (pas d’erreur) pour chaque indice peu lisible', () => {
+  const awk = [
+    { t: 'dir', dir: 'N', of: { who: 'A' }, not: true }, { t: 'sameRow', obj: 'tree', not: true },
+    { t: 'sameCol', obj: 'chair', not: true }, { t: 'sees', obj: 'barrel', not: true },
+  ];
+  const lv = base({ people: base().people.map(p => (p.id === 'B' ? { ...p, clues: awk.slice(0, 2) } : p.id === 'C' ? { ...p, clues: awk.slice(2) } : p)) });
+  const { errors, warnings } = validateLevel(lv);
+  assert.deepEqual(errors, []);
+  const w = warnings.filter(x => /peu lisible/.test(x));
+  assert.equal(w.length, 4, warnings.join(' | '));
+  assert.ok(w[0].startsWith('Bruno, indice 1') && w[2].startsWith('Chloé, indice 1'), w.join(' | '));
+  assert.ok(w.every(x => /préférez une affirmation/.test(x)));
+  // affirmations et négations simples : aucun avertissement
+  const ok = base({ people: base().people.map(p => (p.id === 'B' ? { ...p, clues: [{ t: 'dir', dir: 'N', of: { who: 'A' } }, { t: 'room', room: 'a', not: true }] } : p)) });
+  assert.ok(!validateLevel(ok).warnings.some(x => /peu lisible/.test(x)));
+});
+test('niveaux officiels : aucun indice peu lisible, aucun avertissement, contraintes de lisibilité des 8 niveaux retouchés', () => {
+  let awkward = 0;
+  for (const lv of LEVELS) {
+    for (const p of lv.people) awkward += p.clues.filter(isAwkwardClue).length;
+    const { errors, warnings } = validateLevel(lv);
+    assert.deepEqual(errors, [], lv.id); assert.deepEqual(warnings, [], lv.id);
+  }
+  assert.equal(awkward, 0);
+  for (const id of ['vignoble', 'chapiteau', 'observatoire', 'musee', 'station', 'opera', 'manoir', 'grand-hotel']) {
+    const lv = LEVELS.find(l => l.id === id);
+    const victim = lv.people.find(p => p.victim).id;
+    const all = lv.people.flatMap(p => p.clues);
+    const counts = lv.people.filter(p => !p.victim).map(p => p.clues.length);
+    assert.ok(counts.every(k => k >= 1 && k <= 3) && counts.filter(k => k === 3).length <= 1, `${id} : ${counts}`);
+    assert.ok(all.filter(c => c.not).length <= 2, `${id} : trop de négations`);
+    assert.ok(all.filter(c => c.t === 'dir').length <= 3, `${id} : trop de directions`);
+    assert.ok(!all.some(c => c.who === victim || (c.of && c.of.who === victim)), `${id} : indice visant la victime`);
+    assert.ok(new Set(all.map(c => c.t)).size >= 5, `${id} : types peu variés`);
+    assert.equal(solve(lv, { max: 2 }).length, 1, id);
+  }
+});
+test('generateClues : jamais d’indice peu lisible ni visant la victime (graines, tailles, difficultés, menteur)', () => {
+  let n = 0, nl = 0;
+  const check = (level, sol, g, label, liar) => {
+    if (!g) return;
+    const victim = level.people.find(p => p.victim).id;
+    for (const [id, cs] of Object.entries(g)) for (const c of cs) {
+      assert.ok(!isAwkwardClue(c), `${label} : ${id} ${JSON.stringify(c)}`);
+      assert.ok(!((c.t === 'with' || c.t === 'besidePerson') && c.who === victim), `${label} : ${id} vise la victime`);
+      assert.ok(!(c.t === 'dir' && c.of && c.of.who === victim), `${label} : ${id} direction vers la victime`);
+    }
+    if (liar) nl++; else n++;
+  };
+  for (const N of [5, 6, 7, 8]) for (const seed of [11, 12, 13]) {
+    const { level, sol } = randomLevel(N, N * 313 + seed);
+    for (const difficulty of [1, 2, 3]) {
+      check(level, sol, generateClues(level, sol, { difficulty, seed }), `${N}×${N} d${difficulty} s${seed}`, false);
+      if (N <= 7 && seed !== 13) check(level, sol, generateClues(level, sol, { difficulty, seed, liar: true }), `${N}×${N} d${difficulty} s${seed} menteur`, true);
+    }
+  }
+  for (const [H, W] of [[4, 7], [7, 4], [5, 9]]) for (const difficulty of [1, 2, 3]) {
+    const { level, sol } = randomRect(H, W, H * 71 + W * 5 + difficulty);
+    check(level, sol, generateClues(level, sol, { difficulty, seed: 1 }), `${H}×${W} d${difficulty}`, false);
+  }
+  for (const lv of LEVELS) for (const difficulty of [1, 2, 3]) {
+    check(lv, lv.solution, generateClues(lv, lv.solution, { difficulty, seed: 'clair' }), `${lv.id} d${difficulty}`, false);
+    if (difficulty === 2 && dims(lv).rows <= 7) check(lv, lv.solution, generateClues(lv, lv.solution, { difficulty, seed: 'clair', liar: true }), `${lv.id} menteur`, true);
+  }
+  assert.ok(n >= 60 && nl >= 25, `${n} générations, ${nl} avec menteur`);
+  console.log(`    (${n} générations classiques et ${nl} avec menteur contrôlées)`);
+});
+test('generateClues : rectangles où la victime peut être située, toujours une génération', () => {
+  let found = 0;
+  for (let seed = 1; found < 5 && seed < 60; seed++) {
+    const [H, W] = [[4, 8], [6, 9], [9, 5], [7, 9]][seed % 4];
+    const { level, sol } = randomRect(H, W, 9000 + seed);
+    if (!pinnable(level, sol)) continue;
+    found++;
+    for (const difficulty of [1, 3]) checkGenerated(level, sol, generateClues(level, sol, { difficulty, seed }), `${H}×${W} n°${seed} d${difficulty}`);
+  }
+  assert.ok(found >= 3, `${found} plans possibles trouvés`);
+});
+test('explain({ skip }) : ne repropose pas un personnage ignoré tant qu’un autre est disponible', () => {
+  for (const raw of LEVELS.filter(l => !l.twist)) {
+    const lv = prepare(raw), sol = solPl(lv);
+    const e0 = explain(lv, {});
+    assert.deepEqual(explain(lv, {}, { skip: [] }), e0, `${raw.id} : skip vide = sans skip`);
+    assert.deepEqual(explain(lv, {}, {}), e0);
+    const e1 = explain(lv, {}, { skip: [e0.person] });
+    assert.notEqual(e1.person, e0.person, `${raw.id} : ${e0.person} reproposé`);
+    assert.ok(['forced', 'narrow', 'reveal'].includes(e1.kind), raw.id);
+    if (e1.kind === 'narrow') assert.ok(e1.cells.some(c => sameCell(c, sol[e1.person])), raw.id);
+    else assert.ok(sameCell(e1.cell, sol[e1.person]), `${raw.id} : ${e1.kind} ${e1.cell}`);
+    // tous ignorés sauf un : c'est lui qui est proposé
+    const ids = lv.people.map(p => p.id);
+    const last = ids[ids.length - 1];
+    assert.equal(explain(lv, {}, { skip: ids.slice(0, -1) }).person, last, raw.id);
+    // tous ignorés : ils sont de nouveau proposés (même réponse que sans skip, sans préférence)
+    assert.deepEqual(explain(lv, {}, { skip: ids }), e0, `${raw.id} : tous ignorés`);
+    // prefer n'est prioritaire que hors skip
+    const pr = ids.find(id => id !== e0.person);
+    const ep = explain(lv, {}, { prefer: pr, skip: [pr] });
+    assert.notEqual(ep.person, pr, `${raw.id} : prefer ignoré par skip`);
+  }
+});
+test('explain({ skip }) : parcours complets en passant des pistes, garanties conservées', () => {
+  for (const raw of LEVELS.filter(l => !l.twist)) {
+    const lv = prepare(raw), sol = solPl(lv);
+    const rnd = lcg(raw.id.length * 977);
+    const pl = {};
+    const skip = [];
+    for (let step = 0; step < 3 * lv.people.length + 3; step++) {
+      const unplaced = lv.people.filter(p => !pl[p.id]).map(p => p.id);
+      const e = explain(lv, pl, { skip });
+      if (e.kind === 'done') { assert.equal(unplaced.length, 0); break; }
+      assert.ok(unplaced.includes(e.person), `${raw.id} : ${e.person}`);
+      const others = unplaced.filter(id => !skip.includes(id));
+      if (others.length) assert.ok(!skip.includes(e.person), `${raw.id} : ${e.person} ignoré mais proposé (${others})`);
+      if (e.kind === 'narrow') assert.ok(e.cells.some(c => sameCell(c, sol[e.person])), raw.id);
+      else assert.ok(sameCell(e.cell, sol[e.person]), `${raw.id} : ${e.kind} ${e.person}`);
+      if (rnd() < 0.4 && !skip.includes(e.person)) { skip.push(e.person); continue; } // « autre piste »
+      pl[e.person] = sol[e.person];
+      skip.length = 0;
+    }
+    assert.equal(Object.keys(pl).length, lv.people.length, `${raw.id} : parcours incomplet`);
+  }
+});
+test('explain({ skip }) : seul restant, wrong et done non concernés, menteur', () => {
+  const raw = LEVELS.find(l => l.id === 'librairie');
+  const lv = prepare(raw), sol = solPl(lv);
+  const ids = lv.people.map(p => p.id);
+  // tout le monde posé sauf X, ignoré : X est proposé quand même
+  const X = ids[2];
+  const pl = Object.fromEntries(ids.filter(id => id !== X).map(id => [id, sol[id]]));
+  const e = explain(lv, pl, { skip: [X] });
+  assert.equal(e.person, X); assert.ok(sameCell(e.cell, sol[X]));
+  // un personnage mal placé reste signalé, même ignoré
+  const bad = { ...pl, [ids[0]]: sol[X] };
+  const w = explain(lv, bad, { skip: [ids[0]] });
+  assert.equal(w.kind, 'wrong'); assert.deepEqual(w, explain(lv, bad));
+  // done
+  assert.equal(explain(lv, sol, { skip: ids }).kind, 'done');
+  // id inconnu ignoré
+  assert.deepEqual(explain(lv, {}, { skip: ['?', 42] }), explain(lv, {}));
+  // menteur : reveal hors skip
+  const lr = LEVELS.find(l => l.twist && l.twist.liar);
+  const L2 = prepare(lr), s2 = solPl(L2);
+  const r0 = explain(L2, {});
+  const r1 = explain(L2, {}, { skip: [r0.person] });
+  assert.equal(r1.kind, 'reveal'); assert.notEqual(r1.person, r0.person); assert.ok(sameCell(r1.cell, s2[r1.person]));
 });
 
 console.log(`\n${passed} réussi(s), ${failedCount} échoué(s).`);

@@ -110,8 +110,10 @@ const LEXICON = [
   ['à côté de', 'case voisine par un bord (haut, bas, gauche ou droite), dans la même pièce : ni diagonale, ni à travers un mur.'],
   ['avec', 'dans la même pièce, n’importe où dans cette pièce.'],
   ['seul(e) dans sa pièce', 'personne d’autre ne se trouvait dans cette pièce.'],
-  ['plus au nord / sud / est / ouest que', 'le nord est en haut du plan, l’est à droite. « Plus au nord » : sur une ligne au-dessus, quelle que soit la colonne.'],
-  ['exactement N lignes / colonnes', 'l’écart est pile de N lignes (nord, sud) ou N colonnes (est, ouest), ni plus ni moins.'],
+  ['dans une colonne à gauche / à droite de celle de X', 'la colonne de la personne est plus à gauche (ou plus à droite) que celle de X, peu importe de combien.'],
+  ['sur une ligne au-dessus / en dessous de celle de X', 'la ligne de la personne est plus haut (ou plus bas) sur le plan que celle de X, peu importe de combien.'],
+  ['exactement N colonnes à gauche / à droite de X', 'l’écart est pile de N colonnes, ni plus ni moins.'],
+  ['exactement N lignes au-dessus / en dessous de X', 'l’écart est pile de N lignes, ni plus ni moins.'],
   ['sur la même ligne / dans la même colonne que', 'même rangée horizontale (ligne) ou verticale (colonne), même si un mur sépare.'],
   ['voyait', `${SEES_HELP} Juste à côté, ça compte ; l’objet sur lequel on se trouve, non.`],
 ];
@@ -162,6 +164,7 @@ const TUTO = [
     title: 'Lexique des indices',
     html: `<dl class="lexicon">${LEXICON.map(([t, d]) => `<div class="lexicon-row${t === 'voyait' ? ' lexicon-row--sees' : ''}"><dt>« ${esc(t)} »</dt><dd>${esc(d)}${t === 'voyait' ? `<div class="tuto-fig lexicon-figs"><figure>${miniRow([{ cls: 'p', l: 'A' }, { cls: 'ok' }, { cls: 'ok' }, { cls: 'obj tgt' }])}<figcaption>A voyait l’objet ★ : rien entre les deux</figcaption></figure>
       <figure>${miniRow([{ cls: 'p', l: 'A' }, { cls: 'obj' }, { cls: 'no' }, { cls: 'obj tgt' }])}<figcaption>A ne le voyait pas : un objet le cache</figcaption></figure></div>` : ''}</dd></div>`).join('')}</dl>
+      <p class="tuto-note">Pour ces indices de direction, seule la colonne (ou la ligne) compte : les deux personnages peuvent être n’importe où par ailleurs, même dans des pièces différentes.</p>
       <p class="tuto-note">Certaines enquêtes spéciales ajoutent une règle (un témoin menteur, l’arme du crime) : elle est annoncée à l’ouverture du dossier.</p>`,
     fig: () => '',
   },
