@@ -48,11 +48,12 @@ const NAME_POOL = [
   ['Oscar', 'm'], ['Paul', 'm'], ['Quentin', 'm'], ['Rita', 'f'], ['Sacha', 'm'], ['Théo', 'm'], ['Ursule', 'f'],
   ['Victor', 'm'], ['Wanda', 'f'], ['Xavier', 'm'], ['Yvonne', 'f'], ['Zoé', 'f'],
 ];
-const DIRS = [['N', 'Nord'], ['S', 'Sud'], ['E', 'Est'], ['W', 'Ouest']];
+// Mêmes mots que les phrases d'indices : plus de points cardinaux.
+const DIRS = [['N', 'Au-dessus'], ['S', 'En dessous'], ['W', 'À gauche'], ['E', 'À droite']];
 const FALLBACK_CLUES = [
   { t: 'room', label: 'Dans une pièce' }, { t: 'on', label: 'Sur un objet' }, { t: 'beside', label: 'À côté d’un objet' },
   { t: 'besidePerson', label: 'À côté d’une personne' }, { t: 'with', label: 'Avec une personne' }, { t: 'alone', label: 'Seul(e)' },
-  { t: 'dir', label: 'Position (N/S/E/O)' }, { t: 'sameRow', label: 'Même ligne qu’un objet' }, { t: 'sameCol', label: 'Même colonne qu’un objet' },
+  { t: 'dir', label: 'Position (ligne ou colonne)' }, { t: 'sameRow', label: 'Même ligne qu’un objet' }, { t: 'sameCol', label: 'Même colonne qu’un objet' },
 ];
 const clueTypes = () => (Array.isArray(CLUE_TYPES) && CLUE_TYPES.length ? CLUE_TYPES : FALLBACK_CLUES).map((x) => ({ t: x.t, label: x.label || x.t, help: x.help || '' }));
 // Variantes du niveau (champ `twist`) : objet absent quand aucune n'est cochée.
