@@ -210,6 +210,9 @@ export function mountGame(root, opts = {}) {
   let phase = 'play'; // 'intro' | 'play' | 'accuse' | 'weapon' | 'won'
   let wrong = new Map(); // id -> Set(indices d'indices fautifs) ; -1 = phrase de la victime
   let hintWrong = null;
+  let hintSeen = []; // personnages déjà proposés par l'aide pour l'état actuel du plan
+  let hintCounted = new Set(); // pistes déjà comptées dans les indices pour ce même état
+  const resetHintSeen = () => { hintSeen = []; hintCounted = new Set(); };
   let help = null; // panneau d'aide ouvert : { type: 'hint' | 'weapon', keys: Set('r,c'), … }
   let weaponState = null; // étape bonus de l'arme
   let ruleModal = null;
@@ -433,9 +436,11 @@ export function mountGame(root, opts = {}) {
   function commit(fn) {
     history.push(snapshot());
     if (history.length > 400) history.shift();
+    const plan = JSON.stringify(st.placements);
     fn();
     wrong = new Map();
     hintWrong = null;
+    if (JSON.stringify(st.placements) !== plan) resetHintSeen(); // une note ou une croix ne change pas les pistes
     closeHelp({ redraw: false }); // tout changement du plan ferme le panneau d'aide
     render();
     save();
@@ -705,9 +710,11 @@ export function mountGame(root, opts = {}) {
   function undo() {
     if (!history.length || phase !== 'play') return;
     play('undo');
+    const plan = JSON.stringify(st.placements);
     restore(history.pop());
     wrong = new Map();
     hintWrong = null;
+    if (JSON.stringify(st.placements) !== plan) resetHintSeen();
     closeHelp({ redraw: false });
     render();
     save();
@@ -724,6 +731,7 @@ export function mountGame(root, opts = {}) {
     if (!ok || destroyed) return;
     play('erase');
     commit(() => { st.placements = {}; st.notes = {}; st.crosses = {}; st.seconds = 0; st.hints = 0; st.errors = 0; });
+    resetHintSeen();
     tickCount = 0;
     mode = null;
     render();
@@ -758,10 +766,11 @@ export function mountGame(root, opts = {}) {
     if (was.kind === 'wrong' && hintWrong === was.person) hintWrong = null;
     if (redraw) render();
   }
-  function paintHelp({ kicker, kind, html, actions }) {
+  function paintHelp({ kicker, kind, html, actions, note = '' }) {
     helpEl.dataset.kind = kind;
     helpEl.innerHTML = `<div class="help-head"><span class="help-kicker">${esc(kicker)}</span>
         ${help.type === 'hint' ? `<button type="button" class="help-x" data-help="close" aria-label="Fermer l’aide">${ICONS.cross}</button>` : ''}</div>
+      ${note ? `<p class="help-note">${esc(note)}</p>` : ''}
       <p class="help-text">${html}</p>
       <div class="help-actions">${actions.map(([act, label, cls]) => `<button type="button" class="btn btn--small ${cls || ''}" data-help="${act}">${label}</button>`).join('')}</div>`;
     helpEl.hidden = false;
@@ -787,7 +796,7 @@ export function mountGame(root, opts = {}) {
     const delta = span > maxY - minY ? topY - minY : (topY + botY) / 2 - (minY + maxY) / 2;
     window.scrollBy({ top: delta, behavior: reduceMotion() ? 'auto' : 'smooth' });
   }
-  function showHelp(ex, { revealed = false } = {}) {
+  function showHelp(ex, { revealed = false, step = 0, more = false, note = '' } = {}) {
     const kind = revealed ? 'revealed' : ex.kind;
     const p = ex.person ? byId[ex.person] : null;
     const cells = (kind === 'wrong' ? [ex.cell] : ex.cells || []).filter((x) => Array.isArray(x));
@@ -807,7 +816,9 @@ export function mountGame(root, opts = {}) {
       html = `${html}${complete ? ' Touchez <b>Valider</b> pour confirmer votre plan.' : ''}`;
       actions = complete ? [['validate', 'Valider', 'btn--accent'], ['ok', 'Fermer', '']] : [['ok', 'Fermer', 'btn--primary']];
     }
-    paintHelp({ kicker: HELP_KICKER[kind] || 'Indice', kind, html, actions });
+    const series = !revealed && (kind === 'forced' || kind === 'narrow' || kind === 'reveal') && (step > 1 || more);
+    if (series && more) actions = [...actions, ['next', 'Autre piste', '']];
+    paintHelp({ kicker: series && step > 0 ? `Piste ${step}` : HELP_KICKER[kind] || 'Indice', kind, html, actions, note });
   }
   helpEl.addEventListener('click', (e) => {
     const b = e.target.closest('[data-help]');
@@ -816,6 +827,7 @@ export function mountGame(root, opts = {}) {
     if (help.type === 'weapon') { weaponAction(act); return; }
     const h = help;
     if (act === 'close' || act === 'ok') { play('close'); closeHelp(); return; }
+    if (act === 'next') { hint(); return; }
     if (act === 'place' && h.person && h.cell) { placeAt(h.cell[0], h.cell[1], h.person); return; }
     if (act === 'remove' && h.person && st.placements[h.person]) {
       const p = byId[h.person];
@@ -847,12 +859,23 @@ export function mountGame(root, opts = {}) {
     if (guide) return legacyHint(); // enquête guidée : comportement d'origine
     if (phase !== 'play') return;
     let ex = null;
-    try { ex = explain(level, st.placements, { prefer: selected || undefined }); } catch (err) { console.warn(err); ex = null; }
+    try { ex = explain(level, st.placements, { prefer: selected || undefined, skip: hintSeen.slice() }); } catch (err) { console.warn(err); ex = null; }
     if (!ex) { play('refuse'); setStatus('Impossible de calculer un indice pour ce niveau.', 'error'); return; }
     play('hint');
-    if (ex.person || ex.kind === 'done') st.hints++;
+    const series = ex.person && (ex.kind === 'forced' || ex.kind === 'narrow' || ex.kind === 'reveal');
+    let note = '', step = 0, more = false;
+    if (series) {
+      if (hintSeen.includes(ex.person)) { // toutes les pistes ont été vues : on repart du début
+        note = 'Vous avez fait le tour des pistes : en voici une déjà vue.';
+        hintSeen = [];
+      }
+      hintSeen.push(ex.person);
+      step = hintSeen.length;
+      more = people.some((p) => !st.placements[p.id] && p.id !== ex.person);
+      if (!hintCounted.has(ex.person)) { hintCounted.add(ex.person); st.hints++; }
+    } else if (ex.person || ex.kind === 'done') st.hints++;
     save();
-    showHelp(ex);
+    showHelp(ex, { step, more, note });
   }
 
   function legacyHint() {

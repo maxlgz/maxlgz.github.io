@@ -1214,6 +1214,7 @@ dialog.modal { max-height: calc(100dvh - 24px); }
 }
 .help-x svg { width: 18px; height: 18px; }
 .help-x:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+.help-note { margin: 6px 0 0; font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); line-height: 1.3; }
 .help-text { margin: 8px 0 0; font-weight: 700; }
 .help-text b { font-weight: 800; }
 .help-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 10px; }
